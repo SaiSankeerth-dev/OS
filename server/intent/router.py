@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import enum
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class Intent(str, enum.Enum):
@@ -25,6 +25,7 @@ class RouteDecision:
     intent: Intent
     tool_name: str | None = None
     confidence: float = 1.0
+    args: dict[str, str] = field(default_factory=dict)
 
 
 # Order matters: first match wins.
@@ -73,6 +74,15 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         Intent.TOOL_CALL,
         "get_system_info",
     ),
+    (
+        re.compile(
+            r"^\s*(?:draft|write)\s+(?:a\s+|an\s+)?linkedin\s+post\s+"
+            r"(?:about|on|for)\s+(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "linkedin_draft",
+    ),
 ]
 
 
@@ -85,6 +95,10 @@ class IntentRouter:
 
     def classify(self, text: str) -> RouteDecision:
         for pattern, intent, tool in self._patterns:
-            if pattern.match(text):
-                return RouteDecision(intent=intent, tool_name=tool)
+            m = pattern.match(text)
+            if m:
+                args: dict[str, str] = {}
+                if tool == "linkedin_draft" and m.groups():
+                    args["idea"] = m.group(1).strip()
+                return RouteDecision(intent=intent, tool_name=tool, args=args)
         return RouteDecision(intent=Intent.LLM_CHAT)

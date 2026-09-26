@@ -16,3 +16,5 @@ config/secrets.yaml
 .DS_Store
 .idea/
 .vscode/
+data/*.db
+data/*.db-journal

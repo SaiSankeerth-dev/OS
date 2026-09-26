@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import enum
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
 
 from config import Config
+from ..approvals.gate import ApprovalStore, PendingApproval, content_hash
 from ..llm.base import ChatChunk, Message
 from ..llm.router import ModelRouter
 from ..memory.base import MemoryManager
@@ -17,6 +19,11 @@ from ..tools.datetime_tool import (
     DATETIME_SPEC,
     format_datetime,
     get_current_datetime,
+)
+from ..tools.linkedin_tool import (
+    LINKEDIN_DRAFT_SPEC,
+    format_linkedin_draft,
+    generate_linkedin_draft,
 )
 from ..tools.system_info_tool import (
     SYSTEM_INFO_SPEC,
@@ -32,6 +39,18 @@ from .personality import build_system_prompt
 
 
 log = logging.getLogger("os.conversation")
+
+# Matched only while a PendingApproval exists on the manager - see
+# _handle_pending_approval(). Deliberately narrow: an ambiguous reply
+# should not be silently read as approval either way.
+_APPROVE_RE = re.compile(
+    r"^\s*(yes|y|approve|approved|post it|publish(?: it)?|send it|go ahead)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
+_REJECT_RE = re.compile(
+    r"^\s*(no|n|reject|cancel|discard|stop|don'?t)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
 
 
 class ConversationState(str, enum.Enum):
@@ -57,6 +76,7 @@ def _default_registry() -> ToolRegistry:
     reg = ToolRegistry()
     reg.register(DATETIME_SPEC, get_current_datetime, format_datetime)
     reg.register(SYSTEM_INFO_SPEC, get_system_info, format_system_info)
+    reg.register(LINKEDIN_DRAFT_SPEC, generate_linkedin_draft, format_linkedin_draft)
     return reg
 
 
@@ -73,10 +93,13 @@ class ConversationManager:
         memory_retriever: MemoryRetriever | None = None,
         response_policy: ResponsePolicy | None = None,
         memory: MemoryManager | None = None,
+        approval_store: ApprovalStore | None = None,
     ) -> None:
         self.cfg = cfg
         self.state: ConversationState = ConversationState.IDLE
         self.history: list[Message] = []
+        self._pending_approval: PendingApproval | None = None
+        self._approval_store = approval_store or ApprovalStore()
         self.router = router or ModelRouter.from_config(
             base_url=cfg.llm.base_url,
             model=cfg.llm.model,
@@ -114,12 +137,24 @@ class ConversationManager:
         if not user_text:
             return
 
-        decision = self.intent_router.classify(user_text)
         self.history.append(Message(role="user", content=user_text, ts=time.time()))
+
+        # A pending approval takes priority over normal routing - the
+        # user is answering a question OS just asked, not starting a
+        # new request. Nothing external executes without going through
+        # this branch first.
+        if self._pending_approval is not None:
+            async for chunk in self._handle_pending_approval(user_text):
+                yield chunk
+            perf.mark("turn_end:text")
+            perf.flush("text_turn")
+            return
+
+        decision = self.intent_router.classify(user_text)
 
         if decision.intent == Intent.TOOL_CALL and decision.tool_name:
             async for chunk in self._handle_tool(
-                decision.tool_name, user_text, perf
+                decision.tool_name, user_text, perf, decision.args
             ):
                 yield chunk
             perf.mark("turn_end:text")
@@ -143,8 +178,13 @@ class ConversationManager:
             yield chunk
 
     async def _handle_tool(
-        self, tool_name: str, user_text: str, perf: PerfTrace
+        self,
+        tool_name: str,
+        user_text: str,
+        perf: PerfTrace,
+        args: dict[str, str] | None = None,
     ):
+        args = args or {}
         try:
             spec, _handler, formatter = self.tool_registry.get(tool_name)
         except KeyError:
@@ -156,7 +196,7 @@ class ConversationManager:
             self.memory_retriever.retrieve_relevant(user_text, needs_memory=True)
 
         self.set_state(ConversationState.THINKING)
-        result = self.tool_registry.execute(tool_name)
+        result = self.tool_registry.execute(tool_name, **args)
         perf.mark("tool_executed")
 
         if spec.execution_mode == ExecutionMode.DIRECT and formatter is not None:
@@ -164,11 +204,94 @@ class ConversationManager:
         else:
             fr = self.response_policy.apply_tool_then_llm(tool_name, result)
 
+        # Drafting is never the last step for a skill with external
+        # effects - stash it as pending and wait for the next turn's
+        # approve/reject instead of finishing here. See
+        # _handle_pending_approval() and server/approvals/gate.py.
+        if tool_name == "linkedin_draft" and result.status == "success":
+            draft = result.data["draft"]
+            self._pending_approval = PendingApproval(
+                skill="linkedin",
+                input_text=args.get("idea", user_text),
+                draft=draft,
+                approved_hash=content_hash(draft),
+            )
+            self._approval_store.log(
+                skill="linkedin",
+                input_text=self._pending_approval.input_text,
+                draft=draft,
+                status="SHOWN",
+            )
+
         self.history.append(
             Message(role="assistant", content=fr.text, ts=time.time())
         )
         self.set_state(ConversationState.SPEAKING)
         yield ChatChunk(delta=fr.text, done=True)
+        self.set_state(ConversationState.READY)
+
+    async def _handle_pending_approval(self, user_text: str):
+        pending = self._pending_approval
+        assert pending is not None
+
+        if _APPROVE_RE.match(user_text):
+            # Recompute the hash at execution time - if the draft was
+            # mutated after being shown, this stops matching and the
+            # approval is refused. No execution on a stale approval.
+            if content_hash(pending.draft) != pending.approved_hash:
+                text = (
+                    "That draft changed since I showed it - I won't post "
+                    "something you didn't actually see. Ask me to draft it again."
+                )
+                self._approval_store.log(
+                    pending.skill, pending.input_text, pending.draft,
+                    "REJECTED_HASH_MISMATCH",
+                )
+            else:
+                # STUB: no LinkedIn connector configured yet. Replace
+                # this branch with a real publish call when one exists -
+                # nothing else in this flow needs to change.
+                text = (
+                    "[stub] Would post to LinkedIn now:\n\n"
+                    f"{pending.draft}\n\n"
+                    "(No LinkedIn connector is wired up yet, so nothing "
+                    "actually went out.)"
+                )
+                self._approval_store.log(
+                    pending.skill, pending.input_text, pending.draft,
+                    "PUBLISHED_STUB",
+                )
+            self._pending_approval = None
+            self.history.append(
+                Message(role="assistant", content=text, ts=time.time())
+            )
+            self.set_state(ConversationState.SPEAKING)
+            yield ChatChunk(delta=text, done=True)
+            self.set_state(ConversationState.READY)
+            return
+
+        if _REJECT_RE.match(user_text):
+            self._approval_store.log(
+                pending.skill, pending.input_text, pending.draft,
+                "REJECTED_BY_USER",
+            )
+            self._pending_approval = None
+            text = "Okay, discarded. Nothing was posted."
+            self.history.append(
+                Message(role="assistant", content=text, ts=time.time())
+            )
+            self.set_state(ConversationState.SPEAKING)
+            yield ChatChunk(delta=text, done=True)
+            self.set_state(ConversationState.READY)
+            return
+
+        # Ambiguous reply while something is pending - don't guess in
+        # either direction, don't silently drop the pending draft.
+        text = (
+            "I've still got a draft waiting on your approval. "
+            "Say 'yes' to post it or 'no' to discard it."
+        )
+        yield ChatChunk(delta=text, done=True)
         self.set_state(ConversationState.READY)
 
     async def _handle_llm_chat(self, user_text: str, perf: PerfTrace):
