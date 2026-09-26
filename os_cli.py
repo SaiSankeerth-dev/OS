@@ -103,6 +103,19 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         check("data/ writable", False, f"{type(e).__name__}: {e}")
 
+    # State database health (Phase 2: tasks, events, approvals, sessions)
+    try:
+        from server.state import StateStore
+
+        h = StateStore(ROOT / "data" / "os_state.db").health()
+        detail = (
+            f"{h['path']} ({h['size_bytes']} bytes): "
+            + ", ".join(f"{k}={v}" for k, v in h["tables"].items())
+        )
+        check("state db integrity", h["ok"], detail)
+    except Exception as e:  # noqa: BLE001
+        check("state db integrity", False, f"{type(e).__name__}: {e}")
+
     print(f"\ndoctor: {'all clear' if failures == 0 else f'{failures} problem(s) found'}")
     return 1 if failures else 0
 
