@@ -14,7 +14,7 @@ class _StubSTT:
 
 class _StubVAD:
     def is_speech(self, audio: bytes) -> bool:
-        return True
+        return audio != b"\x00" * 64
 
 
 class _StubCM:
@@ -33,7 +33,8 @@ async def _drive(engine: VoiceEngine) -> None:
 
 
 def test_full_turn_state_progression():
-    inp = MockAudioInput([b"x", b"y"])
+    # Speech chunks + trailing silence so the utterance flushes.
+    inp = MockAudioInput([b"x", b"y"] + [b"\x00" * 64] * 12)
     out = MockAudioOutput()
     engine = VoiceEngine(
         cm=_StubCM(),

@@ -61,8 +61,13 @@ def _quiet_chunk(n: int = 1024) -> bytes:
 
 def test_auto_barge_in_interrupts_playback():
     """Speech on the mic during SPEAKING triggers interrupt() automatically."""
-    # Trigger phrase first (loud), then continuous loud chunks during playback.
-    mic_chunks = [_loud_chunk(0)] + [_loud_chunk(i) for i in range(1, 40)]
+    # Trigger phrase (loud), then quiet so the utterance flushes and the turn
+    # starts, then continuous loud chunks during playback for barge-in.
+    mic_chunks = (
+        [_loud_chunk(0)]
+        + [_quiet_chunk()] * 12
+        + [_loud_chunk(i) for i in range(1, 40)]
+    )
     engine = VoiceEngine(
         cm=_SlowCM(),
         audio_input=MockAudioInput(mic_chunks),

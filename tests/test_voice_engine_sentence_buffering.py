@@ -13,7 +13,7 @@ class _StubSTT:
 
 class _StubVAD:
     def is_speech(self, audio: bytes) -> bool:
-        return True
+        return audio != b"\x00" * 64
 
 
 class _MultiSentenceCM:
@@ -24,7 +24,8 @@ class _MultiSentenceCM:
 
 
 def test_three_sentences_yield_three_cards():
-    inp = MockAudioInput([b"x", b"y"])
+    # Speech chunks + trailing silence so the utterance flushes.
+    inp = MockAudioInput([b"x", b"y"] + [b"\x00" * 64] * 12)
     out = MockAudioOutput()
     engine = VoiceEngine(
         cm=_MultiSentenceCM(),

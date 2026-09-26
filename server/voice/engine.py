@@ -83,6 +83,21 @@ class VoiceEngine:
 
     async def start_listening(self) -> None:
         self._set_state(VoiceState.LISTENING)
+        # Utterance segmentation: VAD-positive chunks are buffered and only
+        # transcribed once the user pauses (end-silence) or the segment hits
+        # its max length. Transcribing every raw chunk gives Whisper fragments
+        # too short to decode, so nothing would ever get answered.
+        stt_cfg = getattr(self.stt, "cfg", None)
+        chunk_ms = int(getattr(stt_cfg, "chunk_ms", 64) or 64)
+        end_silence_ms = int(getattr(stt_cfg, "end_silence_ms", 700) or 700)
+        max_segment_ms = int(getattr(stt_cfg, "max_segment_ms", 15000) or 15000)
+        silence_needed = max(1, -(-end_silence_ms // chunk_ms))
+        max_speech_chunks = max(1, max_segment_ms // chunk_ms)
+
+        buf = bytearray()
+        in_speech = False
+        silence_chunks = 0
+        speech_chunks = 0
         try:
             while not self._stopped:
                 raw = await self.audio_input.read_chunk()
@@ -96,19 +111,38 @@ class VoiceEngine:
                     continue
                 try:
                     cleaned = self.aec.process(raw, self._speaker_ref(len(raw) // 2))
-                    if not self.vad.is_speech(cleaned):
-                        continue
-                    self._set_state(VoiceState.USER_SPEAKING)
-                    transcript = await self._stt_transcribe(cleaned)
+                    is_speech = self.vad.is_speech(cleaned)
                 except Exception:
                     log.exception("input pipeline failure")
+                    buf.clear()
+                    in_speech = False
+                    silence_chunks = 0
+                    speech_chunks = 0
                     self._set_state(VoiceState.ERROR)
                     self._set_state(VoiceState.LISTENING)
                     continue
-                if not transcript or not transcript.strip():
-                    self._set_state(VoiceState.LISTENING)
-                    continue
-                await self._handle_user_text(transcript)
+                if is_speech:
+                    if not in_speech:
+                        in_speech = True
+                        self._set_state(VoiceState.USER_SPEAKING)
+                    silence_chunks = 0
+                    speech_chunks += 1
+                    buf.extend(cleaned)
+                    if speech_chunks >= max_speech_chunks:
+                        await self._flush_utterance(bytes(buf))
+                        buf.clear()
+                        in_speech = False
+                        silence_chunks = 0
+                        speech_chunks = 0
+                elif in_speech:
+                    silence_chunks += 1
+                    buf.extend(cleaned)
+                    if silence_chunks >= silence_needed:
+                        await self._flush_utterance(bytes(buf))
+                        buf.clear()
+                        in_speech = False
+                        silence_chunks = 0
+                        speech_chunks = 0
         except Exception:
             log.exception("start_listening crashed")
             self._set_state(VoiceState.ERROR)
@@ -116,6 +150,19 @@ class VoiceEngine:
         finally:
             if self._stopped:
                 self._set_state(VoiceState.IDLE)
+
+    async def _flush_utterance(self, audio: bytes) -> None:
+        """Transcribe one complete utterance and handle the resulting text."""
+        try:
+            transcript = await self._stt_transcribe(audio)
+        except Exception:
+            log.exception("STT failure")
+            self._set_state(VoiceState.LISTENING)
+            return
+        if not transcript or not transcript.strip():
+            self._set_state(VoiceState.LISTENING)
+            return
+        await self._handle_user_text(transcript)
 
     def _speaker_ref(self, n_samples: int) -> bytes | None:
         """Best-effort speaker reference for AEC (None when unavailable)."""
