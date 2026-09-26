@@ -35,11 +35,14 @@ dev = [
 ]
 
 [project.scripts]
-os-cli = "os.cli:main"
+os = "os_cli:main"
+
+[tool.setuptools]
+py-modules = ["os_cli", "cli", "voice_cli"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["server*", "client*"]
+include = ["server*", "client*", "config*"]
 exclude = ["tests*", "logs*", "memory*"]
 
 [tool.pytest.ini_options]
