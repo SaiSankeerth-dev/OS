@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_intent_router.py -v)",
+      "Bash(python -m pytest tests/test_tool_registry.py -v)",
+      "Bash(python -m pytest tests/test_aec.py tests/test_audio_io.py tests/test_audio_queue.py tests/test_generation.py -v)",
+      "Bash(python -m pytest tests/test_audio_queue.py -v)",
+      "Bash(python verify_bridge.py)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"from server.voice.pipecat_runner import main; print\\('runner imports OK'\\)\")",
+      "Bash(python -m pytest)",
+      "Bash(timeout 25 python -c ' *)",
+      "Bash(timeout 30 python -c ' *)",
+      "Bash(python verify_pipecat_e2e.py)",
+      "Bash(python -u verify_pipecat_e2e.py)",
+      "Bash(python -u verify_pipecat_bargein.py)"
+    ]
+  }
+}

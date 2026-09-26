@@ -1,0 +1,173 @@
+"""Configuration loader for OS.
+
+Loads `config/settings.yaml`, then overlays `config/local.yaml` if present
+(gitignored) for machine-specific overrides without touching the shared file.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+CONFIG_DIR = Path(__file__).resolve().parent
+
+
+@dataclass
+class LLMConfig:
+    provider: str = "ollama"
+    base_url: str = "http://localhost:11434"
+    model: str = "qwen3:8b"
+    temperature: float = 0.6
+    max_tokens: int = 256
+    stop: list[str] = field(default_factory=list)
+    request_timeout_sec: int = 120
+
+
+@dataclass
+class ConversationConfig:
+    max_recent_messages: int = 12
+    max_relevant_memories: int = 4
+    max_task_context_chars: int = 2000
+
+
+@dataclass
+class PersonalityConfig:
+    name: str = "JARVIS"
+    traits: list[str] = field(default_factory=list)
+    forbidden_phrases: list[str] = field(default_factory=list)
+
+
+@dataclass
+class LoggingConfig:
+    level: str = "INFO"
+    file: str = "logs/os.log"
+    perf_file: str = "logs/perf.jsonl"
+
+
+@dataclass
+class VoiceConfig:
+    input_device: Any = None  # None=default, str=name substring, int=index
+    output_device: Any = None
+    sample_rate_in: int = 16000
+    sample_rate_out: int = 24000
+    channels: int = 1
+    chunk_ms: int = 64
+    vad_backend: str = "silero"
+    vad_threshold: float = 0.5
+    aec: str = "nlms"
+    aec_filter_len: int = 256
+    barge_in_chunks: int = 4
+    stt_model: str = "small"
+    stt_device: str = "cpu"
+    stt_compute_type: str = "int8"
+    stt_language: Any = None
+    tts_engine: str = "pocket-tts"
+
+
+@dataclass
+class Config:
+    llm: LLMConfig = field(default_factory=LLMConfig)
+    conversation: ConversationConfig = field(default_factory=ConversationConfig)
+    personality: PersonalityConfig = field(default_factory=PersonalityConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
+    voice: VoiceConfig = field(default_factory=VoiceConfig)
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    out = dict(base)
+    for k, v in override.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def load_config(config_dir: Path | None = None) -> Config:
+    cfg_dir = config_dir or CONFIG_DIR
+    shared = cfg_dir / "settings.yaml"
+    local = cfg_dir / "local.yaml"
+
+    data: dict[str, Any] = {}
+    if shared.exists():
+        data = yaml.safe_load(shared.read_text(encoding="utf-8")) or {}
+    if local.exists():
+        local_data = yaml.safe_load(local.read_text(encoding="utf-8")) or {}
+        data = _deep_merge(data, local_data)
+
+    def get(path: str, default):
+        node: Any = data
+        for part in path.split("."):
+            if not isinstance(node, dict) or part not in node:
+                return default
+            node = node[part]
+        return node
+
+    cfg = Config(
+        llm=LLMConfig(
+            provider=get("llm.provider", "ollama"),
+            base_url=get("llm.base_url", "http://localhost:11434"),
+            model=get("llm.model", "qwen3:8b"),
+            temperature=float(get("llm.temperature", 0.6)),
+            max_tokens=int(get("llm.max_tokens", 256)),
+            stop=get("llm.stop", []) or [],
+            request_timeout_sec=int(get("llm.request_timeout_sec", 120)),
+        ),
+        conversation=ConversationConfig(
+            max_recent_messages=int(get("conversation.max_recent_messages", 12)),
+            max_relevant_memories=int(get("conversation.max_relevant_memories", 4)),
+            max_task_context_chars=int(get("conversation.max_task_context_chars", 2000)),
+        ),
+        personality=PersonalityConfig(
+            name=get("personality.name", "JARVIS"),
+            traits=get("personality.traits", []) or [],
+            forbidden_phrases=get("personality.forbidden_phrases", []) or [],
+        ),
+        logging=LoggingConfig(
+            level=get("logging.level", "INFO"),
+            file=get("logging.file", "logs/os.log"),
+            perf_file=get("logging.perf_file", "logs/perf.jsonl"),
+        ),
+        voice=VoiceConfig(
+            input_device=get("voice.input_device", None),
+            output_device=get("voice.output_device", None),
+            sample_rate_in=int(get("voice.sample_rate_in", 16000)),
+            sample_rate_out=int(get("voice.sample_rate_out", 24000)),
+            channels=int(get("voice.channels", 1)),
+            chunk_ms=int(get("voice.chunk_ms", 64)),
+            vad_backend=get("voice.vad_backend", "silero"),
+            vad_threshold=float(get("voice.vad_threshold", 0.5)),
+            aec=get("voice.aec", "nlms"),
+            aec_filter_len=int(get("voice.aec_filter_len", 256)),
+            barge_in_chunks=int(get("voice.barge_in_chunks", 4)),
+            stt_model=get("voice.stt_model", "small"),
+            stt_device=get("voice.stt_device", "cpu"),
+            stt_compute_type=get("voice.stt_compute_type", "int8"),
+            stt_language=get("voice.stt_language", None),
+            tts_engine=get("voice.tts_engine", "pocket-tts"),
+        ),
+        raw=data,
+    )
+    return cfg
+
+
+_default: Config | None = None
+
+
+def get_config() -> Config:
+    """Return a cached default config (reload per-process)."""
+    global _default
+    if _default is None:
+        _default = load_config()
+    return _default
+
+
+def reload_config() -> Config:
+    """Discard the cached config; used by tests and live config edits."""
+    global _default
+    _default = load_config()
+    return _default

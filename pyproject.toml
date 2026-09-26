@@ -1,0 +1,47 @@
+[project]
+name = "os"
+version = "0.1.0"
+description = "OS - a real-time voice-first AI assistant. Local-first, Python end-to-end."
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+voice = [
+    # Real voice pipeline (mic -> AEC -> VAD -> STT -> TTS -> speaker).
+    # torch is CPU-only here; install the CUDA build yourself for GPU.
+    "faster-whisper>=1.0",
+    "silero-vad>=5.0",
+    "pocket-tts>=3.0",
+    "sounddevice>=0.4",
+    "torch>=2.0",
+    # Optional: Pipecat-based runner (server/voice/pipecat_runner.py).
+    # "pipecat-ai>=1.0",
+    # Optional: Pipecat local audio transport needs PyAudio (system PortAudio
+    # headers required to build it).
+    # "pyaudio>=0.2",
+]
+server = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "websockets>=12.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+os-cli = "os.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server*", "client*"]
+exclude = ["tests*", "logs*", "memory*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
