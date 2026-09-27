@@ -29,6 +29,7 @@ class PendingApproval:
     input_text: str
     draft: str
     approved_hash: str  # hash of `draft` at the moment it was shown to the user
+    run_id: str = ""  # supervisor lifecycle run this approval belongs to
 
 
 class ApprovalStore:

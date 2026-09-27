@@ -35,6 +35,7 @@ from ..intent.registry import ExecutionMode, ToolRegistry
 from ..intent.router import Intent, IntentRouter, RouteDecision
 from ..routing.laya_router import TOOL_MAP as _LAYA_TOOL_MAP
 from ..routing.laya_router import LayaRouter
+from ..supervisor import Supervisor
 from ..response.policy import ResponsePolicy
 from .context import build_context_messages
 from .personality import build_system_prompt
@@ -97,6 +98,8 @@ class ConversationManager:
         memory: MemoryManager | None = None,
         approval_store: ApprovalStore | None = None,
         fast_router: LayaRouter | None = None,
+        supervisor: Supervisor | None = None,
+        state_store=None,
     ) -> None:
         self.cfg = cfg
         self.state: ConversationState = ConversationState.IDLE
@@ -106,6 +109,8 @@ class ConversationManager:
         # Phase 3: Laya fast router. None = regex routing only (the safe
         # default used by tests). Pass LayaRouter() to enable the fast path.
         self._fast_router = fast_router
+        self._supervisor_param = supervisor
+        self._state_store_param = state_store
         self.router = router or ModelRouter.from_config(
             base_url=cfg.llm.base_url,
             model=cfg.llm.model,
@@ -113,6 +118,15 @@ class ConversationManager:
         )
         self.intent_router = intent_router or IntentRouter()
         self.tool_registry = tool_registry or _default_registry()
+        # Phase 4: Pydantic AI supervisor. Every tool call runs through
+        # the safety pipeline (scope -> permission -> approval ->
+        # executor -> verifier) and the lifecycle tracker. Pass a
+        # Supervisor() to override (tests use TestModel-backed ones).
+        self._supervisor = self._supervisor_param or Supervisor(
+            self.tool_registry,
+            approval_store=self._approval_store,
+            state_store=self._state_store_param,
+        )
         self.response_policy = response_policy or ResponsePolicy(
             forbidden_prefixes=cfg.personality.forbidden_phrases
         )
@@ -220,8 +234,29 @@ class ConversationManager:
             self.memory_retriever.retrieve_relevant(user_text, needs_memory=True)
 
         self.set_state(ConversationState.THINKING)
-        result = self.tool_registry.execute(tool_name, **args)
+
+        # Phase 4: every tool call runs through the supervisor's safety
+        # pipeline (scope -> permission -> approval -> executor ->
+        # verifier) instead of hitting the registry directly.
+        supervised = await self._supervisor.run_tool(tool_name, args, user_text)
         perf.mark("tool_executed")
+
+        if supervised.status == "rejected":
+            # Fail closed with the explicit code - nothing executed.
+            text = f"{supervised.message} [{supervised.code}]"
+            self.history.append(
+                Message(role="assistant", content=text, ts=time.time())
+            )
+            self.set_state(ConversationState.SPEAKING)
+            yield ChatChunk(delta=text, done=True)
+            self.set_state(ConversationState.READY)
+            return
+
+        result = supervised.tool_result
+        if result is None:  # executor-level failure inside the pipeline
+            fr = self.response_policy.apply_llm_chat("")
+            yield ChatChunk(delta=fr.text, done=True)
+            return
 
         if spec.execution_mode == ExecutionMode.DIRECT and formatter is not None:
             fr = self.response_policy.apply_direct(tool_name, result, formatter)
@@ -232,13 +267,17 @@ class ConversationManager:
         # effects - stash it as pending and wait for the next turn's
         # approve/reject instead of finishing here. See
         # _handle_pending_approval() and server/approvals/gate.py.
-        if tool_name == "linkedin_draft" and result.status == "success":
+        # Phase 4: the supervisor marks NEEDS_APPROVAL tools as
+        # waiting_approval; the run_id ties the approval back to the
+        # lifecycle run for APPROVE -> EXECUTE -> VERIFY -> REMEMBER.
+        if supervised.needs_approval and result.status == "success":
             draft = result.data["draft"]
             self._pending_approval = PendingApproval(
                 skill="linkedin",
                 input_text=args.get("idea", user_text),
                 draft=draft,
                 approved_hash=content_hash(draft),
+                run_id=supervised.run_id,
             )
             self._approval_store.log(
                 skill="linkedin",
@@ -275,16 +314,26 @@ class ConversationManager:
                 # STUB: no LinkedIn connector configured yet. Replace
                 # this branch with a real publish call when one exists -
                 # nothing else in this flow needs to change.
-                text = (
-                    "[stub] Would post to LinkedIn now:\n\n"
-                    f"{pending.draft}\n\n"
-                    "(No LinkedIn connector is wired up yet, so nothing "
-                    "actually went out.)"
+                # Phase 4: the publish runs inside the supervisor as the
+                # APPROVE -> EXECUTE -> VERIFY -> REMEMBER tail of the
+                # lifecycle run that produced the draft.
+                def _publish() -> str:
+                    text = (
+                        "[stub] Would post to LinkedIn now:\n\n"
+                        f"{pending.draft}\n\n"
+                        "(No LinkedIn connector is wired up yet, so nothing "
+                        "actually went out.)"
+                    )
+                    self._approval_store.log(
+                        pending.skill, pending.input_text, pending.draft,
+                        "PUBLISHED_STUB",
+                    )
+                    return text
+
+                completed = await self._supervisor.complete_approved(
+                    pending.run_id, "linkedin_draft", _publish
                 )
-                self._approval_store.log(
-                    pending.skill, pending.input_text, pending.draft,
-                    "PUBLISHED_STUB",
-                )
+                text = completed.message
             self._pending_approval = None
             self.history.append(
                 Message(role="assistant", content=text, ts=time.time())
@@ -299,6 +348,8 @@ class ConversationManager:
                 pending.skill, pending.input_text, pending.draft,
                 "REJECTED_BY_USER",
             )
+            # Phase 4: close the lifecycle run - discarded, nothing ran.
+            self._supervisor.reject_approved_run(pending.run_id, "linkedin_draft")
             self._pending_approval = None
             text = "Okay, discarded. Nothing was posted."
             self.history.append(

@@ -140,6 +140,21 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         check("laya fast router", False, f"{type(e).__name__}: {e}")
 
+    # Supervisor (Phase 4: Pydantic AI). Core orchestration layer.
+    try:
+        from server.conversation.manager import _default_registry
+        from server.supervisor import Supervisor
+
+        st = Supervisor(_default_registry()).status()
+        check(
+            "supervisor",
+            True,
+            f"agent model={st['agent_model']}, tools={len(st['tools'])}, "
+            f"stages={len(st['lifecycle_stages'])}",
+        )
+    except Exception as e:  # noqa: BLE001
+        check("supervisor", False, f"{type(e).__name__}: {e}")
+
     print(f"\ndoctor: {'all clear' if failures == 0 else f'{failures} problem(s) found'}")
     return 1 if failures else 0
 
