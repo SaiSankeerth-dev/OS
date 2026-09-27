@@ -179,6 +179,19 @@ class ChatIn(BaseModel):
     message: str
 
 
+@app.get("/api/onboarding")
+async def onboarding() -> dict:
+    """First-run state: has the user connected Google yet?"""
+    creds = get_dash().load_credentials("google")
+    google_configured = bool(creds.get("client_id") and creds.get("client_secret"))
+    google_connected = bool(creds.get("refresh_token"))
+    return {
+        "google_configured": google_configured,
+        "google_connected": google_connected,
+        "needs_google": not google_connected,
+    }
+
+
 @app.post("/api/chat")
 async def chat(inp: ChatIn):
     # 1) Connector commands do real work first ("schedule a meeting…",
@@ -622,14 +635,15 @@ async def connector_detail(cid: str) -> dict:
 
 
 class GrantIn(BaseModel):
-    scopes: list[str]
+    scopes: list[str] = []
 
 
 @app.post("/api/connectors/{cid}/grant")
-async def grant_connector(cid: str, inp: GrantIn) -> dict:
+async def grant_connector(cid: str, inp: GrantIn | None = None) -> dict:
     c = _manifest_or_404(cid)
     allowed = set(c.scopes)
-    chosen = [s for s in inp.scopes if s in allowed]
+    asked = inp.scopes if inp else []
+    chosen = [s for s in asked if s in allowed] or list(c.scopes)
     if not chosen:
         raise HTTPException(400, "grant at least one permission")
     get_dash().grant(cid, chosen)

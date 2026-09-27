@@ -33,6 +33,20 @@ DEFAULT_FORBIDDEN_PREFIXES: list[str] = [
 ]
 
 
+# Shown when the language model is unreachable or returns nothing.
+# Lists what genuinely works without it instead of dead-ending.
+_NO_LLM_HELP = """\
+I can't reach my language model right now, so free-form chat is limited — \
+but everything below works without it:
+
+- **Connectors** — try "what's on my calendar today" or "send a message on telegram"
+- **Tasks** — "add buy milk to my tasks"
+- **Drafts** — "draft a linkedin post about shipping early"
+
+To unlock full chat, run a local model: install Ollama (https://ollama.com), \
+then `ollama pull qwen3:8b`, and restart."""
+
+
 class ResponsePolicy:
     def __init__(self, forbidden_prefixes: list[str] | None = None) -> None:
         self._forbidden = (
@@ -79,9 +93,9 @@ class ResponsePolicy:
     def apply_llm_chat(self, raw_text: str) -> FinalResponse:
         text = (raw_text or "").strip()
         if not text:
-            return FinalResponse(
-                text="I don't have anything to add.", source="fallback"
-            )
+            # The language model is unreachable or returned nothing. Don't
+            # dead-end: say what actually works without it.
+            return FinalResponse(text=_NO_LLM_HELP, source="fallback")
         for prefix in self._forbidden:
             stripped = text.lstrip()
             if stripped.startswith(prefix):

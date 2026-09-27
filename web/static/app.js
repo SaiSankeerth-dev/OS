@@ -367,74 +367,76 @@ $("#file-input").addEventListener("change", async (e) => {
 /* ---------------- execution cards ---------------- */
 function executionCardHTML(exec, approval) {
   const st = exec.status;
-  const params = exec.params || {};
-  const paramHTML = Object.entries(params).map(([k, v]) =>
-    `<div class="kv"><span>${esc(k)}:</span><b>${esc(typeof v === "object" ? JSON.stringify(v) : v)}</b></div>`
-  ).join("");
-  const actions = (exec.actions || []).map((a, i) =>
-    `<div class="aa-row"><span style="font-size:13.5px">${esc(a)}</span>
-     <button class="link-btn" data-aa="${i}">Run ✓</button></div>`
-  ).join("");
+  const label = exec.label || exec.action || "Execution";
+  let inner = "";
+  if (st === "needs_connection") {
+    inner = `<div class="exec-card needs-conn">
+      <div class="exec-head">🔌 ${esc(exec.connector_name || exec.connector_id || "Connector")} isn't connected yet</div>
+      <p class="muted">I can ${esc(label)} as soon as it's connected.</p>
+      ${exec.connector_id ? `<p><button class="btn-primary" data-open-conn="${esc(exec.connector_id)}">Connect ${esc(exec.connector_name || exec.connector_id)} →</button></p>` : ""}
+    </div>`;
+  } else if (st === "needs_info") {
+    inner = `<div class="exec-card needs-info">
+      <div class="exec-head">⏳ One more thing</div>
+      <p>${esc(label)}</p>
+    </div>`;
+  } else if (st === "error") {
+    inner = `<div class="exec-card err">
+      <div class="exec-head">❌ ${esc(label)}</div>
+      <p class="muted">${esc(exec.error || "Something went wrong.")}</p>
+    </div>`;
+  } else if (st === "done") {
+    const res = exec.result;
+    const resText = res && typeof res === "object"
+      ? (res.summary || res.text || JSON.stringify(res).slice(0, 300))
+      : String(res || "");
+    inner = `<div class="exec-card done">
+      <div class="exec-head">✅ ${esc(label)}</div>
+      ${resText ? `<p>${esc(resText)}</p>` : ""}
+    </div>`;
+  } else { // pending_approval and anything else
+    inner = `<div class="exec-card pending">
+      <div class="exec-head">⏳ ${esc(label)}</div>
+      ${exec.summary ? `<p class="muted">${esc(exec.summary)}</p>` : ""}
+    </div>`;
+  }
   const ap = approval ? `
-    <div class="exec-card pending">
-      <div class="exec-head">🔒 Approval needed for "${esc(approval.tool)}"</div>
-      <div class="aa-row"><span class="muted" style="font-size:12.5px">${esc(approval.summary)}</span></div>
+    <div class="exec-card approval">
+      <div class="exec-head">🔒 Approval needed</div>
+      <div class="aa-row"><span class="muted" style="font-size:12.5px">${esc(approval.summary || approval.label || "")}</span></div>
       <div class="btn-row">
-        <button class="btn-primary" data-aa-approve="${approval.id}">Approve &amp; run</button>
-        <button class="btn-ghost" data-aa-reject="${approval.id}">Reject</button>
+        <button class="btn-primary" data-act-approve="${esc(approval.id)}">Approve &amp; run</button>
+        <button class="btn-ghost" data-act-reject="${esc(approval.id)}">Reject</button>
       </div>
     </div>` : "";
-  return `<div class="exec-card ${st}">
-    <div class="exec-head">${st === "done" ? "✅" : st === "err" ? "❌" : st === "needs_connector" ? "🔌" : "⏳"} ${esc(exec.summary || "Execution")}</div>
-    <p>${esc(exec.tool)}${exec.tool_label ? " — " + esc(exec.tool_label) : ""}</p>
-    <div class="exec-params">${paramHTML}</div>
-    ${actions}
-    ${exec.result ? `<p><b>Result:</b> ${esc(exec.result)}</p>` : ""}
-    ${exec.note ? `<p class="muted">${esc(exec.note)}</p>` : ""}
-    ${exec.connector_id ? `<p><button class="link-btn" data-open-conn="${esc(exec.connector_id)}">Connect ${esc(exec.connector_id)} →</button></p>` : ""}
-  </div>${ap}`;
+  return inner + ap;
 }
 
 function bindExecutionCard(scope, ev) {
-  scope.querySelectorAll("[data-aa]").forEach((b) =>
-    b.addEventListener("click", async () => {
-      const idx = parseInt(b.dataset.aa, 10);
-      try {
-        const r = await api("/api/actions/run", {
-          method: "POST", body: JSON.stringify({ run_id: ev.execution.run_id, action_idx: idx }),
-        });
-        addOsMsg().innerHTML = md(r.text || "Done.");
-      } catch (e) { toast("Action failed: " + e.message); }
-    })
-  );
   scope.querySelectorAll("[data-open-conn]").forEach((b) =>
-    b.addEventListener("click", () => openConnectorDetail(b.dataset.openConn))
+    b.addEventListener("click", () => { openSettings("connectors"); openConnectorDetail(b.dataset.openConn); })
   );
-  scope.querySelectorAll("[data-aa-approve]").forEach((b) => b.addEventListener("click", () => approveById(b.dataset.aaApprove)));
-  scope.querySelectorAll("[data-aa-reject]").forEach((b) => b.addEventListener("click", () => rejectById(b.dataset.aaReject)));
+  scope.querySelectorAll("[data-act-approve]").forEach((b) =>
+    b.addEventListener("click", () => approveActionById(b.dataset.actApprove, scope)));
+  scope.querySelectorAll("[data-act-reject]").forEach((b) =>
+    b.addEventListener("click", () => rejectActionById(b.dataset.actReject, scope)));
 }
 
-async function approveById(id) {
+async function approveActionById(id, scope) {
   try {
-    const r = await api(`/api/approvals/${id}/approve`, { method: "POST" });
-    const body = addOsMsg();
-    body.innerHTML = md(r.text);
-    if (r.execution) {
-      const wrap = document.createElement("div");
-      wrap.innerHTML = executionCardHTML(r.execution, null);
-      body.appendChild(wrap.firstChild);
-    }
+    const r = await api(`/api/actions/${id}/approve`, { method: "POST" });
     toast("Approved ✓");
+    const body = addOsMsg();
+    body.innerHTML = md("Done: " + (r.result && (r.result.summary || r.result.text) || "approved action ran."));
   } catch (e) { toast("Approve failed: " + e.message); }
-  refreshApprovalRail(); refreshBadges();
+  refreshApprovalRail(); refreshBadges(); refreshPerms();
 }
-async function rejectById(id) {
+async function rejectActionById(id, scope) {
   try {
-    const r = await api(`/api/approvals/${id}/reject`, { method: "POST" });
-    addOsMsg().innerHTML = md(r.text);
-    toast("Rejected");
+    await api(`/api/actions/${id}/reject`, { method: "POST" });
+    toast("Rejected — nothing ran.");
   } catch (e) { toast("Reject failed: " + e.message); }
-  refreshApprovalRail(); refreshBadges();
+  refreshApprovalRail(); refreshBadges(); refreshPerms();
 }
 
 /* ---------------- tasks ---------------- */
@@ -888,29 +890,37 @@ async function openConnectorDetail(id) {
   const d = $("#conn-detail");
   const st = c.state;
   const pill = st === "connected" ? `<span class="pill pill-ok">Connected</span>`
-    : st === "permission_granted" ? `<span class="pill pill-granted">Permission granted</span>`
+    : st === "granted" ? `<span class="pill pill-granted">Permission granted</span>`
+    : st === "setup_error" ? `<span class="pill pill-err">Setup error</span>`
+    : st === "denied" ? `<span class="pill">Denied</span>`
     : `<span class="pill">Available</span>`;
   let statusNote = "";
-  if (st === "connected") statusNote = `<div class="callout ok">Connected — reads can run and writes will ask for your approval first.</div>`;
-  else if (st === "permission_granted") statusNote = `<div class="callout warn">Permission granted. Add your credentials below to go live.</div>`;
-  else if (st === "credential_added") statusNote = `<div class="callout warn">Credentials saved. Run a test to verify the connection.</div>`;
-  else if (st === "auth_error") statusNote = `<div class="callout err">The last health check failed. Re-enter credentials or reconnect with Google.</div>`;
+  if (st === "connected") statusNote = `<div class="callout ok">Connected — reads run now, writes ask for your approval first.</div>`;
+  else if (st === "granted" && !c.has_credentials) statusNote = `<div class="callout warn">Permission granted. Add your credentials below to go live.</div>`;
+  else if (st === "granted" && c.has_credentials && c.needs_oauth) statusNote = `<div class="callout warn">Credentials saved. Press “Connect with Google” to sign in.</div>`;
+  else if (st === "granted") statusNote = `<div class="callout warn">Credentials saved. Run a health check to verify.</div>`;
+  else if (st === "setup_error") statusNote = `<div class="callout err">The last health check failed: ${esc(c.health_msg || "unknown error")}. Re-enter credentials or reconnect.</div>`;
+  else if (st === "denied") statusNote = `<div class="callout warn">Permission denied. Grant it again to reconnect.</div>`;
 
   const scopes = (c.scopes || []).map((s) => `<li>${esc(s)}</li>`).join("");
   const setupSteps = (c.setup_steps || []).map((s, i) => `<li>${i + 1}. ${esc(s)}</li>`).join("");
-  const credFields = (c.credential_fields || []).map((f) => `
-    <label>${esc(f.label || f.name)}<input type="${f.secret ? "password" : "text"}" data-cred="${esc(f.name)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off"></label>`).join("");
+  const credFields = (c.cred_fields || []).map((f) => `
+    <label>${esc(f.label || f.key)}<input type="${f.secret ? "password" : "text"}" data-cred="${esc(f.key)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off"></label>`).join("");
   const defaults = (c.defaults || []).map((f) => `
-    <label>${esc(f.label || f.name)}<input type="text" data-def="${esc(f.name)}" value="${esc(f.value || "")}"></label>`).join("");
-  const authHTML = c.oauth_url
-    ? `<div class="btn-row"><button class="btn-primary" id="cd-google">🔗 Connect with Google</button></div>
+    <label>${esc(f.label || f.key)}<input type="text" data-def="${esc(f.key)}" value="${esc(f.value || "")}" placeholder="${esc(f.placeholder || "")}"></label>`).join("");
+  const isGoogle = c.auth_kind === "google_oauth";
+  const authHTML = isGoogle
+    ? `${c.needs_oauth ? `<div class="btn-row"><button class="btn-primary" id="cd-google">🔗 Connect with Google</button></div>
        <p class="muted small" style="margin-top:8px">OAuth signs you in at Google — OS only stores the tokens, encrypted on this machine.</p>`
+      : `<div class="callout ok">Signed in with Google ✓</div>`}
+       ${credFields ? `<h4 style="margin:14px 0 6px">OAuth app credentials</h4><div class="cred-form">${credFields}
+       <div class="btn-row"><button class="btn-primary" id="cd-save-creds">Save credentials</button></div></div>` : ""}`
     : `<div class="cred-form">${credFields || '<p class="muted">No credentials needed for this connector.</p>'}
        ${credFields ? `<div class="btn-row"><button class="btn-primary" id="cd-save-creds">Save credentials</button></div>` : ""}</div>`;
-  const grantBtn = st === "available" ? `<button class="btn-primary" id="cd-connect">Grant permission</button>` : "";
-  const revokeSmall = st === "permission_granted" ? `<button class="btn-ghost" id="cd-revoke">Revoke permission</button>` : "";
-  const tryHTML = (c.try_it || []).map((t) => `<button class="try-chip" data-try="${esc(t.prompt)}">${esc(t.label)}</button>`).join("");
-  const actionsHTML = (c.actions || []).map((a) => `<li>🔧 ${esc(a)}</li>`).join("");
+  const grantBtn = (st === "available" || st === "denied") ? `<button class="btn-primary" id="cd-connect">Grant permission</button>` : "";
+  const revokeSmall = st === "granted" ? `<button class="btn-ghost" id="cd-revoke">Revoke permission</button>` : "";
+  const tryHTML = (c.try_it || []).map((t) => `<button class="try-chip" data-try="${esc(t)}">${esc(t)}</button>`).join("");
+  const actionsHTML = (c.actions || []).map((a) => `<li>🔧 <b>${esc(a.label || a.name)}</b> <span class="muted">${esc(a.description || "")}</span></li>`).join("");
 
   d.innerHTML = `
     <div class="cd-head">
@@ -919,8 +929,7 @@ async function openConnectorDetail(id) {
       ${pill}
     </div>
     ${statusNote}
-    ${c.free_note ? `<div class="callout ok">${esc(c.free_note)}</div>` : ""}
-    ${c.cost_note ? `<div class="callout warn">${esc(c.cost_note)}</div>` : ""}
+    ${c.note ? `<div class="callout ok">${esc(c.note)}</div>` : ""}
     <div class="cd-tabs">
       <button class="cd-tab active" data-cdtab="permissions">Permissions</button>
       <button class="cd-tab" data-cdtab="setup">Setup</button>
@@ -962,18 +971,24 @@ async function openConnectorDetail(id) {
   });
   const doRevoke = async () => {
     if (!confirm(`Disconnect ${c.name}?`)) return;
-    await api(`/api/connectors/${id}/revoke`, { method: "DELETE" }).catch((e) => toast("Revoke failed: " + e.message));
+    await api(`/api/connectors/${id}/revoke`, { method: "POST" }).catch((e) => toast("Revoke failed: " + e.message));
     toast("Disconnected");
     openConnectorDetail(id); loadConnectors($("#conn-search").value); refreshBadges();
   };
   d.querySelector("#cd-revoke")?.addEventListener("click", doRevoke);
   d.querySelector("#cd-revoke-big")?.addEventListener("click", doRevoke);
-  d.querySelector("#cd-google")?.addEventListener("click", () => startOAuth(id, c.oauth_url));
+  d.querySelector("#cd-google")?.addEventListener("click", async () => {
+    try {
+      const r = await api(`/api/connectors/${id}/oauth/start`);
+      if (r.url) startOAuth(id, r.url);
+      else toast(r.detail || "OAuth not ready — save your Client ID and Secret first.");
+    } catch (e) { toast("OAuth failed to start: " + e.message); }
+  });
   d.querySelector("#cd-save-creds")?.addEventListener("click", async () => {
     const vals = {};
     d.querySelectorAll("[data-cred]").forEach((i) => { vals[i.dataset.cred] = i.value; });
     try {
-      await api(`/api/connectors/${id}/credentials`, { method: "POST", body: JSON.stringify({ values: vals }) });
+      await api(`/api/connectors/${id}/credentials`, { method: "POST", body: JSON.stringify({ label: c.name, fields: vals }) });
       toast("Credentials saved — running health check…");
     } catch (e) { toast("Save failed: " + e.message); return; }
     openConnectorDetail(id); loadConnectors($("#conn-search").value);
@@ -981,14 +996,15 @@ async function openConnectorDetail(id) {
   d.querySelector("#cd-test")?.addEventListener("click", async () => {
     try {
       const r = await api(`/api/connectors/${id}/test`, { method: "POST" });
-      toast(r.ok ? "Health check passed ✓" : "Health check failed: " + (r.error || "unknown"));
+      const msg = r.status && r.status.health_msg;
+      toast(r.ok ? "Health check passed ✓" : "Health check failed: " + (msg || "unknown"));
     } catch (e) { toast("Health check failed: " + e.message); }
     openConnectorDetail(id); loadConnectors($("#conn-search").value);
   });
   d.querySelector("#cd-save-defaults")?.addEventListener("click", async () => {
     const vals = {};
-    d.querySelectorAll("[data-def]").forEach((i) => { vals[i.dataset.def] = i.value; });
-    await api(`/api/connectors/${id}/defaults`, { method: "POST", body: JSON.stringify({ values: vals }) }).catch((e) => toast("Save failed: " + e.message));
+    d.querySelectorAll("[data-def]").forEach((i) => { if (i.value) vals[i.dataset.def] = i.value; });
+    await api(`/api/connectors/${id}/settings`, { method: "POST", body: JSON.stringify({ settings: vals }) }).catch((e) => toast("Save failed: " + e.message));
     toast("Defaults saved");
   });
   d.querySelectorAll("[data-try]").forEach((b) => b.addEventListener("click", () => {
@@ -1001,7 +1017,7 @@ async function openConnectorDetail(id) {
 function startOAuth(id, url) {
   const w = window.open(url, "oauth", "width=520,height=640");
   const onMsg = (e) => {
-    if (e.data && e.data.oauth_done) {
+    if (e.data && (e.data.oauth_done || e.data.type === "oauth-done")) {
       window.removeEventListener("message", onMsg);
       w && w.close();
       toast("Google connected ✓");
@@ -1011,30 +1027,33 @@ function startOAuth(id, url) {
   window.addEventListener("message", onMsg);
 }
 
-/* ---------------- permission modal ---------------- */
+/* ---------------- permission modal (connector write approvals) ---------------- */
 let pendingPerms = [];
 async function refreshPerms() {
-  try { pendingPerms = (await api("/api/permissions/pending")).pending; } catch { pendingPerms = []; }
+  try { pendingPerms = (await api("/api/actions/pending")).pending; } catch { pendingPerms = []; }
   const row = $("#perm-row");
   if (pendingPerms.length) {
     row.hidden = false;
     $("#perm-count").textContent = `${pendingPerms.length} waiting`;
   } else row.hidden = true;
 }
-$("#perm-banner").addEventListener("click", () => {
+$("#perm-banner").addEventListener("click", async () => {
   if (!pendingPerms.length) return;
   const p = pendingPerms[0];
-  $("#perm-title").textContent = p.title;
-  $("#perm-sub").textContent = p.description;
-  $("#perm-scopes").innerHTML = (p.scopes || []).map((s) =>
-    `<label><input type="checkbox" checked> ${esc(s)}</label>`).join("");
+  let scopes = [];
+  try { scopes = (await api(`/api/connectors/${p.connector_id}`)).scopes || []; } catch {}
+  $("#perm-title").textContent = `${p.connector_name || p.connector_id} — ${p.label}`;
+  $("#perm-sub").textContent = p.summary || "OS is asking your permission. It will only use what you allow, and you can revoke anytime.";
+  $("#perm-scopes").innerHTML = (scopes.length ? scopes : Object.entries(p.params || {}).map(([k, v]) => `${k}: ${v}`))
+    .map((s) => `<label><input type="checkbox" checked disabled> ${esc(s)}</label>`).join("");
   $("#perm-modal").hidden = false;
 });
 $("#perm-deny").addEventListener("click", () => { $("#perm-modal").hidden = true; });
 $("#perm-allow").addEventListener("click", async () => {
   const p = pendingPerms[0];
   $("#perm-modal").hidden = true;
-  await api(`/api/permissions/${p.id}/grant`, { method: "POST" }).catch((e) => toast("Grant failed: " + e.message));
+  await api(`/api/actions/${p.id}/approve`, { method: "POST" }).catch((e) => toast("Approve failed: " + e.message));
+  toast("Approved ✓");
   refreshPerms(); loadConnectors($("#conn-search").value); refreshBadges();
 });
 
@@ -1044,11 +1063,11 @@ async function openCredModal(connId, credGroup) {
   credTarget = { connId, credGroup };
   const c = await api(`/api/connectors/${connId}`);
   $("#cred-title").textContent = `Connect ${c.name}`;
-  const fields = (c.credential_fields || []).filter((f) =>
+  const fields = (c.cred_fields || []).filter((f) =>
     !credGroup || !f.group || f.group === credGroup);
   $("#cred-fields").innerHTML = fields.map((f) => `
-    <label>${esc(f.label || f.name)}
-      <input type="${f.secret ? "password" : "text"}" data-cf="${esc(f.name)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off">
+    <label>${esc(f.label || f.key)}
+      <input type="${f.secret ? "password" : "text"}" data-cf="${esc(f.key)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off">
     </label>`).join("") || `<p class="muted">No credentials needed.</p>`;
   $("#cred-modal").hidden = false;
 }
@@ -1059,7 +1078,7 @@ $("#cred-save").addEventListener("click", async () => {
   $("#cred-modal").hidden = true;
   try {
     await api(`/api/connectors/${credTarget.connId}/credentials`, {
-      method: "POST", body: JSON.stringify({ values: vals, group: credTarget.credGroup }),
+      method: "POST", body: JSON.stringify({ label: credTarget.connId, fields: vals }),
     });
     toast("Credentials saved — running health check…");
   } catch (e) { toast("Save failed: " + e.message); }
@@ -1116,11 +1135,62 @@ window.addEventListener("load", () => {
   }, 900);
 });
 
+/* ---------------- first-run onboarding: Google sign-in ---------------- */
+function onboardDone() {
+  try { localStorage.setItem("os-onboarded", "1"); } catch {}
+  $("#onboard-modal").hidden = true;
+}
+async function maybeOnboard() {
+  let ob = null;
+  try { ob = await api("/api/onboarding"); } catch { return; }
+  if (!ob.needs_google) return;
+  try { if (localStorage.getItem("os-onboarded")) return; } catch {}
+  // resume at step 2 if the OAuth app credentials are already saved
+  if (ob.google_configured) {
+    $("#ob-step-setup").hidden = true;
+    $("#ob-step-signin").hidden = false;
+  }
+  $("#onboard-modal").hidden = false;
+}
+$("#ob-save").addEventListener("click", async () => {
+  const cid = $("#ob-client-id").value.trim(), sec = $("#ob-client-secret").value.trim();
+  if (!cid || !sec) { toast("Paste both the Client ID and the Client Secret."); return; }
+  try {
+    await api("/api/connectors/google_calendar/grant", { method: "POST" });
+    await api("/api/connectors/google_calendar/credentials", {
+      method: "POST",
+      body: JSON.stringify({ label: "Google", fields: { client_id: cid, client_secret: sec } }),
+    });
+  } catch (e) { toast("Save failed: " + e.message); return; }
+  $("#ob-step-setup").hidden = true;
+  $("#ob-step-signin").hidden = false;
+  toast("Saved — now sign in with Google.");
+});
+$("#ob-google").addEventListener("click", async () => {
+  try {
+    const r = await api("/api/connectors/google_calendar/oauth/start");
+    if (!r.url) { toast(r.detail || "OAuth not ready yet."); return; }
+    const w = window.open(r.url, "oauth", "width=520,height=640");
+    const onMsg = (e) => {
+      if (e.data && (e.data.oauth_done || e.data.type === "oauth-done")) {
+        window.removeEventListener("message", onMsg);
+        w && w.close();
+        onboardDone();
+        toast("Google connected ✓ — Calendar, Gmail, Drive, Sheets, YouTube are live.");
+        refreshBadges();
+      }
+    };
+    window.addEventListener("message", onMsg);
+  } catch (e) { toast("OAuth failed to start: " + e.message); }
+});
+$("#ob-skip").addEventListener("click", () => { onboardDone(); toast("Skipped — connect Google anytime from Connectors."); });
+
 /* ---------------- init ---------------- */
 loadMe();
 refreshBadges();
 refreshApprovalRail();
 refreshPerms();
+maybeOnboard();
 setInterval(refreshApprovalRail, 15000);
 setInterval(refreshPerms, 20000);
 switchView("chat");

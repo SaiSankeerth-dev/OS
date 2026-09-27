@@ -56,3 +56,13 @@ def test_llm_chat_empty_returns_fallback():
     fr = p.apply_llm_chat("   ")
     assert fr.source == "fallback"
     assert fr.text.strip()
+
+def test_llm_chat_empty_guides_user_without_dead_end():
+    # When the model is unreachable, the fallback must say what works —
+    # never the old "I don't have anything to add." dead end.
+    p = ResponsePolicy()
+    fr = p.apply_llm_chat("")
+    assert fr.source == "fallback"
+    assert "I don't have anything to add" not in fr.text
+    assert "Ollama" in fr.text
+    assert "draft a linkedin post" in fr.text
