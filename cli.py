@@ -78,7 +78,7 @@ async def amain(args: argparse.Namespace) -> int:
 
     while True:
         try:
-            user = await asyncio.to_thread(input, "sir > ")
+            user = await asyncio.to_thread(input, "you › ")
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -101,28 +101,40 @@ async def amain(args: argparse.Namespace) -> int:
             print("  (history reset)")
             continue
 
-        # --- Conversational output: spinner until the first token, then
-        # stream (DeepSeek-style). Falls back to the plain prompt.
+        # --- Conversational output, Muse-style: quiet framing, live
+        # markdown while tokens stream, structured finish (panels for
+        # approvals and heads-ups). Plain text when rich/TTY missing.
         from server import jarvis_ui as ui  # noqa: E402
 
-        status = ui.begin_thinking()
-        first = True
+        thinking = ui.begin_thinking()
+        stream = None
+        buf: list[str] = []
         try:
             async for chunk in mgr.respond_text(user):
-                if chunk.delta:
-                    if first:
-                        if status is not None:
-                            status.stop()
-                        print("jarvis > ", end="", flush=True)
-                        first = False
+                if not chunk.delta:
+                    continue
+                if thinking is not None:
+                    thinking.stop()
+                    thinking = None
+                if stream is None:
+                    stream = ui.start_stream()
+                    if stream is None:
+                        print("jarvis › ", end="", flush=True)
+                buf.append(chunk.delta)
+                if stream is not None:
+                    stream.update("".join(buf))
+                else:
                     print(chunk.delta, end="", flush=True)
-            print()
+            if stream is None:
+                print()
         except Exception as e:
             print(f"\n  [error: {type(e).__name__}]\n")
             log.exception("respond_text failed")
         finally:
-            if status is not None:
-                status.stop()
+            if thinking is not None:
+                thinking.stop()
+            if stream is not None:
+                stream.finish("".join(buf))
             continue
 
     print("Powering down. Good day, sir.")

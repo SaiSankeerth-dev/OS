@@ -1,160 +1,64 @@
-"""JARVIS terminal presentation: animated arc-reactor boot + HUD.
+"""JARVIS terminal presentation: quiet, conversational, friendly.
 
 Pure presentation layer — no behavior. Safe to import anywhere.
+The style goal is a calm chat, not a sci-fi cockpit: a minimal boot,
+clear you/jarvis framing, markdown-formatted answers, and gentle
+panels for approvals and suggestions.
 
-With `rich` installed and stdout a TTY you get the full show:
-  - animated arc-reactor boot (pulsing core, rotating energy ring)
-  - animated boot checklist
-  - "thinking" spinner while the first token streams in
-Without rich (or piped output) everything degrades to plain static
-text — the same public functions, no animation, no crash.
+With `rich` installed and stdout a TTY you get markdown rendering,
+a subtle thinking indicator, and soft panels. Without rich (or piped
+output) everything degrades to plain text — same functions, no crash.
 """
 from __future__ import annotations
 
-import math
 import sys
 import time
 
 try:
     from rich.console import Console
     from rich.live import Live
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+    from rich.markdown import Markdown
+    from rich.panel import Panel
     from rich.text import Text
 
     _RICH = True
 except ImportError:  # pragma: no cover
     _RICH = False
 
-_CYAN = "\033[96m"
-_DIM = "\033[2m"
-_BOLD = "\033[1m"
-_RESET = "\033[0m"
-
 _console = Console() if _RICH else None
+
+# Kept for compatibility; the banner no longer shows the big art.
+ARC_REACTOR = "( arc reactor )"
 
 
 def rich_available() -> bool:
     return bool(_RICH and _console is not None and sys.stdout.isatty())
 
 
-# --------------------------------------------------------------------------
-# Arc reactor — drawn mathematically so it can animate.
-# --------------------------------------------------------------------------
-
-_W, _H = 37, 17
-_CX, _CY = 18.0, 8.0
-
-
-def _reactor_cells(t: float) -> dict[tuple[int, int], tuple[str, float]]:
-    """(x, y) -> (char, intensity 0..1) for animation time t."""
-    cells: dict[tuple[int, int], tuple[str, float]] = {}
-    for y in range(_H):
-        for x in range(_W):
-            dx, dy = (x - _CX) * 0.5, (y - _CY) * 1.0
-            d = math.hypot(dx, dy)
-            ang = math.atan2(dy, dx)
-
-            # Outer energy ring — segments chase around it.
-            if abs(d - 8.0) < 0.6:
-                seg = int((ang + t * 2.4) / (math.pi / 6)) % 12
-                if seg % 3 == 0:
-                    cells[(x, y)] = ("◈", 0.95)
-                else:
-                    cells[(x, y)] = ("○", 0.55)
-            # Inner coil ring.
-            elif abs(d - 5.4) < 0.45:
-                cells[(x, y)] = ("·", 0.35)
-            # Rotating spokes between core and coil.
-            elif 2.8 < d < 7.4:
-                rel = (ang - t * 1.2) % (math.pi / 3)
-                if rel < 0.10:
-                    cells[(x, y)] = ("│", 0.5)
-            # Pulsing core.
-            if d < 2.3:
-                pulse = 0.5 + 0.5 * math.sin(t * 4.0)
-                ch = "●" if pulse > 0.66 else ("◉" if pulse > 0.33 else "○")
-                cells[(x, y)] = (ch, 0.65 + 0.35 * pulse)
-    return cells
-
-
-def _intensity_style(i: float) -> str:
-    if i >= 0.9:
-        return "bold white"
-    if i >= 0.7:
-        return "bright_cyan"
-    if i >= 0.5:
-        return "cyan"
-    return "blue"
-
-
-def _reactor_text(t: float) -> "Text":
-    cells = _reactor_cells(t)
-    out = Text(justify="center")
-    for y in range(_H):
-        for x in range(_W):
-            ch, inten = cells.get((x, y), (" ", 0.0))
-            if ch == " ":
-                out.append(" ")
-            else:
-                out.append(ch, style=_intensity_style(inten))
-        if y < _H - 1:
-            out.append("\n")
-    return out
-
-
-def _reactor_plain() -> str:
-    cells = _reactor_cells(0.0)
-    lines = []
-    for y in range(_H):
-        lines.append(
-            "".join(cells.get((x, y), (" ", 0.0))[0] for x in range(_W)).rstrip()
-        )
-    return "\n".join(lines).strip("\n")
-
-
-# Static art kept for compatibility (plain environments, logs).
-ARC_REACTOR = _reactor_plain()
-
-
 def banner_lines() -> list[str]:
-    """Arc-reactor art + title lines, colorized for TTYs."""
-    art = ARC_REACTOR
-    if sys.stdout.isatty():
-        art = f"{_CYAN}{ARC_REACTOR}{_RESET}"
-    title = "J.A.R.V.I.S."
-    subtitle = "Just A Rather Very Intelligent System"
-    if sys.stdout.isatty():
-        title = f"{_BOLD}{_CYAN}{title}{_RESET}"
-        subtitle = f"{_DIM}{subtitle}{_RESET}"
-    return [art, "", f"  {title}", f"  {subtitle}", ""]
+    return [
+        "  ◉ JARVIS — at your service, sir.",
+        '  Try "draft a linkedin post about shipping early"',
+        '  or "remember that my launch code is 1234".',
+        "",
+    ]
 
 
-def print_banner(animate: bool = True) -> None:
-    """Boot banner. Animated arc reactor when rich + TTY, else static."""
-    if animate and rich_available():
+def print_banner(animate: bool = False) -> None:
+    """Minimal boot banner. The `animate` arg is kept for compatibility."""
+    if rich_available():
         assert _console is not None
-        duration, fps = 2.0, 12
-        start = time.time()
-        with Live(
-            _reactor_text(0.0),
-            console=_console,
-            refresh_per_second=fps,
-            transient=True,
-        ) as live:
-            while (t := time.time() - start) < duration:
-                live.update(_reactor_text(t))
-                time.sleep(1 / fps)
-        # Settle on the final frame, then the title card.
-        _console.print(_reactor_text(duration), justify="center")
         _console.print()
-        _console.print(
-            Text("J.A.R.V.I.S.", style="bold bright_cyan", justify="center")
-        )
+        line = Text()
+        line.append("  ◉ ", style="bold bright_cyan")
+        line.append("JARVIS", style="bold")
+        line.append(" — at your service, sir.", style="")
+        _console.print(line)
         _console.print(
             Text(
-                "Just A Rather Very Intelligent System",
+                '  Try "draft a linkedin post about shipping early"\n'
+                '  or "remember that my launch code is 1234".',
                 style="dim",
-                justify="center",
             )
         )
         _console.print()
@@ -164,66 +68,28 @@ def print_banner(animate: bool = True) -> None:
 
 
 def boot_sequence(checks: list[tuple[str, bool, str]] | None = None) -> None:
-    """Iron-Man-style system boot. Animated checklist when rich + TTY."""
+    """Short static boot lines. Fast — no theatrics."""
 
     def _line(label: str, ok: bool, detail: str = "") -> str:
-        mark = "online" if ok else "OFFLINE"
-        core = f"  [ {label:<14} ] {mark}"
+        mark = "✓" if ok else "✗"
+        core = f"  {mark} {label}"
         if detail:
-            core += f"  {detail}"
-        if sys.stdout.isatty():
-            color = _CYAN if ok else "\033[91m"
-            core = f"{color}{core}{_RESET}"
+            core += f" — {detail}"
         return core
 
-    steps = [
-        ("power", True, ""),
-        ("neural core", True, ""),
-    ] + [(label, ok, detail) for label, ok, detail in (checks or [])]
-
-    if rich_available():
-        assert _console is not None
-        _console.print(Text("  Initializing JARVIS…", style="bold cyan"))
-        with Progress(
-            SpinnerColumn("dots2", style="cyan"),
-            TextColumn("[cyan]{task.description}"),
-            BarColumn(bar_width=24, complete_style="cyan"),
-            console=_console,
-            transient=True,
-        ) as progress:
-            task = progress.add_task("boot", total=len(steps))
-            for label, ok, detail in steps:
-                time.sleep(0.22)
-                mark = "[green]online[/green]" if ok else "[red]OFFLINE[/red]"
-                progress.update(
-                    task,
-                    advance=1,
-                    description=f"{label:<16} {mark}  {detail}",
-                )
-        _console.print(Text("  At your service, sir.", style="bold bright_cyan"))
-        _console.print()
-        return
-
-    print("  Initializing JARVIS...")
-    for label, ok, detail in steps:
+    print("  Initializing JARVIS…")
+    for label, ok, detail in checks or []:
         print(_line(label, ok, detail))
-    print()
-    greeting = "At your service, sir."
-    if sys.stdout.isatty():
-        greeting = f"{_BOLD}{_CYAN}{greeting}{_RESET}"
-    print(f"  {greeting}\n")
+    print("  At your service, sir.\n")
 
 
 def hud(prefix: str, text: str) -> str:
     """Format a JARVIS HUD status line."""
-    line = f"  {prefix} {text}"
-    if sys.stdout.isatty():
-        line = f"{_CYAN}  {prefix}{_RESET} {text}"
-    return line
+    return f"  {prefix} {text}"
 
 
-def begin_thinking(message: str = "JARVIS is thinking"):
-    """Start a spinner shown until the first token arrives.
+def begin_thinking(message: str = "thinking"):
+    """Subtle spinner until the first token arrives.
 
     Returns a rich Status, or None when animation is unavailable.
     Caller must .stop() it (safe to call twice).
@@ -231,4 +97,82 @@ def begin_thinking(message: str = "JARVIS is thinking"):
     if not rich_available():
         return None
     assert _console is not None
-    return _console.status(f"[cyan]{message}…", spinner="dots2")
+    return _console.status(f"[dim]{message}…", spinner="dots")
+
+
+# --------------------------------------------------------------------------
+# Streaming, Muse-style: live markdown while tokens arrive, then a final
+# structured render (approval panels, heads-up panels, markdown body).
+# --------------------------------------------------------------------------
+
+
+def _split_notes(full: str) -> tuple[str, list[str]]:
+    """Pull trailing 'Heads up: ...' notes off the turn text."""
+    parts = full.split("\n\nHeads up: ")
+    main = parts[0].strip()
+    notes = [p.strip() for p in parts[1:] if p.strip()]
+    return main, notes
+
+
+def _looks_like_approval(text: str) -> bool:
+    low = text.lower()
+    return ("approve" in low and "reject" in low) or "approve and post" in low
+
+
+class StreamRenderer:
+    """Live markdown stream; finish() renders the final structured view."""
+
+    def __init__(self, label: str = "jarvis") -> None:
+        assert _console is not None
+        self._console = _console
+        self._label = label
+        self._last_update = 0.0
+        head = Text()
+        head.append(f"{label} › ", style="bold bright_cyan")
+        self._console.print(head, end="")
+        self._live = Live(
+            Markdown(""), console=self._console, refresh_per_second=8
+        )
+        self._live.start()
+
+    def update(self, text: str) -> None:
+        now = time.time()
+        if now - self._last_update < 0.1:
+            return
+        self._last_update = now
+        self._live.update(Markdown(text))
+
+    def finish(self, full: str) -> None:
+        full = full.strip()
+        self._live.stop()
+        main, notes = _split_notes(full)
+        if main:
+            if _looks_like_approval(main):
+                self._console.print(
+                    Panel(
+                        Markdown(main),
+                        title="Approval needed",
+                        border_style="yellow",
+                        padding=(1, 2),
+                    )
+                )
+            else:
+                self._console.print(Markdown(main))
+        for note in notes:
+            self._console.print(
+                Panel(
+                    note,
+                    title="Heads up",
+                    border_style="blue",
+                    padding=(0, 2),
+                    expand=False,
+                )
+            )
+        self._console.print()
+
+
+def start_stream(label: str = "jarvis"):
+    """Begin a streaming render. Returns None when rich/TTY unavailable."""
+    if not rich_available():
+        return None
+    return StreamRenderer(label=label)
