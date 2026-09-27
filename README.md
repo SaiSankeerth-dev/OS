@@ -1,6 +1,29 @@
 # J.A.R.V.I.S.
 
-**Just A Rather Very Intelligent System** — a local-first, voice-first AI assistant that runs on your own machine. No cloud required.
+**Just A Rather Very Intelligent System** — a local-first AI assistant that *does things*. Chat with it in your browser and it books meetings, opens GitHub issues, sends messages, and manages your calendar — every write approved by you first. It can also talk to you out loud, mic and speaker, entirely on-device.
+
+One command, then open **http://localhost:3000**:
+
+```bash
+docker compose up        # builds once, keeps your data in a volume
+# …or without Docker:
+pip install ".[dashboard,google]"
+python cli.py dashboard --port 3000
+```
+
+## The dashboard — the part that does things
+
+Chat does real work through connectors: *"schedule a meeting tomorrow at 4"* creates a real Google Calendar event, *"send this to GitHub"* opens a real issue. Reads run immediately; **every write asks your approval first** — in chat, and again in the approval rail. Nothing is "connected" until it passes a live health check, and credentials are encrypted on disk.
+
+- **Settings ▦ → Connectors** — Connected / Available groups, search, per-service setup guides, OAuth sign-in, test & revoke. Like the mock, but everything works.
+- **15 real connectors** — Google Calendar, Gmail, Sheets, Drive, YouTube, GitHub, Notion, Telegram, Slack, Discord, Spotify, WhatsApp, LinkedIn, X, Instagram.
+- **Defaults per connector** — default GitHub repo, Slack channel, Notion parent, spreadsheet.
+- **MCP bridge** — every connected service is also an MCP tool at `POST /mcp` (`initialize`, `tools/list`, `tools/call`); write tools return a pending approval instead of executing.
+- **Honest free tier** — GitHub, Notion, Telegram, Slack, Discord bots, Google OAuth apps and YouTube search all have free paths; X posting needs a paid API tier and says so.
+
+Google connectors need a one-time [Google Cloud OAuth client](https://console.cloud.google.com/apis/credentials) (desktop app, redirect `http://localhost:3000/api/connectors/google/oauth/callback` — the setup guide inside the app walks you through it).
+
+## Voice mode — it also talks
 
 ```
                  .-=========-.
@@ -10,14 +33,12 @@
           |    |   ( ◉  )     |    |
           |    |    '--'      |    |
            \    \   .--.     /    /
-            '.   '.        .'   .'
+            '.   '.        .'   '.'
               '-._  '-..-'  _.-'
-                  '-=====-'
+                  '-=====-
 ```
 
 > "At your service, sir."
-
-## What it does
 
 Talk to it. It listens, thinks, and talks back — entirely on-device except the LLM, which runs on your local Ollama.
 
@@ -28,8 +49,6 @@ mic → echo cancellation → voice activity detection → speech-to-text
 ```
 
 Talk over it mid-sentence and it stops — automatic barge-in is always on.
-
-## Quick start
 
 ```bash
 # 1. Python env + deps
@@ -48,37 +67,6 @@ python cli.py
 python voice_cli.py
 python voice_cli.py --list-devices   # check your audio hardware
 ```
-
-## Web dashboard — the OS that does things
-
-One command, then open **http://localhost:3000**:
-
-```bash
-docker compose up        # builds once, keeps your data in a volume
-# …or without Docker:
-pip install ".[dashboard,google]"
-python cli.py dashboard --port 3000
-```
-
-Chat does real work through connectors: *"schedule a meeting tomorrow at 4"*
-creates a real Google Calendar event, *"send this to GitHub"* opens a real
-issue. Reads run immediately; **every write asks your approval first** —
-in chat, and again in the approval rail. Nothing is "connected" until it
-passes a live health check, and credentials are encrypted on disk.
-
-- **Settings ▦ → Connectors** — Connected / Available groups, search, per-service
-  setup guides, OAuth sign-in, test & revoke. Like the mock, but everything works.
-- **Defaults per connector** — default GitHub repo, Slack channel, Notion parent, spreadsheet.
-- **MCP bridge** — every connected service is also an MCP tool at `POST /mcp`
-  (`initialize`, `tools/list`, `tools/call`); write tools return a pending
-  approval instead of executing.
-- **Honest free tier** — GitHub, Notion, Telegram, Slack, Discord bots, Google
-  OAuth apps and YouTube search all have free paths; X posting needs a paid API
-  tier and says so.
-
-Google connectors need a one-time [Google Cloud OAuth client](https://console.cloud.google.com/apis/credentials)
-(desktop app, redirect `http://localhost:3000/api/connectors/google/oauth/callback` —
-the setup guide inside the app walks you through it).
 
 ## The pipeline, stage by stage
 
@@ -127,7 +115,7 @@ JARVIS is precise, unfailingly polite, and dry-witted. He addresses you as "sir"
 ## Tests
 
 ```bash
-pytest tests/ -q     # 119 tests, all passing
+pytest tests/ -q     # 313+ tests passing
 ```
 
 Includes a real TTS→STT roundtrip: PocketTTS synthesizes speech, faster-whisper transcribes it back word-perfect.
