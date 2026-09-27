@@ -243,6 +243,21 @@ class StateStore:
         finally:
             conn.close()
 
+    def search_events(
+        self, kind: str, query: str, limit: int = 20
+    ) -> list[dict]:
+        """Keyword search over an event kind's data. Phase 6: memory."""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE kind = ? AND data LIKE ? "
+                "ORDER BY id DESC LIMIT ?",
+                (kind, f"%{query}%", limit),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
     # ---- sessions -------------------------------------------------
     def save_session(self, session_id: str, state: str) -> None:
         conn = self._connect()

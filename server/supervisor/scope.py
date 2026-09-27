@@ -18,6 +18,9 @@ TOOL_SKILLS: dict[str, tuple[str, tuple[str, ...]]] = {
     "linkedin_draft": ("linkedin", ("linkedin:draft",)),
     "get_current_datetime": ("system", ("system:read",)),
     "get_system_info": ("system", ("system:read",)),
+    "memory_save": ("memory", ("memory:write",)),
+    "memory_recall": ("memory", ("memory:read",)),
+    "calc": ("calc", ("calc:eval",)),
 }
 
 

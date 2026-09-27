@@ -155,6 +155,22 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         check("supervisor", False, f"{type(e).__name__}: {e}")
 
+    # Skills (Phase 6: SKILL.md contracts). Planned skills are listed,
+    # never loaded.
+    try:
+        from server.skills import SkillLoader
+
+        loader = SkillLoader()
+        infos = loader.discover()
+        active = sorted(i.name for i in infos if i.status == "active")
+        planned = sorted(i.name for i in infos if i.status != "active")
+        detail = f"active: {', '.join(active) or 'none'}"
+        if planned:
+            detail += f" | planned: {', '.join(planned)}"
+        check("skills", bool(active), detail)
+    except Exception as e:  # noqa: BLE001
+        check("skills", False, f"{type(e).__name__}: {e}")
+
     print(f"\ndoctor: {'all clear' if failures == 0 else f'{failures} problem(s) found'}")
     return 1 if failures else 0
 

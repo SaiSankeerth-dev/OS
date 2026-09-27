@@ -1,3 +1,10 @@
+---
+name: linkedin
+description: Drafts LinkedIn posts from a rough idea. Never publishes on its own.
+version: 1.0.0
+status: active
+---
+
 # LinkedIn Skill
 
 ## Purpose

@@ -1,3 +1,10 @@
+---
+name: files
+description: Filesystem access. Deferred until the safety foundation is proven.
+version: 0.1.0
+status: planned
+---
+
 # File Skill
 
 ## Purpose

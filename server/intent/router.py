@@ -96,7 +96,44 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         Intent.TASK,
         None,
     ),
+    (
+        # Phase 6: memory skill.
+        re.compile(
+            r"^\s*(?:remember|note\s+down|save\s+to\s+memory)\s+"
+            r"(?:that\s+)?(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "memory_save",
+    ),
+    (
+        re.compile(
+            r"^\s*(?:recall|what\s+do\s+you\s+remember|do\s+you\s+remember)"
+            r"\b\s*(.*?)\s*\??\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "memory_recall",
+    ),
+    (
+        # Phase 6: calculator skill.
+        re.compile(
+            r"^\s*(?:calculate|calc|compute)\s+(.+?)\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "calc",
+    ),
 ]
+
+
+# Maps a tool name to the intent-pattern capture group holding its arg.
+_TOOL_ARG = {
+    "linkedin_draft": "idea",
+    "memory_save": "note",
+    "memory_recall": "query",
+    "calc": "expression",
+}
 
 
 class IntentRouter:
@@ -111,7 +148,7 @@ class IntentRouter:
             m = pattern.match(text)
             if m:
                 args: dict[str, str] = {}
-                if tool == "linkedin_draft" and m.groups():
-                    args["idea"] = m.group(1).strip()
+                if tool in _TOOL_ARG and m.groups():
+                    args[_TOOL_ARG[tool]] = m.group(1).strip()
                 return RouteDecision(intent=intent, tool_name=tool, args=args)
         return RouteDecision(intent=Intent.LLM_CHAT)

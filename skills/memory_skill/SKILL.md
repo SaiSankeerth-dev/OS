@@ -1,3 +1,10 @@
+---
+name: memory
+description: Saves and recalls notes in local SQLite memory.
+version: 1.0.0
+status: active
+---
+
 # Memory Skill
 
 ## Purpose

@@ -29,6 +29,11 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "linkedin_draft": ToolPolicy.NEEDS_APPROVAL,
     "get_current_datetime": ToolPolicy.ALLOW,
     "get_system_info": ToolPolicy.ALLOW,
+    # Phase 6: local-only tools. Memory is SQLite on this machine, calc is
+    # pure arithmetic - no external effect, so no approval needed.
+    "memory_save": ToolPolicy.ALLOW,
+    "memory_recall": ToolPolicy.ALLOW,
+    "calc": ToolPolicy.ALLOW,
 }
 
 

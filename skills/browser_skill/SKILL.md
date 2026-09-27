@@ -1,3 +1,10 @@
+---
+name: browser
+description: Web browsing and computer use. Deferred until the safety foundation is proven.
+version: 0.1.0
+status: planned
+---
+
 # Browser Skill
 
 ## Purpose

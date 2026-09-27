@@ -75,11 +75,34 @@ class TurnResult:
     perf: PerfTrace
 
 
-def _default_registry() -> ToolRegistry:
+def _default_registry(state_store=None) -> ToolRegistry:
+    """Phase 6: tools come from SKILL.md skill contracts via SkillLoader.
+
+    Active skills register their tools; planned skills (browser, files)
+    are listed but never loaded.
+    """
+    from server.skills import SkillLoader
+
+    def _has(reg: ToolRegistry, name: str) -> bool:
+        try:
+            reg.get(name)
+            return True
+        except KeyError:
+            return False
+
     reg = ToolRegistry()
-    reg.register(DATETIME_SPEC, get_current_datetime, format_datetime)
-    reg.register(SYSTEM_INFO_SPEC, get_system_info, format_system_info)
-    reg.register(LINKEDIN_DRAFT_SPEC, generate_linkedin_draft, format_linkedin_draft)
+    loader = SkillLoader()
+    loader.load(reg, state_store=state_store)
+    # Safety net: the three original tools must always exist. If a skill
+    # failed to load, fall back to direct registration.
+    if not _has(reg, "get_current_datetime"):
+        reg.register(DATETIME_SPEC, get_current_datetime, format_datetime)
+    if not _has(reg, "get_system_info"):
+        reg.register(SYSTEM_INFO_SPEC, get_system_info, format_system_info)
+    if not _has(reg, "linkedin_draft"):
+        reg.register(
+            LINKEDIN_DRAFT_SPEC, generate_linkedin_draft, format_linkedin_draft
+        )
     return reg
 
 
@@ -117,7 +140,9 @@ class ConversationManager:
             timeout_sec=float(cfg.llm.request_timeout_sec),
         )
         self.intent_router = intent_router or IntentRouter()
-        self.tool_registry = tool_registry or _default_registry()
+        self.tool_registry = tool_registry or _default_registry(
+            self._state_store_param
+        )
         # Phase 4: Pydantic AI supervisor. Every tool call runs through
         # the safety pipeline (scope -> permission -> approval ->
         # executor -> verifier) and the lifecycle tracker. Pass a
