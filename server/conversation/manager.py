@@ -175,8 +175,13 @@ class ConversationManager:
         # Phase 3: Laya fast path. Consulted only when the regex router
         # found no tool - exact regex hits stay authoritative. A confident
         # Laya skill pick becomes the decision; anything unsure falls
-        # through to the old path unchanged.
-        if self._fast_router is not None and decision.tool_name is None:
+        # through to the old path unchanged. Phase 5: TASK intents skip
+        # Laya - a multi-step request is not a single-skill decision.
+        if (
+            self._fast_router is not None
+            and decision.tool_name is None
+            and decision.intent != Intent.TASK
+        ):
             hit = self._fast_router.route(user_text)
             if hit is not None:
                 skill, _confidence, _latency_ms = hit
@@ -200,14 +205,10 @@ class ConversationManager:
             return
 
         if decision.intent == Intent.TASK:
-            fr = self.response_policy.apply_llm_chat(
-                "I'll handle tasks in a later phase."
-            )
-            self.history.append(
-                Message(role="assistant", content=fr.text, ts=time.time())
-            )
-            yield ChatChunk(delta=fr.text, done=True)
-            self.set_state(ConversationState.READY)
+            # Phase 5: multi-step request -> dynamic agent team under the
+            # supervisor (plan -> parallel workers -> verify -> merge).
+            async for chunk in self._handle_team(user_text, perf):
+                yield chunk
             perf.mark("turn_end:text")
             perf.flush("text_turn")
             return
@@ -291,6 +292,25 @@ class ConversationManager:
         )
         self.set_state(ConversationState.SPEAKING)
         yield ChatChunk(delta=fr.text, done=True)
+        self.set_state(ConversationState.READY)
+
+    async def _handle_team(self, user_text: str, perf: PerfTrace):
+        """Phase 5: run a dynamic agent team for a multi-step request."""
+        self.set_state(ConversationState.THINKING)
+        team_result = await self._supervisor.run_team(user_text)
+        perf.mark("team_done")
+        text = team_result.text or "I couldn't complete that task."
+        if team_result.status == "partial":
+            text += (
+                f"\n\n({team_result.verified} of "
+                f"{len(team_result.subtasks)} parts verified; "
+                f"{team_result.dropped} dropped.)"
+            )
+        self.history.append(
+            Message(role="assistant", content=text, ts=time.time())
+        )
+        self.set_state(ConversationState.SPEAKING)
+        yield ChatChunk(delta=text, done=True)
         self.set_state(ConversationState.READY)
 
     async def _handle_pending_approval(self, user_text: str):

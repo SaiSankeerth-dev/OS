@@ -70,6 +70,9 @@ class SupervisorAgent:
         self._reachable_at = now
         return self._reachable
 
+    def _build_model(self):
+        return build_model(self._base_url, self._model_name)
+
     def _ensure_agent(self):
         if self._agent is None:
             from pydantic_ai import Agent

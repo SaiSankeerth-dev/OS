@@ -172,6 +172,54 @@ class Supervisor:
         t(LifecycleStage.APPROVE, "rejected by user")
         t(LifecycleStage.REMEMBER, "discarded, nothing executed")
 
+    # ---------- team entry: a multi-step task ---------------------------
+
+    async def run_team(
+        self,
+        user_text: str,
+        max_workers: int = 4,
+        worker_model=None,
+    ):
+        """NOTICE -> SUGGEST(plan) -> EXECUTE(workers) -> VERIFY ->
+        REMEMBER. Workers are isolated (no tools); every result is
+        verified before synthesis."""
+        from ..teams import Team
+
+        run_id = self.tracker.new_run()
+        t = lambda s, d="": self.tracker.transition(run_id, s, d)  # noqa: E731
+        t(LifecycleStage.NOTICE, f"team task: {user_text[:80]}")
+        team = Team(
+            agent=self.agent,
+            max_workers=max_workers,
+            worker_model=worker_model,
+        )
+        subtasks = await team.plan(user_text)
+        t(LifecycleStage.SUGGEST, f"plan: {len(subtasks)} subtasks")
+        outputs = await team.execute(subtasks)
+        t(LifecycleStage.EXECUTE, f"{len(outputs)} worker outputs")
+        verified: list[tuple[str, str]] = []
+        dropped = 0
+        for subtask, out in zip(subtasks, outputs):
+            if team.verify(subtask, out):
+                verified.append((subtask, out))
+            else:
+                dropped += 1
+        t(LifecycleStage.VERIFY,
+          f"verified={len(verified)} dropped={dropped}")
+        text = await team.synthesize(user_text, verified)
+        t(LifecycleStage.REMEMBER,
+          f"status={'ok' if dropped == 0 else 'partial'}")
+        from ..teams import TeamResult
+
+        return TeamResult(
+            status="ok" if dropped == 0 else ("partial" if verified else "failed"),
+            text=text,
+            subtasks=subtasks,
+            verified=len(verified),
+            dropped=dropped,
+            run_id=run_id,
+        )
+
     # ---------- helpers --------------------------------------------------
 
     @staticmethod

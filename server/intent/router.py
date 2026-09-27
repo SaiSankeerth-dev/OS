@@ -4,6 +4,7 @@ Classifies user text into one of:
 - TOOL_CALL: needs a deterministic tool (clock, system info, etc.)
 - LLM_CHAT: regular conversational reply
 - TASK: deferred; reserved for the planner (not used in Phase 1)
+- TASK: multi-step requests, handled by a dynamic agent team (Phase 5)
 
 Patterns are ordered; first match wins.
 """
@@ -82,6 +83,18 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         ),
         Intent.TOOL_CALL,
         "linkedin_draft",
+    ),
+    (
+        # Phase 5: multi-step requests go to a dynamic agent team.
+        # "research X and then summarize it", "plan my trip: ..."
+        re.compile(
+            r"^\s*(?:please\s+)?(?:research|plan|prepare|organize|compare|"
+            r"investigate|analyze|analyse)\b.{0,200}?\b(?:and then|then|"
+            r"also|and also)\b",
+            re.IGNORECASE,
+        ),
+        Intent.TASK,
+        None,
     ),
 ]
 
