@@ -47,7 +47,10 @@ def _registry() -> ToolRegistry:
 
     def now() -> ToolResult:
         return ToolResult(
-            status="success", mode=ExecutionMode.DIRECT, data={"now": "2026-09-27"}
+            status="success",
+            mode=ExecutionMode.DIRECT,
+            data={"date": "Sunday, September 27, 2026",
+                  "time": "06:00 PM", "timezone": "IST"},
         )
 
     reg.register(
@@ -66,7 +69,7 @@ def _registry() -> ToolRegistry:
             execution_mode=ExecutionMode.DIRECT,
         ),
         now,
-        formatter=lambda r: r.data["now"],
+        formatter=lambda r: r.data["time"],
     )
     return reg
 
@@ -120,7 +123,7 @@ def test_allow_tool_runs_straight_through():
     s = _supervisor()
     res = _run(s.run_tool("get_current_datetime", {}, "what time is it"))
     assert res.status == "ok"
-    assert res.tool_result.data["now"] == "2026-09-27"
+    assert res.tool_result.data["time"] == "06:00 PM"
 
 
 def test_complete_approved_runs_execute_verify_remember():

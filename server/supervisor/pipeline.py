@@ -24,6 +24,7 @@ from .agent import SupervisorAgent
 from .lifecycle import LifecycleStage, LifecycleTracker
 from .permissions import APPROVAL_REQUIRED, ToolPermission, ToolPolicy
 from .scope import ScopeGuard
+from .verifier import verify_tool_result
 
 
 log = logging.getLogger("os.supervisor")
@@ -39,6 +40,9 @@ class SupervisedResult:
     verifier_note: str = ""
     needs_approval: bool = False
     refined_args: dict[str, Any] = field(default_factory=dict)
+    # Phase 11: the failure was a failed VERIFICATION, not a tool
+    # error - the manager must not format the unverified result.
+    verification_failed: bool = False
 
 
 class Supervisor:
@@ -108,11 +112,25 @@ class Supervisor:
                 refined_args=refined,
             )
 
-        # Independent Verifier.
-        summary = self._summarize(tool_name, result)
-        verdict = await self.agent.verify(tool_name, refined, summary)
+        # Independent Verifier - Phase 11: deterministic, structural.
+        # A tool that claims success but returns nothing verifiable
+        # FAILS here and is never presented as fact. The model-based
+        # agent.verify remains available as advisory (agent.py), but
+        # the gate is pure code: never trust a "done" claim.
+        verdict = verify_tool_result(tool_name, refined, result)
         t(LifecycleStage.VERIFY,
           f"passed={verdict.passed} note={verdict.note}")
+
+        if not verdict.passed:
+            t(LifecycleStage.REMEMBER,
+              f"verification failed: {verdict.note}")
+            return SupervisedResult(
+                status="failed", tool_result=result, run_id=run_id,
+                message=f"I couldn't verify that worked ({verdict.note}).",
+                refined_args=refined,
+                verifier_note=verdict.note,
+                verification_failed=True,
+            )
 
         if policy == ToolPolicy.NEEDS_APPROVAL:
             # Local part done; the external effect waits for the user.
@@ -158,6 +176,17 @@ class Supervisor:
                 message=f"{type(e).__name__}: {e}",
             )
         t(LifecycleStage.EXECUTE, "external effect ran")
+        # Phase 11: deterministic gate on the publish outcome too - an
+        # empty outcome is a failed verification, not a success.
+        if not outcome or not outcome.strip():
+            t(LifecycleStage.VERIFY,
+              "passed=False note=empty publish outcome")
+            t(LifecycleStage.REMEMBER, "publish produced nothing")
+            return SupervisedResult(
+                status="failed", run_id=run_id,
+                message="The publish step produced nothing to verify.",
+                verification_failed=True,
+            )
         verdict = await self.agent.verify(tool_name, {}, outcome)
         t(LifecycleStage.VERIFY,
           f"passed={verdict.passed} note={verdict.note}")
@@ -238,13 +267,6 @@ class Supervisor:
         if code == "TOOL_NOT_ALLOWED":
             return f"I'm not permitted to run {tool_name}."
         return f"Blocked ({code})."
-
-    @staticmethod
-    def _summarize(tool_name: str, result: ToolResult) -> str:
-        data = result.data
-        if tool_name == "linkedin_draft":
-            return f"draft: {data.get('draft', '')[:300]}"
-        return str(data)[:300]
 
     def status(self) -> dict:
         return {

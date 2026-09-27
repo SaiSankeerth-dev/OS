@@ -359,6 +359,18 @@ class ConversationManager:
             self.set_state(ConversationState.READY)
             return
 
+        if supervised.verification_failed:
+            # Phase 11: the tool's "done" claim did not verify. Never
+            # format or present the unverified result - say so plainly.
+            text = supervised.message
+            self.history.append(
+                Message(role="assistant", content=text, ts=time.time())
+            )
+            self.set_state(ConversationState.SPEAKING)
+            yield ChatChunk(delta=text, done=True)
+            self.set_state(ConversationState.READY)
+            return
+
         result = supervised.tool_result
         if result is None:  # executor-level failure inside the pipeline
             fr = self.response_policy.apply_llm_chat("")
