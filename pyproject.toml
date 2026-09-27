@@ -12,6 +12,9 @@ dependencies = [
     "pydantic-ai-slim[ollama]>=2.0",
     # Phase 8: MCP tool bus (official SDK, MIT). Local stdio only.
     "mcp==2.2.0",
+    # Animated terminal UI (arc-reactor boot, spinners). Pure Python,
+    # degrades to plain text when missing.
+    "rich>=13",
 ]
 
 [project.optional-dependencies]

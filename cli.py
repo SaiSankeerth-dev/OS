@@ -101,16 +101,28 @@ async def amain(args: argparse.Namespace) -> int:
             print("  (history reset)")
             continue
 
-        # --- Conversational output: clean, no internal prefixes ---
-        print("jarvis > ", end="", flush=True)
+        # --- Conversational output: spinner until the first token, then
+        # stream (DeepSeek-style). Falls back to the plain prompt.
+        from server import jarvis_ui as ui  # noqa: E402
+
+        status = ui.begin_thinking()
+        first = True
         try:
             async for chunk in mgr.respond_text(user):
                 if chunk.delta:
+                    if first:
+                        if status is not None:
+                            status.stop()
+                        print("jarvis > ", end="", flush=True)
+                        first = False
                     print(chunk.delta, end="", flush=True)
             print()
         except Exception as e:
             print(f"\n  [error: {type(e).__name__}]\n")
             log.exception("respond_text failed")
+        finally:
+            if status is not None:
+                status.stop()
             continue
 
     print("Powering down. Good day, sir.")
