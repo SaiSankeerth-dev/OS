@@ -59,7 +59,7 @@ $("#theme-toggle").addEventListener("click", () => {
 /* ---------------- nav ---------------- */
 const loaders = {};
 $$("#nav .nav-item").forEach((b) =>
-  b.addEventListener("click", () => switchView(b.dataset.view))
+  b.addEventListener("click", () => { document.body.classList.remove("nav-open"); switchView(b.dataset.view); })
 );
 function switchView(name) {
   if (name === "connectors") { openSettings("connectors"); return; }
@@ -68,6 +68,8 @@ function switchView(name) {
   if (loaders[name]) loaders[name]();
 }
 $("#grid-btn").addEventListener("click", () => openSettings("connectors"));
+$("#menu-btn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
+$("#nav-scrim").addEventListener("click", () => document.body.classList.remove("nav-open"));
 
 /* ---------------- me / greeting ---------------- */
 async function loadMe() {
