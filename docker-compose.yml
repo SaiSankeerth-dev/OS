@@ -1,0 +1,27 @@
+services:
+  os-dashboard:
+    build: .
+    image: os-dashboard:latest
+    container_name: os-dashboard
+    # Dashboard binds 0.0.0.0 inside the container; published on localhost only.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # All persistent state lives here: dashboard DB (with the encrypted
+      # credential vault), the local vault key, memory and logs.
+      - os-data:/app/data
+    environment:
+      # Optional: pin the vault encryption key instead of the generated
+      # machine-local one. Keep this value secret and backed up —
+      # losing it locks you out of stored credentials.
+      # - OS_DASHBOARD_KEY=${OS_DASHBOARD_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/me', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  os-data:

@@ -157,6 +157,18 @@ class StateStore:
         finally:
             conn.close()
 
+    def delete_task(self, task_id: int) -> None:
+        """Permanently remove a task and its events. Raises KeyError if missing."""
+        if self.get_task(task_id) is None:
+            raise KeyError(f"no such task: {task_id}")
+        conn = self._connect()
+        try:
+            conn.execute("DELETE FROM task_events WHERE task_id = ?", (task_id,))
+            conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
     def list_tasks(self, status: str | None = None) -> list[Task]:
         conn = self._connect()
         try:

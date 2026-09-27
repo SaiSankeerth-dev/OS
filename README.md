@@ -49,6 +49,37 @@ python voice_cli.py
 python voice_cli.py --list-devices   # check your audio hardware
 ```
 
+## Web dashboard — the OS that does things
+
+One command, then open **http://localhost:3000**:
+
+```bash
+docker compose up        # builds once, keeps your data in a volume
+# …or without Docker:
+pip install ".[dashboard,google]"
+python cli.py dashboard --port 3000
+```
+
+Chat does real work through connectors: *"schedule a meeting tomorrow at 4"*
+creates a real Google Calendar event, *"send this to GitHub"* opens a real
+issue. Reads run immediately; **every write asks your approval first** —
+in chat, and again in the approval rail. Nothing is "connected" until it
+passes a live health check, and credentials are encrypted on disk.
+
+- **Settings ▦ → Connectors** — Connected / Available groups, search, per-service
+  setup guides, OAuth sign-in, test & revoke. Like the mock, but everything works.
+- **Defaults per connector** — default GitHub repo, Slack channel, Notion parent, spreadsheet.
+- **MCP bridge** — every connected service is also an MCP tool at `POST /mcp`
+  (`initialize`, `tools/list`, `tools/call`); write tools return a pending
+  approval instead of executing.
+- **Honest free tier** — GitHub, Notion, Telegram, Slack, Discord bots, Google
+  OAuth apps and YouTube search all have free paths; X posting needs a paid API
+  tier and says so.
+
+Google connectors need a one-time [Google Cloud OAuth client](https://console.cloud.google.com/apis/credentials)
+(desktop app, redirect `http://localhost:3000/api/connectors/google/oauth/callback` —
+the setup guide inside the app walks you through it).
+
 ## The pipeline, stage by stage
 
 | Stage | Component | File |

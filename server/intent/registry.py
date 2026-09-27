@@ -59,6 +59,10 @@ class ToolRegistry:
             raise KeyError(f"unknown tool: {name}")
         return self._tools[name]
 
+    def specs(self) -> list[ToolSpec]:
+        """All registered tool specs (for dashboards / introspection)."""
+        return [spec for spec, _, _ in self._tools.values()]
+
     def execute(self, name: str, **kwargs: Any) -> ToolResult:
         if name not in self._tools:
             return ToolResult(

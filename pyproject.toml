@@ -15,8 +15,13 @@ dependencies = [
     # Animated terminal UI (arc-reactor boot, spinners). Pure Python,
     # degrades to plain text when missing.
     "rich>=13",
+    # Web dashboard (`os dashboard`). Localhost only.
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    # Dashboard connector vault (encrypted credentials) + date parsing.
+    "cryptography>=42",
+    "python-dateutil>=2.9",
 ]
-
 [project.optional-dependencies]
 voice = [
     # Real voice pipeline (mic -> AEC -> VAD -> STT -> TTS -> speaker).
@@ -41,6 +46,20 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
+google = [
+    # Live Google connectors (Calendar, Gmail, Drive, Sheets, YouTube).
+    # Optional: dashboard works without them; Google connectors just
+    # report "setup failed" until these are installed.
+    "google-api-python-client>=2.0",
+    "google-auth>=2.0",
+    "google-auth-oauthlib>=1.0",
+]
+dashboard = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "cryptography>=42",
+    "python-dateutil>=2.9",
+]
 
 [project.scripts]
 os = "os_cli:main"
@@ -50,7 +69,7 @@ py-modules = ["os_cli", "cli", "voice_cli"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["server*", "client*", "config*"]
+include = ["server*", "client*", "config*", "web*"]
 exclude = ["tests*", "logs*", "memory*"]
 
 [tool.pytest.ini_options]

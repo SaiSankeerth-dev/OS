@@ -145,7 +145,25 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="JARVIS — text conversation")
     ap.add_argument("--model", help="override Ollama model (e.g. qwen3:14b)")
     ap.add_argument("--reset", action="store_true", help="start with empty history")
+    ap.add_argument(
+        "command",
+        nargs="?",
+        choices=["dashboard"],
+        help="'dashboard' starts the web UI",
+    )
+    ap.add_argument("--port", type=int, default=3000, help="dashboard port")
+    ap.add_argument("--host", default="127.0.0.1", help="dashboard host")
     args = ap.parse_args()
+    if args.command == "dashboard":
+        import os as _os
+
+        # Data paths (data/...) are relative: run from the repo root so the
+        # dashboard shares the CLI's databases.
+        _os.chdir(_os.path.dirname(_os.path.abspath(__file__)))
+        from web.server import run as run_dashboard
+
+        run_dashboard(port=args.port, host=args.host)
+        return 0
     try:
         return asyncio.run(amain(args))
     except KeyboardInterrupt:

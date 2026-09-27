@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS — Your Personal AI Assistant</title>
+<link rel="stylesheet" href="/static/styles.css">
+<!-- system fonts only — no external requests -->
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-ring">
+        <svg viewBox="0 0 64 64" width="52" height="52">
+          <defs>
+            <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ff7ab8"/><stop offset=".5" stop-color="#7a7aff"/><stop offset="1" stop-color="#37c6ff"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="32" cy="32" rx="26" ry="18" fill="none" stroke="url(#lg)" stroke-width="5" transform="rotate(-24 32 32)"/>
+          <ellipse cx="32" cy="32" rx="26" ry="18" fill="none" stroke="url(#lg)" stroke-width="3" opacity=".45" transform="rotate(38 32 32)"/>
+        </svg>
+      </div>
+      <div class="logo-name">OS</div>
+      <div class="logo-sub">YOUR PERSONAL AI ASSISTANT</div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-view="chat"><span class="nav-ico">💬</span>Chat</button>
+      <button class="nav-item" data-view="tasks"><span class="nav-ico">☑</span>Tasks<span class="badge" id="badge-tasks"></span></button>
+      <button class="nav-item" data-view="calendar"><span class="nav-ico">📅</span>Calendar</button>
+      <button class="nav-item" data-view="projects"><span class="nav-ico">📁</span>Projects</button>
+      <button class="nav-item" data-view="memory"><span class="nav-ico">🧠</span>Memory</button>
+      <button class="nav-item" data-view="skills"><span class="nav-ico">🛠</span>Skills</button>
+      <button class="nav-item" data-view="watchers"><span class="nav-ico">🔔</span>Watchers<span class="badge" id="badge-watchers"></span></button>
+      <button class="nav-item" data-view="files"><span class="nav-ico">🗂</span>Files</button>
+      <button class="nav-item" data-view="analytics"><span class="nav-ico">📊</span>Analytics</button>
+      <button class="nav-item" data-view="connectors"><span class="nav-ico">🔌</span>Connectors</button>
+    </nav>
+
+    <div class="quick-label">QUICK ACTIONS</div>
+    <div class="quick-actions">
+      <button data-qa="newtask">＋ New Task</button>
+      <button data-qa="ask">✦ Ask OS</button>
+      <button data-qa="draft">📝 Draft Content</button>
+      <button data-qa="code">⟨/⟩ Analyze Code</button>
+      <button data-qa="plan">📅 Plan My Day</button>
+    </div>
+
+    <div class="user-card">
+      <div class="avatar">S</div>
+      <div class="user-meta">
+        <div class="user-name" id="user-name">sai</div>
+        <div class="user-mode" id="user-mode">Builder Mode ▾</div>
+        <div class="user-online"><span class="dot"></span>Online</div>
+      </div>
+      <button class="gear" title="Settings">⚙</button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <header class="topbar">
+      <div class="greet">
+        <div class="greet-logo">🌀</div>
+        <div>
+          <div class="greet-title" id="greet-title">Good morning, sai ☀️</div>
+          <div class="greet-sub">Ready to think, plan, build and grow with you.</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="searchbox" id="open-palette">🔍 <span>Search anything…</span> <kbd>Ctrl K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" title="Toggle theme">☀️</button>
+        <button class="icon-btn" id="grid-btn" title="Connectors">▦</button>
+        <button class="icon-btn avatar-sm">◐</button>
+      </div>
+    </header>
+
+    <div class="views">
+      <!-- ===== CHAT VIEW ===== -->
+      <section class="view active" id="view-chat">
+        <div class="chat-layout">
+          <div class="chat-main">
+            <div class="action-cards" id="action-cards">
+              <button class="acard" data-prompt="Plan my day"><div class="acard-ico pink">📅</div><div><b>Plan My Day</b><span>Tasks, meetings, focus</span></div></button>
+              <button class="acard" data-prompt="Draft a linkedin post about shipping early"><div class="acard-ico purple">✒</div><div><b>Create Content</b><span>LinkedIn, YouTube, Instagram</span></div></button>
+              <button class="acard" data-prompt="Write code for"><div class="acard-ico blue">⟨/⟩</div><div><b>Write Code</b><span>Build, debug, explain</span></div></button>
+              <button class="acard" data-prompt="Research"><div class="acard-ico green">🔍</div><div><b>Research</b><span>Find, analyze, summarize</span></div></button>
+              <button class="acard" data-prompt="Automate"><div class="acard-ico orange">⚡</div><div><b>Automate</b><span>Connect apps, set workflows</span></div></button>
+            </div>
+
+            <div class="messages" id="messages"></div>
+
+            <div class="composer">
+              <div class="composer-box">
+                <button class="icon-btn" id="attach-btn" title="Attach a file">📎</button>
+                <input type="file" id="file-input" hidden>
+                <input id="chat-input" type="text" placeholder="Message OS…" autocomplete="off">
+                <button class="icon-btn" id="mic-btn" title="Voice input">🎙</button>
+                <button class="send-btn" id="send-btn" title="Send">➤</button>
+              </div>
+              <div class="chips" id="chips">
+                <button data-chip="Make it shorter">✦ Make it shorter</button>
+                <button data-chip="Add a personal story">👤 Add a personal story</button>
+                <button data-chip="More technical">⟨/⟩ More technical</button>
+                <button data-chip="Different tone">🎚 Different tone</button>
+                <button data-chip="">⋯</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== RIGHT RAIL ===== -->
+          <aside class="rail">
+            <div class="card approval-card" id="approval-card" hidden>
+              <div class="card-head">
+                <div class="warn-ico">⏳</div>
+                <div><b class="warn-title">Approval Required</b><div class="muted">Review and approve to post</div></div>
+                <button class="icon-btn" id="approval-close">✕</button>
+              </div>
+              <div class="approval-title-row">
+                <span class="li-ico">in</span><b>LinkedIn Post</b>
+                <span class="ver-badge" id="approval-ver">v1.0</span>
+              </div>
+              <div class="kv"><span>🎯 Platform</span><b>LinkedIn</b></div>
+              <div class="kv"><span>👁 Persona</span><b>Builder</b></div>
+              <div class="kv"><span>🌐 Visibility</span><b>Public</b></div>
+              <div class="kv"><span>🏷 Topics</span><b>Build in public, AI</b></div>
+              <div class="kv"><span>🖼 Media</span><b>3 images</b></div>
+              <div class="kv"><span>🔔 Hashtags</span><b>5 hashtags</b></div>
+              <div class="kv"><span>🔔 Account</span><b class="not-conn" id="li-account">● Not connected</b><button class="link-btn" id="li-connect">Connect</button></div>              <button class="btn-primary" id="btn-approve">➤ Approve &amp; Post</button>
+              <button class="btn-ghost" id="btn-edit">✎ Edit Draft</button>
+              <button class="btn-danger-ghost" id="btn-discard">🗑 Discard</button>
+            </div>
+
+            <!-- connector write-action approvals -->
+            <div class="card" id="action-approval-card" hidden>
+              <div class="card-head">
+                <div class="warn-ico">🛡</div>
+                <div><b class="warn-title">Action approval</b><div class="muted">OS will run this on the connected service</div></div>
+                <button class="icon-btn" id="action-approval-close">✕</button>
+              </div>
+              <div id="action-approval-body"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">🗂 Context</div>
+              <div class="kv"><span>📁 Project</span><b>Personal OS</b></div>
+              <div class="kv"><span>🏷 Topic</span><b>Build in public</b></div>
+              <div class="kv"><span>🎯 Tone</span><b>Honest, Real, Technical</b></div>
+              <div class="kv"><span>👥 Audience</span><b>Developers, Builders</b></div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">⚡ Related Actions</div>
+              <button class="rel-action" data-rel="Make a Twitter/X version of the linkedin draft">𝕏 Make a Twitter/X version <span>›</span></button>
+              <button class="rel-action" data-rel="Create an Instagram post version of the linkedin draft">📸 Create an Instagram post <span>›</span></button>
+              <button class="rel-action" data-rel="Turn the linkedin draft into a YouTube script">▶ Turn into a YouTube script <span>›</span></button>
+              <button class="rel-action" data-rel="Save the linkedin draft to my content calendar">🗓 Save to content calendar <span>›</span></button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ===== OTHER VIEWS ===== -->
+      <section class="view" id="view-tasks">
+        <h2>Tasks</h2>
+        <div class="task-add"><input id="task-input" placeholder="Add a task…"><button class="btn-primary" id="task-add-btn">Add</button></div>
+        <div id="task-list" class="list"></div>
+      </section>
+
+      <section class="view" id="view-calendar">
+        <h2>Calendar</h2>
+        <div id="calendar-body"></div>
+      </section>
+
+      <section class="view" id="view-projects">
+        <h2>Projects</h2>
+        <div id="project-grid" class="grid"></div>
+      </section>
+
+      <section class="view" id="view-memory">
+        <h2>Memory</h2>
+        <p class="muted">Things OS remembers about you. Delete anything, anytime.</p>
+        <div id="memory-list" class="list"></div>
+      </section>
+
+      <section class="view" id="view-skills">
+        <h2>Skills</h2>
+        <p class="muted">Capabilities wired into the OS engine.</p>
+        <div id="skill-grid" class="grid"></div>
+      </section>
+
+      <section class="view" id="view-watchers">
+        <h2>Watchers</h2>
+        <p class="muted">Proactive suggestions from OS. It suggests — never acts.</p>
+        <div id="watcher-list" class="list"></div>
+      </section>
+
+      <section class="view" id="view-files">
+        <h2>Files</h2>
+        <p class="muted" id="files-root"></p>
+        <div id="file-list" class="list"></div>
+      </section>
+
+      <section class="view" id="view-analytics">
+        <h2>Analytics</h2>
+        <div id="analytics-grid" class="stat-grid"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ============ MODALS ============ -->
+<!-- ============ SETTINGS MODAL (like the reference) ============ -->
+<div class="modal-backdrop" id="settings-modal" hidden>
+  <div class="modal settings-modal">
+    <div class="sm-layout">
+      <nav class="sm-nav">
+        <h3>Settings</h3>
+        <button class="sm-nav-item" data-dtab="general"><span>⚙️</span>General</button>
+        <button class="sm-nav-item active" data-dtab="connectors"><span>▦</span>Connectors</button>
+        <button class="sm-nav-item" data-dtab="privacy"><span>🔒</span>Data &amp; privacy</button>
+        <div class="sm-nav-foot">
+          <div class="sm-ver" id="sm-ver">OS Dashboard</div>
+        </div>
+      </nav>
+      <div class="sm-content">
+        <button class="sm-close" id="settings-close" title="Close">✕</button>
+
+        <section class="dtab" id="dtab-general">
+          <h2>General</h2>
+          <div class="set-row"><div><b>Theme</b><p>Light or dark interface.</p></div>
+            <button class="btn-ghost" id="set-theme">Toggle theme</button></div>
+          <div class="set-row"><div><b>Language model</b><p id="set-model">Local Ollama</p></div>
+            <span class="pill" id="set-model-pill">checking…</span></div>
+          <div class="set-row"><div><b>MCP bridge</b><p>Connected connectors are exposed as MCP tools at <code>/mcp</code>.</p></div>
+            <span class="pill pill-ok" id="set-mcp">on</span></div>
+        </section>
+
+        <section class="dtab active" id="dtab-connectors">
+          <div id="conn-list-view">
+            <h2>Connectors</h2>
+            <p class="muted sm-sub">OS asks your permission before touching any service. Nothing runs until you allow it — and every write asks again.</p>
+            <div class="conn-search"><span>🔍</span><input id="conn-search" placeholder="Search connectors" autocomplete="off"></div>
+            <h4 class="conn-group">Connected</h4>
+            <div class="conn-group-box" id="conn-connected"></div>
+            <h4 class="conn-group">Available</h4>
+            <div class="conn-group-box" id="conn-available"></div>
+          </div>
+          <div id="conn-detail-view" hidden>
+            <button class="btn-ghost back-btn" id="conn-back">‹ Back</button>
+            <div id="conn-detail"></div>
+          </div>
+        </section>
+
+        <section class="dtab" id="dtab-privacy">
+          <h2>Data &amp; privacy</h2>
+          <div class="set-row"><div><b>Local-first</b><p>Everything runs on this machine. Credentials are encrypted before they're stored.</p></div>
+            <span class="pill pill-ok">on</span></div>
+          <div class="set-row"><div><b>Revoke everything</b><p>Remove all connector grants and delete every stored credential.</p></div>
+            <button class="btn-danger-ghost" id="revoke-all">Revoke all</button></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="perm-modal" hidden>
+  <div class="modal">
+    <h3 id="perm-title">Connect Gmail?</h3>
+    <p class="muted">OS is asking your permission. It will only use what you allow, and you can revoke anytime.</p>
+    <div id="perm-scopes" class="scope-list"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="perm-deny">Deny</button>
+      <button class="btn-primary" id="perm-allow">Allow</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cred-modal" hidden>
+  <div class="modal">
+    <h3 id="cred-title">Add credentials</h3>
+    <p class="muted">Stored only on this machine. Never sent anywhere except the service itself.</p>
+    <div id="cred-fields"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cred-cancel">Cancel</button>
+      <button class="btn-primary" id="cred-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="edit-modal" hidden>
+  <div class="modal wide">
+    <h3>Edit draft</h3>
+    <p class="muted">Saving creates a new version that goes through approval again.</p>
+    <textarea id="edit-text" rows="10"></textarea>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="edit-cancel">Cancel</button>
+      <button class="btn-primary" id="edit-save">Save as new version</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="palette" hidden>
+  <div class="modal palette-modal">
+    <input id="palette-input" placeholder="Search anything…" autocomplete="off">
+    <div id="palette-results"></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
