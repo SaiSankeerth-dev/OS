@@ -5,25 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OS — Your Personal AI Assistant</title>
 <link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" type="image/png" href="/static/logo.png">
 <!-- system fonts only — no external requests -->
 </head>
 <body>
+
+<!-- ============ BOOT SPLASH ============ -->
+<div id="boot">
+  <img class="boot-logo" src="/static/logo.png" alt="OS">
+  <div class="boot-name">OS</div>
+  <div class="boot-sub">YOUR PERSONAL AI ASSISTANT</div>
+  <div class="boot-tag">Think&nbsp;&nbsp;•&nbsp;&nbsp;Plan&nbsp;&nbsp;•&nbsp;&nbsp;Build&nbsp;&nbsp;•&nbsp;&nbsp;Automate</div>
+  <div class="boot-bar"><div class="boot-fill"></div></div>
+</div>
+
 <div class="app">
 
   <!-- ============ SIDEBAR ============ -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="logo">
-      <div class="logo-ring">
-        <svg viewBox="0 0 64 64" width="52" height="52">
-          <defs>
-            <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#ff7ab8"/><stop offset=".5" stop-color="#7a7aff"/><stop offset="1" stop-color="#37c6ff"/>
-            </linearGradient>
-          </defs>
-          <ellipse cx="32" cy="32" rx="26" ry="18" fill="none" stroke="url(#lg)" stroke-width="5" transform="rotate(-24 32 32)"/>
-          <ellipse cx="32" cy="32" rx="26" ry="18" fill="none" stroke="url(#lg)" stroke-width="3" opacity=".45" transform="rotate(38 32 32)"/>
-        </svg>
-      </div>
+      <img class="logo-img" src="/static/logo.png" alt="OS logo">
       <div class="logo-name">OS</div>
       <div class="logo-sub">YOUR PERSONAL AI ASSISTANT</div>
     </div>
@@ -67,7 +68,7 @@
     <header class="topbar">
       <button class="icon-btn menu-btn" id="menu-btn" title="Menu">☰</button>
       <div class="greet">
-        <div class="greet-logo">🌀</div>
+        <img class="greet-logo" src="/static/logo.png" alt="">
         <div>
           <div class="greet-title" id="greet-title">Good morning, sai ☀️</div>
           <div class="greet-sub">Ready to think, plan, build and grow with you.</div>
@@ -77,7 +78,7 @@
         <button class="searchbox" id="open-palette">🔍 <span>Search anything…</span> <kbd>Ctrl K</kbd></button>
         <button class="icon-btn" id="theme-toggle" title="Toggle theme">☀️</button>
         <button class="icon-btn" id="grid-btn" title="Connectors">▦</button>
-        <button class="icon-btn avatar-sm">◐</button>
+        <button class="icon-btn avatar-sm" title="Settings">◐</button>
       </div>
     </header>
 
@@ -86,6 +87,13 @@
       <section class="view active" id="view-chat">
         <div class="chat-layout">
           <div class="chat-main">
+            <div class="hero" id="hero">
+              <img class="hero-logo" src="/static/logo.png" alt="">
+              <h1>Turn your ideas into reality with OS</h1>
+              <p>Plan, create, research and automate — all in one place.</p>
+              <button class="btn-primary hero-cta" id="hero-new">Start a new chat <span>→</span></button>
+            </div>
+
             <div class="action-cards" id="action-cards">
               <button class="acard" data-prompt="Plan my day"><div class="acard-ico pink">📅</div><div><b>Plan My Day</b><span>Tasks, meetings, focus</span></div></button>
               <button class="acard" data-prompt="Draft a linkedin post about shipping early"><div class="acard-ico purple">✒</div><div><b>Create Content</b><span>LinkedIn, YouTube, Instagram</span></div></button>
@@ -100,6 +108,7 @@
               <div class="composer-box">
                 <button class="icon-btn" id="attach-btn" title="Attach a file">📎</button>
                 <input type="file" id="file-input" hidden>
+                <input type="file" id="upload-input" hidden>
                 <input id="chat-input" type="text" placeholder="Message OS…" autocomplete="off">
                 <button class="icon-btn" id="mic-btn" title="Voice input">🎙</button>
                 <button class="send-btn" id="send-btn" title="Send">➤</button>
@@ -132,7 +141,8 @@
               <div class="kv"><span>🏷 Topics</span><b>Build in public, AI</b></div>
               <div class="kv"><span>🖼 Media</span><b>3 images</b></div>
               <div class="kv"><span>🔔 Hashtags</span><b>5 hashtags</b></div>
-              <div class="kv"><span>🔔 Account</span><b class="not-conn" id="li-account">● Not connected</b><button class="link-btn" id="li-connect">Connect</button></div>              <button class="btn-primary" id="btn-approve">➤ Approve &amp; Post</button>
+              <div class="kv"><span>🔔 Account</span><b class="not-conn" id="li-account">● Not connected</b><button class="link-btn" id="li-connect">Connect</button></div>
+              <button class="btn-primary" id="btn-approve">➤ Approve &amp; Post</button>
               <button class="btn-ghost" id="btn-edit">✎ Edit Draft</button>
               <button class="btn-danger-ghost" id="btn-discard">🗑 Discard</button>
             </div>
@@ -166,58 +176,126 @@
         </div>
       </section>
 
-      <!-- ===== OTHER VIEWS ===== -->
+      <!-- ===== TASKS ===== -->
       <section class="view" id="view-tasks">
-        <h2>Tasks</h2>
-        <div class="task-add"><input id="task-input" placeholder="Add a task…"><button class="btn-primary" id="task-add-btn">Add</button></div>
+        <div class="page-head">
+          <div><h2>Tasks</h2><p class="page-sub">Stay organized and get things done.</p></div>
+          <button class="btn-primary btn-auto" id="task-new-btn">＋ New Task</button>
+        </div>
+        <div class="tab-row" id="task-tabs">
+          <button class="tab active" data-tab="all">All</button>
+          <button class="tab" data-tab="today">Today</button>
+          <button class="tab" data-tab="upcoming">Upcoming</button>
+          <button class="tab" data-tab="completed">Completed</button>
+        </div>
+        <div class="task-add" id="task-add" hidden>
+          <input id="task-input" placeholder="Add a task…">
+          <button class="btn-primary btn-auto" id="task-add-btn">Add</button>
+        </div>
         <div id="task-list" class="list"></div>
       </section>
 
+      <!-- ===== CALENDAR ===== -->
       <section class="view" id="view-calendar">
-        <h2>Calendar</h2>
+        <div class="page-head">
+          <div><h2>Calendar</h2><p class="page-sub">Plan your day, stay productive.</p></div>
+          <button class="btn-primary btn-auto" id="cal-add">＋ Add Event</button>
+        </div>
+        <div class="cal-bar">
+          <div class="month-nav">
+            <button class="icon-btn" id="cal-prev">‹</button>
+            <b id="cal-month">—</b>
+            <button class="icon-btn" id="cal-next">›</button>
+          </div>
+          <div class="tab-row" id="cal-tabs">
+            <button class="tab" data-tab="day">Day</button>
+            <button class="tab active" data-tab="week">Week</button>
+            <button class="tab" data-tab="month">Month</button>
+          </div>
+        </div>
         <div id="calendar-body"></div>
       </section>
 
+      <!-- ===== PROJECTS ===== -->
       <section class="view" id="view-projects">
-        <h2>Projects</h2>
-        <div id="project-grid" class="grid"></div>
+        <div class="page-head">
+          <div><h2>Projects</h2><p class="page-sub">Organize your work and ideas.</p></div>
+          <button class="btn-primary btn-auto" id="proj-new">＋ New Project</button>
+        </div>
+        <div id="project-grid" class="proj-grid"></div>
       </section>
 
+      <!-- ===== MEMORY ===== -->
       <section class="view" id="view-memory">
-        <h2>Memory</h2>
-        <p class="muted">Things OS remembers about you. Delete anything, anytime.</p>
+        <div class="page-head"><div><h2>Memory</h2><p class="page-sub">OS remembers what matters to you.</p></div></div>
+        <div class="tab-row" id="memory-tabs">
+          <button class="tab active" data-tab="all">All</button>
+          <button class="tab" data-tab="personal">Personal</button>
+          <button class="tab" data-tab="work">Work</button>
+          <button class="tab" data-tab="preference">Preferences</button>
+        </div>
         <div id="memory-list" class="list"></div>
       </section>
 
+      <!-- ===== SKILLS ===== -->
       <section class="view" id="view-skills">
-        <h2>Skills</h2>
-        <p class="muted">Capabilities wired into the OS engine.</p>
-        <div id="skill-grid" class="grid"></div>
+        <div class="page-head"><div><h2>Skills</h2><p class="page-sub">Tools and capabilities OS can use.</p></div></div>
+        <div class="tab-row" id="skill-tabs">
+          <button class="tab active" data-tab="all">All</button>
+          <button class="tab" data-tab="development">Development</button>
+          <button class="tab" data-tab="content">Content</button>
+          <button class="tab" data-tab="research">Research</button>
+          <button class="tab" data-tab="automation">Automation</button>
+        </div>
+        <div id="skill-grid" class="skill-grid"></div>
       </section>
 
+      <!-- ===== WATCHERS ===== -->
       <section class="view" id="view-watchers">
-        <h2>Watchers</h2>
-        <p class="muted">Proactive suggestions from OS. It suggests — never acts.</p>
+        <div class="page-head"><div><h2>Watchers</h2><p class="page-sub">Get suggestions, never acts without you.</p></div></div>
         <div id="watcher-list" class="list"></div>
       </section>
 
+      <!-- ===== FILES ===== -->
       <section class="view" id="view-files">
-        <h2>Files</h2>
+        <div class="page-head">
+          <div><h2>Files</h2><p class="page-sub">Keep your important files and conversations.</p></div>
+          <button class="btn-primary btn-auto" id="files-upload">＋ Upload</button>
+        </div>
+        <div class="tab-row" id="file-tabs">
+          <button class="tab active" data-tab="all">All Files</button>
+          <button class="tab" data-tab="docs">Documents</button>
+          <button class="tab" data-tab="images">Images</button>
+          <button class="tab" data-tab="other">Other</button>
+        </div>
         <p class="muted" id="files-root"></p>
-        <div id="file-list" class="list"></div>
+        <div id="file-list" class="file-grid"></div>
       </section>
 
+      <!-- ===== ANALYTICS ===== -->
       <section class="view" id="view-analytics">
-        <h2>Analytics</h2>
-        <div id="analytics-grid" class="stat-grid"></div>
+        <div class="page-head">
+          <div><h2>Analytics</h2><p class="page-sub">Track your productivity and usage.</p></div>
+          <span class="pill">All time ▾</span>
+        </div>
+        <div id="analytics-tiles" class="tile-grid"></div>
+        <div class="charts">
+          <div class="card chart-card">
+            <div class="card-title">Activity Overview</div>
+            <div id="chart-bars"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-title">Tasks by Status</div>
+            <div id="chart-donut"></div>
+          </div>
+        </div>
       </section>
 
     </div>
   </main>
 </div>
 
-<!-- ============ MODALS ============ -->
-<!-- ============ SETTINGS MODAL (like the reference) ============ -->
+<!-- ============ SETTINGS MODAL ============ -->
 <div class="modal-backdrop" id="settings-modal" hidden>
   <div class="modal settings-modal">
     <div class="sm-layout">
@@ -235,8 +313,14 @@
 
         <section class="dtab" id="dtab-general">
           <h2>General</h2>
-          <div class="set-row"><div><b>Theme</b><p>Light or dark interface.</p></div>
-            <button class="btn-ghost" id="set-theme">Toggle theme</button></div>
+          <div class="set-row"><div><b>Theme</b><p>Light, dark, or follow your system.</p></div>
+            <div class="seg" id="theme-seg">
+              <button data-theme-opt="light">Light</button>
+              <button data-theme-opt="dark">Dark</button>
+              <button data-theme-opt="system">System</button>
+            </div></div>
+          <div class="set-row" id="perm-row" hidden><div><b>Permission requests</b><p>Connectors waiting for your approval. <span id="perm-count"></span></p></div>
+            <button class="btn-ghost btn-auto" id="perm-banner">Review</button></div>
           <div class="set-row"><div><b>Language model</b><p id="set-model">Local Ollama</p></div>
             <span class="pill" id="set-model-pill">checking…</span></div>
           <div class="set-row"><div><b>MCP bridge</b><p>Connected connectors are exposed as MCP tools at <code>/mcp</code>.</p></div>
@@ -264,7 +348,7 @@
           <div class="set-row"><div><b>Local-first</b><p>Everything runs on this machine. Credentials are encrypted before they're stored.</p></div>
             <span class="pill pill-ok">on</span></div>
           <div class="set-row"><div><b>Revoke everything</b><p>Remove all connector grants and delete every stored credential.</p></div>
-            <button class="btn-danger-ghost" id="revoke-all">Revoke all</button></div>
+            <button class="btn-danger-ghost btn-auto" id="revoke-all">Revoke all</button></div>
         </section>
       </div>
     </div>
@@ -274,7 +358,7 @@
 <div class="modal-backdrop" id="perm-modal" hidden>
   <div class="modal">
     <h3 id="perm-title">Connect Gmail?</h3>
-    <p class="muted">OS is asking your permission. It will only use what you allow, and you can revoke anytime.</p>
+    <p class="muted" id="perm-sub">OS is asking your permission. It will only use what you allow, and you can revoke anytime.</p>
     <div id="perm-scopes" class="scope-list"></div>
     <div class="modal-actions">
       <button class="btn-ghost" id="perm-deny">Deny</button>
@@ -309,7 +393,7 @@
 
 <div class="modal-backdrop" id="palette" hidden>
   <div class="modal palette-modal">
-    <input id="palette-input" placeholder="Search anything…" autocomplete="off">
+    <div class="palette-input-row"><span>🔍</span><input id="palette-input" placeholder="Search anything…" autocomplete="off"><kbd>Ctrl K</kbd></div>
     <div id="palette-results"></div>
   </div>
 </div>

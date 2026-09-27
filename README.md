@@ -1,93 +1,92 @@
-# J.A.R.V.I.S.
+# J.A.R.V.I.S. — Just A Rather Very Intelligent System
 
-**Just A Rather Very Intelligent System** — a local-first AI assistant that *does things*. Chat with it in your browser and it books meetings, opens GitHub issues, sends messages, and manages your calendar — every write approved by you first. It can also talk to you out loud, mic and speaker, entirely on-device.
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Local-first](https://img.shields.io/badge/cloud-required-none-purple.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-313%2B-brightgreen.svg)](#testing)
+
+A **local-first AI assistant that does things**. Chat with it in your browser and it books meetings, opens GitHub issues, sends messages, and manages your calendar — **every write approved by you first**. It can also talk to you out loud, mic and speaker, entirely on-device. Runs at ₹0: no paid APIs, no cloud required.
+
+## Screenshots
+
+| Chat | Connectors |
+|---|---|
+| ![Chat dashboard](docs/screenshots/chat.png) | ![Connector settings](docs/screenshots/connectors.png) |
+
+| Calendar | Dark mode |
+|---|---|
+| ![Calendar](docs/screenshots/calendar.png) | ![Dark mode](docs/screenshots/dark.png) |
+
+## Quickstart
 
 One command, then open **http://localhost:3000**:
 
 ```bash
 docker compose up        # builds once, keeps your data in a volume
-# …or without Docker:
+```
+
+Or without Docker:
+
+```bash
 pip install ".[dashboard,google]"
 python cli.py dashboard --port 3000
 ```
 
-## The dashboard — the part that does things
+You'll need a local LLM for chat: `ollama serve && ollama pull qwen3:8b`.
 
-Chat does real work through connectors: *"schedule a meeting tomorrow at 4"* creates a real Google Calendar event, *"send this to GitHub"* opens a real issue. Reads run immediately; **every write asks your approval first** — in chat, and again in the approval rail. Nothing is "connected" until it passes a live health check, and credentials are encrypted on disk.
+## What it does
 
-- **Settings ▦ → Connectors** — Connected / Available groups, search, per-service setup guides, OAuth sign-in, test & revoke. Like the mock, but everything works.
-- **15 real connectors** — Google Calendar, Gmail, Sheets, Drive, YouTube, GitHub, Notion, Telegram, Slack, Discord, Spotify, WhatsApp, LinkedIn, X, Instagram.
-- **Defaults per connector** — default GitHub repo, Slack channel, Notion parent, spreadsheet.
-- **MCP bridge** — every connected service is also an MCP tool at `POST /mcp` (`initialize`, `tools/list`, `tools/call`); write tools return a pending approval instead of executing.
-- **Honest free tier** — GitHub, Notion, Telegram, Slack, Discord bots, Google OAuth apps and YouTube search all have free paths; X posting needs a paid API tier and says so.
+**The dashboard is the product.** Chat executes real work through connectors — *"schedule a meeting tomorrow at 4"* creates a real Google Calendar event, *"send this to GitHub"* opens a real issue. The UI covers chat, tasks, calendar (day/week/month), projects, memory, skills, watchers, files, analytics, and settings.
 
-Google connectors need a one-time [Google Cloud OAuth client](https://console.cloud.google.com/apis/credentials) (desktop app, redirect `http://localhost:3000/api/connectors/google/oauth/callback` — the setup guide inside the app walks you through it).
+**Connectors (15 real adapters, zero mocks).** Google Calendar, Gmail, Sheets, Drive, YouTube, GitHub, Notion, Telegram, Slack, Discord, Spotify, WhatsApp, LinkedIn, X, Instagram.
 
-## Voice mode — it also talks
+- **Settings → Connectors**: Connected / Available groups, search, per-service setup guides, OAuth sign-in, credential storage, test & revoke.
+- A connector counts as *connected* only after permission grant **+** credentials **+** a live health check. No fake green dots.
+- Per-connector defaults: default GitHub repo, Slack channel, Notion parent page, spreadsheet.
+- **Honest free tier**: GitHub, Notion, Telegram/Slack/Discord bots, Google OAuth apps, and YouTube search all have free paths. X posting needs a paid API tier and the UI says so instead of failing silently.
 
-```
-                 .-=========-.
-              _.-'  .-""-.  '-._
-            .'   .'        '.   '.
-           /    /   .--.     \    \
-          |    |   ( ◉  )     |    |
-          |    |    '--'      |    |
-           \    \   .--.     /    /
-            '.   '.        .'   '.'
-              '-._  '-..-'  _.-'
-                  '-=====-
-```
+**Safety model.** Reads execute immediately; **every external write creates an approval first** — shown in chat and in the approval rail — and only executes after you approve. Approvals bind the exact tool, arguments, and content hash: changed parameters invalidate the approval, and rejected/expired approvals guarantee zero handler calls. Credentials are encrypted at rest and never echoed.
 
-> "At your service, sir."
+**MCP bridge.** Every connected service is also an MCP tool at `POST /mcp` (`initialize`, `tools/list`, `tools/call`, dotted names like `telegram.send_message`). Write tools return a pending approval instead of executing.
 
-Talk to it. It listens, thinks, and talks back — entirely on-device except the LLM, which runs on your local Ollama.
+**Voice mode.** Fully on-device pipeline: mic → echo cancellation → VAD → speech-to-text → conversation engine → text-to-speech → speaker, with automatic barge-in (talk over it mid-sentence and it stops). See [the pipeline](#voice-pipeline) below.
+
+## Architecture
 
 ```
-mic → echo cancellation → voice activity detection → speech-to-text
-    → conversation engine (intent routing · tools · memory · Ollama)
-    → sentence buffering → text-to-speech → speaker
+web/                    FastAPI dashboard + static UI (chat, connectors, approvals)
+server/conversation/    Intent router, tool calling, memory, state machine
+server/connectors/      15 service adapters + credential vault + health checks
+server/approvals/       Approval engine (binds tool + args + content hash)
+server/mcpbus/          MCP JSON-RPC bridge over connected services
+server/teams/           Supervisor + worker agent teams (phased, see RELEASE notes)
+config/settings.yaml    All configuration (local.yaml overrides, gitignored)
 ```
 
-Talk over it mid-sentence and it stops — automatic barge-in is always on.
+## Voice pipeline
+
+| Stage | Component |
+|---|---|
+| Microphone capture | sounddevice input stream, selectable device |
+| Echo cancellation | NLMS adaptive filter (~21 dB reduction) |
+| Voice activity detection | Silero VAD (energy fallback) |
+| Speech → text | faster-whisper, VAD-gated streaming |
+| Conversation | state machine + intent router + tools + memory + Ollama |
+| Text → speech | PocketTTS |
+| Barge-in | VAD watchdog interrupts playback on speech |
 
 ```bash
-# 1. Python env + deps
+# Voice setup
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-voice.txt   # mic/speaker/STT/TTS/VAD
+ollama serve && ollama pull qwen3:8b
 
-# 2. Local LLM
-ollama serve
-ollama pull qwen3:8b
-
-# 3a. Text mode
-python cli.py
-
-# 3b. Voice mode (needs mic + speaker)
-python voice_cli.py
-python voice_cli.py --list-devices   # check your audio hardware
+python cli.py            # text mode
+python voice_cli.py      # voice mode (needs mic + speaker)
 ```
 
-## The pipeline, stage by stage
-
-| Stage | Component | File |
-|---|---|---|
-| Microphone capture | sounddevice input stream, selectable device | `server/voice/audio_io.py` |
-| Echo cancellation | NLMS adaptive filter (~21 dB reduction) | `server/voice/aec.py` |
-| Voice activity detection | Silero VAD (energy fallback) | `server/voice/vad.py` |
-| Speech → text | faster-whisper, VAD-gated streaming | `server/voice/stt.py` |
-| Conversation | state machine + intent router + tools + memory + Ollama | `server/conversation/` |
-| Sentence buffering | abbreviation/decimal-aware splitter | `server/voice/` |
-| Text → speech | PocketTTS | `server/tts/pocket.py` |
-| Speaker playback | sounddevice output stream | `server/voice/audio_io.py` |
-| Barge-in | VAD watchdog interrupts playback on speech | `server/voice/engine.py` |
-
-Assemble the whole thing from config with one call:
-
-```python
-from server.voice.factory import build_voice_engine
-engine = build_voice_engine(conversation_manager, config)
-```
+JARVIS is precise, unfailingly polite, and dry-witted — he addresses you as "sir" and keeps spoken replies to a few sentences. Full trait list in `config/settings.yaml` → `personality:`.
 
 ## Configuration
 
@@ -98,39 +97,35 @@ personality:
   name: JARVIS
 voice:
   input_device: null      # null = default; or match by name / index
-  output_device: null
-  sample_rate_in: 16000
-  sample_rate_out: 24000
   vad_backend: silero
   aec: nlms
-  barge_in_chunks: 4
   stt_model: small
   tts_engine: pocket-tts
 ```
 
-## Personality
+Google connectors need a one-time [Google Cloud OAuth client](https://console.cloud.google.com/apis/credentials) (desktop app, redirect `http://localhost:3000/api/connectors/google/oauth/callback` — the in-app setup guide walks you through it).
 
-JARVIS is precise, unfailingly polite, and dry-witted. He addresses you as "sir", keeps spoken replies to a few sentences, never uses robotic filler, and never breaks character. Forbidden-phrase scrubbing and the full trait list are in `config/settings.yaml` → `personality:`.
-
-## Tests
+## Testing
 
 ```bash
-pytest tests/ -q     # 313+ tests passing
+pytest tests/ -q     # 313+ tests
 ```
 
-Includes a real TTS→STT roundtrip: PocketTTS synthesizes speech, faster-whisper transcribes it back word-perfect.
-
-## Hardware validation
-
-This repo was completed on a headless machine, so live mic/speaker I/O is validated via `HARDWARE_TEST.md` — a step-by-step checklist for your laptop.
+Covers the approval invariants (no double-execution, arg-binding, expiry guarantees), connector health gating, the voice pipeline (including a real TTS→STT roundtrip: PocketTTS synthesizes, faster-whisper transcribes back word-perfect), and the dashboard API.
 
 ## Docs
 
 - `docs/RELEASE_v1.md` — v1.0.0 foundation release notes (what's in, what's deferred, known limitations)
-- `AUDIT_REPORT.md` — full component audit with scores (74/100)
+- `AUDIT_REPORT.md` — full component audit (74/100)
 - `COMPLETION_REPORT.md` — what was built to complete the voice pipeline
-- `HARDWARE_TEST.md` — laptop validation checklist
+- `HARDWARE_TEST.md` — laptop mic/speaker validation checklist
+
+## Known limitations
+
+- Voice hardware path is validated via checklist, not CI — run `HARDWARE_TEST.md` on your machine.
+- Browser/computer autonomy is intentionally deferred until the foundation is stable.
+- Live connector authentication (Google OAuth, bot tokens) can't be tested in CI — the health-check gate exists precisely so "connected" always means verified.
 
 ## Credits
 
-Voice-pipeline patterns adapted from [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) (Apache-2.0, Stanford Hazy Research) — see `COMPLETION_REPORT.md` for per-file attribution. Built by [Sai Sankeerth Voorugonda](https://github.com/SaiSankeerth-dev). MIT licensed.
+Voice-pipeline patterns adapted from [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) (Apache-2.0) — see `COMPLETION_REPORT.md` for per-file attribution. Built by [Sai Sankeerth Voorugonda](https://github.com/SaiSankeerth-dev). MIT licensed.

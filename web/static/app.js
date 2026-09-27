@@ -48,13 +48,58 @@ function now() {
   return new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-/* ---------------- theme ---------------- */
+function relTime(ts) {
+  if (!ts) return "never";
+  const s = (Date.now() - ts * 1000) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+/* tolerant relative time: epoch seconds, epoch ms, or ISO strings */
+function relTimeAny(v) {
+  if (v == null || v === "") return "";
+  let ms = NaN;
+  if (typeof v === "number") ms = v < 1e12 ? v * 1000 : v;
+  else if (/^\d+(\.\d+)?$/.test(String(v).trim())) { const n = parseFloat(v); ms = n < 1e12 ? n * 1000 : n; }
+  else ms = Date.parse(v);
+  if (isNaN(ms)) return "";
+  const s = (Date.now() - ms) / 1000;
+  if (s < 0) return "just now";
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+}
+
+/* ---------------- theme (light / dark / system) ---------------- */
+function applyTheme(opt) {
+  let theme = opt;
+  if (opt === "system") {
+    theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.documentElement.dataset.theme = theme;
+  $("#theme-toggle").textContent = theme === "dark" ? "🌙" : "☀️";
+  $$("#theme-seg button").forEach((b) => b.classList.toggle("active", b.dataset.themeOpt === opt));
+  try { localStorage.setItem("os-theme", opt); } catch {}
+}
 $("#theme-toggle").addEventListener("click", () => {
-  const html = document.documentElement;
-  const dark = html.dataset.theme !== "dark";
-  html.dataset.theme = dark ? "dark" : "light";
-  $("#theme-toggle").textContent = dark ? "🌙" : "☀️";
+  const cur = document.documentElement.dataset.theme;
+  applyTheme(cur === "dark" ? "light" : "dark");
 });
+$$("#theme-seg button").forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.themeOpt)));
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  let saved = "light";
+  try { saved = localStorage.getItem("os-theme") || "light"; } catch {}
+  if (saved === "system") applyTheme("system");
+});
+(function initTheme() {
+  let saved = "light";
+  try { saved = localStorage.getItem("os-theme") || "light"; } catch {}
+  applyTheme(saved);
+})();
 
 /* ---------------- nav ---------------- */
 const loaders = {};
@@ -68,6 +113,8 @@ function switchView(name) {
   if (loaders[name]) loaders[name]();
 }
 $("#grid-btn").addEventListener("click", () => openSettings("connectors"));
+$(".gear").addEventListener("click", () => openSettings("general"));
+$(".avatar-sm").addEventListener("click", () => openSettings("general"));
 $("#menu-btn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
 $("#nav-scrim").addEventListener("click", () => document.body.classList.remove("nav-open"));
 
@@ -96,11 +143,21 @@ const messagesEl = $("#messages");
 let currentApproval = null;
 const approvalVersions = {};
 
+function hideHero() { $("#hero").style.display = "none"; }
+function showHero() { $("#hero").style.display = ""; }
+$("#hero-new").addEventListener("click", () => {
+  messagesEl.innerHTML = "";
+  showHero();
+  $("#chat-input").focus();
+});
+
 function addUserMsg(text) {
+  hideHero();
   const el = document.createElement("div");
   el.className = "msg-user";
-  el.innerHTML = `<div class="bubble">${esc(text)}</div><div class="avatar">S</div>
-    <div class="ts" style="font-size:11px;color:var(--muted)">${now()}</div>`;
+  el.innerHTML = `<div><div class="bubble">${esc(text)}</div>
+    <div class="ts" style="font-size:11px;color:var(--muted);text-align:right;margin-top:4px">${now()}</div></div>
+    <div class="avatar">S</div>`;
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -108,7 +165,7 @@ function addUserMsg(text) {
 function addOsMsg() {
   const el = document.createElement("div");
   el.className = "msg-os";
-  el.innerHTML = `<div class="msg-os-head"><div class="os-ico">🌀</div><b>OS</b><span class="ts">${now()}</span></div>
+  el.innerHTML = `<div class="msg-os-head"><img src="/static/logo.png" alt=""><b>OS</b><span class="ts">${now()}</span></div>
     <div class="msg-os-body"><span class="typing">thinking…</span></div>`;
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -122,8 +179,8 @@ function extractHashtags(text) {
 
 function draftCardHTML(approval) {
   const tags = extractHashtags(approval.draft);
-  const thumbs = ["Just\\nShip It.", "Progress\\n> Perfection", "Build\\nShip\\nLearn"].map(
-    (t, i) => `<div class="thumb" style="background:linear-gradient(135deg,${["#2b3a67,#e07a5f", "#3d348b,#f6bd60", "#14213d,#fca311"][i]})">${t.replace(/\\n/g, "<br>")}</div>`
+  const thumbs = ["Just<br>Ship It.", "Progress<br>> Perfection", "Build<br>Ship<br>Learn"].map(
+    (t, i) => `<div class="thumb" style="background:linear-gradient(135deg,${["#2b3a67,#e07a5f", "#3d348b,#f6bd60", "#14213d,#fca311"][i]})">${t}</div>`
   ).join("");
   return `<div class="draft-card">
     <div class="draft-head"><span class="li-ico">in</span><b>LinkedIn Post Draft</b>
@@ -152,7 +209,6 @@ function bindCardButtons(scope) {
 function showApprovalRail(approval) {
   currentApproval = approval;
   const v = (approvalVersions[approval.id] = (approvalVersions[approval.id] || 0) + 1);
-  // only bump display version on edit; keep simple counter per approval id chain
   $("#approval-ver").textContent = `v1.${v - 1}`;
   $("#approval-card").hidden = false;
 }
@@ -226,7 +282,10 @@ $$("#action-cards .acard").forEach((b) => b.addEventListener("click", () => send
 $$(".rel-action").forEach((b) => b.addEventListener("click", () => sendMessage(b.dataset.rel)));
 $$(".quick-actions button").forEach((b) => b.addEventListener("click", () => {
   const qa = b.dataset.qa;
-  if (qa === "newtask") { switchView("tasks"); $("#task-input").focus(); }
+  if (qa === "newtask") { switchView("tasks"); $("#task-add").hidden = false; $("#task-input").focus(); }
+  else if (qa === "draft") { switchView("chat"); sendMessage("Draft a linkedin post about shipping early"); }
+  else if (qa === "plan") { switchView("chat"); sendMessage("Plan my day"); }
+  else if (qa === "code") { switchView("chat"); $("#chat-input").value = "Analyze this code: "; $("#chat-input").focus(); }
   else { switchView("chat"); $("#chat-input").focus(); }
 }));
 
@@ -305,602 +364,763 @@ $("#file-input").addEventListener("change", async (e) => {
   } catch { toast("Upload failed."); }
   e.target.value = "";
 });
-
-/* ---------------- tasks ---------------- */
-loaders.tasks = async () => {
-  const { tasks } = await api("/api/tasks");
-  const el = $("#task-list");
-  el.innerHTML = tasks.length ? "" : `<div class="empty">No tasks yet. Add one above.</div>`;
-  for (const t of tasks) {
-    const row = document.createElement("div");
-    row.className = "row-card" + (t.status === "DONE" ? " done" : "");
-    row.innerHTML = `<input type="checkbox" class="checkbox" ${t.status === "DONE" ? "checked" : ""}>
-      <div class="grow">${esc(t.title)}</div>
-      <span class="tag ${t.status.toLowerCase()}">${t.status}</span>
-      <button class="mini-btn">Remove</button>`;
-    row.querySelector(".checkbox").addEventListener("change", async (e) => {
-      await api(`/api/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ status: e.target.checked ? "DONE" : "PENDING" }) });
-      loaders.tasks(); refreshBadges();
-    });
-    row.querySelector(".mini-btn").addEventListener("click", async () => {
-      await api(`/api/tasks/${t.id}`, { method: "DELETE" });
-      loaders.tasks(); refreshBadges();
-    });
-    el.appendChild(row);
-  }
-};
-$("#task-add-btn").addEventListener("click", async () => {
-  const v = $("#task-input").value.trim();
-  if (!v) return;
-  await api("/api/tasks", { method: "POST", body: JSON.stringify({ title: v }) });
-  $("#task-input").value = "";
-  loaders.tasks(); refreshBadges(); toast("Task added");
-});
-$("#task-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#task-add-btn").click(); });
-
-/* ---------------- calendar ---------------- */
-loaders.calendar = async () => {
-  const cal = await api("/api/calendar");
-  $("#calendar-body").innerHTML = cal.connected
-    ? `<div class="empty">Connected ✓ — no events in the next 7 days.</div>`
-    : `<div class="empty"><h3>Calendar isn't connected</h3>
-       <p>Connect Google Calendar to see your day here. OS will ask your permission first.</p>
-       <button class="btn-primary" id="cal-connect">Connect Google Calendar</button></div>`;
-  const b = $("#cal-connect");
-  if (b) b.addEventListener("click", () => switchView("connectors"));
-};
-
-/* ---------------- projects ---------------- */
-loaders.projects = async () => {
-  const { projects } = await api("/api/projects");
-  const el = $("#project-grid");
-  el.innerHTML = projects.length ? "" : `<div class="empty">No projects found.</div>`;
-  for (const p of projects) {
-    const c = document.createElement("div");
-    c.className = "card";
-    c.innerHTML = `<h4>${esc(p.title)}</h4><p class="muted">${esc(p.description)}</p>`;
-    el.appendChild(c);
-  }
-};
-
-/* ---------------- memory ---------------- */
-loaders.memory = async () => {
-  const { memories } = await api("/api/memory");
-  const el = $("#memory-list");
-  el.innerHTML = memories.length ? "" : `<div class="empty">Nothing remembered yet. Tell OS something with "remember that…".</div>`;
-  for (const m of memories) {
-    const row = document.createElement("div");
-    row.className = "row-card";
-    row.innerHTML = `<div class="grow"><b>${esc(m.key)}</b><div class="muted">${esc(m.value)}</div></div>
-      <span class="tag pending">${esc(m.type || "")}</span><button class="mini-btn">Forget</button>`;
-    row.querySelector(".mini-btn").addEventListener("click", async () => {
-      await api(`/api/memory/${encodeURIComponent(m.key)}`, { method: "DELETE" });
-      loaders.memory(); toast("Forgotten");
-    });
-    el.appendChild(row);
-  }
-};
-
-/* ---------------- skills ---------------- */
-loaders.skills = async () => {
-  const { skills } = await api("/api/skills");
-  const el = $("#skill-grid");
-  el.innerHTML = "";
-  for (const s of skills) {
-    const c = document.createElement("div");
-    c.className = "card";
-    c.innerHTML = `<h4>🛠 ${esc(s.name)}</h4><p class="muted">${esc(s.description || "")}</p>
-      <div class="kv"><span>Category</span><b>${esc(s.category || "—")}</b></div>
-      <div class="kv"><span>Mode</span><b>${esc(s.mode || "—")}</b></div>`;
-    el.appendChild(c);
-  }
-};
-
-/* ---------------- watchers ---------------- */
-loaders.watchers = async () => {
-  const { suggestions } = await api("/api/watchers");
-  const el = $("#watcher-list");
-  el.innerHTML = suggestions.length ? "" : `<div class="empty">All quiet. OS will nudge you here when it notices something.</div>`;
-  for (const s of suggestions) {
-    const row = document.createElement("div");
-    row.className = "row-card";
-    row.innerHTML = `<div class="grow"><b>💡 ${esc(s.kind)}</b><div>${esc(s.text)}</div></div>
-      <button class="mini-btn">Dismiss</button>`;
-    row.querySelector(".mini-btn").addEventListener("click", async () => {
-      await api(`/api/watchers/${s.id}/seen`, { method: "POST" });
-      loaders.watchers(); refreshBadges();
-    });
-    el.appendChild(row);
-  }
-};
-
-/* ---------------- files ---------------- */
-loaders.files = async () => {
-  const { root, files } = await api("/api/files");
-  $("#files-root").textContent = root;
-  const el = $("#file-list");
-  el.innerHTML = "";
-  for (const f of files.slice(0, 200)) {
-    const row = document.createElement("div");
-    row.className = "row-card";
-    const isDir = f.type === "dir";
-    row.innerHTML = `<div class="grow">${isDir ? "📁" : "📄"} ${esc(f.path)}
-      ${f.size != null ? `<span class="muted"> · ${(f.size / 1024).toFixed(1)} KB</span>` : ""}</div>
-      ${isDir ? "" : `<button class="mini-btn">Download</button>`}`;
-    if (!isDir) row.querySelector(".mini-btn").addEventListener("click", () => {
-      window.open(`/api/files/download?path=${encodeURIComponent(f.path)}`, "_blank");
-    });
-    el.appendChild(row);
-  }
-};
-
-/* ---------------- analytics ---------------- */
-loaders.analytics = async () => {
-  const a = await api("/api/analytics");
-  const stats = [
-    [a.approvals_approved, "Approvals granted"],
-    [a.approvals_rejected, "Approvals rejected"],
-    [a.approvals_expired, "Approvals expired"],
-    [a.memories, "Memories stored"],
-    [a.tasks_open, "Open tasks"],
-    [a.tasks_done, "Tasks done"],
-    [a.events, "Events logged"],
-  ];
-  $("#analytics-grid").innerHTML = stats.map(([n, l]) =>
-    `<div class="stat"><div class="num">${n}</div><div class="lbl">${l}</div></div>`).join("");
-};
-
-/* ---------------- settings modal + connectors (v2) ---------------- */
-let connectors = [];
-let connQuery = "";
-let detailId = null;
-let permTarget = null;
-
-const STATE_META = {
-  available: ["Available", "pill"],
-  granted: ["Permission granted", "pill pill-granted"],
-  connected: ["Connected", "pill pill-ok"],
-  setup_error: ["Setup failed", "pill pill-err"],
-  denied: ["Denied", "pill"],
-};
-const stateLabel = (c) => (STATE_META[c.state] || ["—", "pill"])[0];
-const statePill = (c) => (STATE_META[c.state] || ["—", "pill"])[1];
-
-function openSettings(tab) {
-  $("#settings-modal").hidden = false;
-  switchDTab(tab || "connectors");
-  if ((tab || "connectors") === "connectors") { showConnList(); loadConnectors(); }
-  if (tab === "general") loadGeneral();
-}
-function closeSettings() { $("#settings-modal").hidden = true; }
-function switchDTab(name) {
-  $$(".sm-nav-item").forEach((b) => b.classList.toggle("active", b.dataset.dtab === name));
-  $$(".dtab").forEach((s) => s.classList.toggle("active", s.id === "dtab-" + name));
-}
-$$(".sm-nav-item").forEach((b) => b.addEventListener("click", () => {
-  switchDTab(b.dataset.dtab);
-  if (b.dataset.dtab === "connectors") { showConnList(); loadConnectors(); }
-  if (b.dataset.dtab === "general") loadGeneral();
-}));
-$("#settings-close").addEventListener("click", closeSettings);
-$("#settings-modal").addEventListener("click", (e) => { if (e.target.id === "settings-modal") closeSettings(); });
-$("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
-$("#revoke-all").addEventListener("click", async () => {
-  if (!confirm("Revoke ALL connectors and delete every stored credential?")) return;
-  for (const c of connectors) { try { await api(`/api/connectors/${c.id}/revoke`, { method: "POST" }); } catch {} }
-  loadConnectors(); refreshChips(); toast("Everything revoked");
-});
-window.addEventListener("message", (e) => {
-  if (e.data && e.data.type === "oauth-done") {
-    toast(`${e.data.connector || "Service"} connected ✓`);
-    loadConnectors();
-    if (detailId) openConnectorDetail(detailId);
-    refreshChips();
-  }
-});
-
-async function loadGeneral() {
-  try {
-    const me = await api("/api/me");
-    $("#set-model").textContent = me.model_ok ? "Local Ollama — reachable" : "Local Ollama — unreachable";
-    $("#set-model-pill").textContent = me.model_ok ? "ok" : "offline";
-    $("#set-model-pill").className = "pill " + (me.model_ok ? "pill-ok" : "pill-err");
-  } catch {}
-}
-
-async function loadConnectors() {
-  try {
-    const { connectors: list } = await api("/api/connectors");
-    connectors = list;
-    renderConnectorList();
-    if (detailId) renderConnectorDetail();
-  } catch (e) { toast("Couldn't load connectors: " + e.message); }
-}
-
-function connRow(c) {
-  const [label, pill] = [stateLabel(c), statePill(c)];
-  const right = c.state === "connected"
-    ? `<span class="${pill}">${label}</span><span class="conn-chev">›</span>`
-    : `<button class="btn-primary btn-sm" data-conn="${c.id}" data-act="connect">Connect</button>`;
-  return `<button class="conn-row" data-conn="${c.id}" data-act="open">
-    <div class="conn-ico" style="background:${esc(c.color)}">${esc(c.icon || c.name.trim()[0])}</div>
-    <div class="conn-meta"><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p></div>
-    <div class="conn-right">${right}</div>
-  </button>`;
-}
-
-function renderConnectorList() {
-  const q = connQuery;
-  const list = connectors.filter((c) =>
-    !q || (c.name + " " + c.tagline + " " + (c.category || "")).toLowerCase().includes(q));
-  const conn = list.filter((c) => c.state === "connected");
-  const avail = list.filter((c) => c.state !== "connected");
-  $("#conn-connected").innerHTML = conn.length
-    ? conn.map(connRow).join("")
-    : `<div class="conn-empty">Nothing connected yet — pick one below to get started.</div>`;
-  $("#conn-available").innerHTML = avail.length
-    ? avail.map(connRow).join("")
-    : `<div class="conn-empty">No connectors match “${esc(connQuery)}”.</div>`;
-  bindConnRows($("#dtab-connectors"));
-}
-$("#conn-search").addEventListener("input", (e) => { connQuery = e.target.value.toLowerCase(); renderConnectorList(); });
-
-function bindConnRows(scope) {
-  scope.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    const c = connectors.find((x) => x.id === b.dataset.conn);
-    if (!c) return;
-    const act = b.dataset.act;
-    if (act === "connect") openPermModal(c);
-    else if (act === "open") openConnectorDetail(c.id);
-  }));
-}
-
-function showConnList() {
-  detailId = null;
-  $("#conn-detail-view").hidden = true;
-  $("#conn-list-view").hidden = false;
-}
-$("#conn-back").addEventListener("click", showConnList);
-
-function openConnectorDetail(id) {
-  detailId = id;
-  $("#conn-list-view").hidden = true;
-  $("#conn-detail-view").hidden = false;
-  renderConnectorDetail();
-}
-
-function relTime(ts) {
-  if (!ts) return "never";
-  const s = (Date.now() - ts * 1000) / 1000;
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
-function renderConnectorDetail() {
-  const c = connectors.find((x) => x.id === detailId);
-  if (!c) return;
-  const el = $("#conn-detail");
-  const [label, pill] = [stateLabel(c), statePill(c)];
-
-  const credFormHTML = `<div class="cred-form" id="cd-credform">
-      ${c.cred_fields.map((f) => `<label><b>${esc(f.label)}</b>
-        <input data-key="${esc(f.key)}" type="${f.secret ? "password" : "text"}" autocomplete="off"
-               placeholder="${esc(f.placeholder || f.help || "")}">
-        ${f.help ? `<span class="muted small">${esc(f.help)}</span>` : ""}</label>`).join("")}
-      <button class="btn-primary" id="cd-save-creds">Save &amp; test connection</button>
-    </div>`;
-  let authHTML = "";
-  if (c.state === "available") {
-    authHTML = `<button class="btn-primary" id="cd-connect">Connect ${esc(c.name)}</button>`;
-  } else if (c.auth_kind === "google_oauth" && c.needs_oauth) {
-    authHTML = `${c.has_credentials ? "" : credFormHTML}
-      <button class="btn-primary" id="cd-google">🔑 Connect with Google</button>
-      <p class="muted small">Sign in with your Google account in a popup. OS only gets the scopes you granted above.</p>`;
-  } else if (!c.has_credentials) {
-    authHTML = credFormHTML;
-  }
-
-  const statusNote = c.state === "setup_error" && c.health_msg
-    ? `<div class="callout err">⚠️ ${esc(c.health_msg)}</div>` : "";
-  const noteCls = /paid|review|approval|limited/i.test(c.note || "") ? "callout warn" : "callout ok";
-
-  el.innerHTML = `
-    <div class="cd-head">
-      <div class="conn-ico lg" style="background:${esc(c.color)}">${esc(c.icon || c.name.trim()[0])}</div>
-      <div class="grow"><h3>${esc(c.name)}</h3><p class="muted">${esc(c.tagline)}</p></div>
-      <span class="${pill}">${label}</span>
-    </div>
-    ${statusNote}
-    <div class="callout ${c.has_credentials ? "ok" : "warn"}">
-      ${c.has_credentials ? "🔒 Credentials saved &amp; encrypted on this machine." : "🔓 No credentials saved yet."}
-      ${c.health_at ? ` Last checked ${relTime(c.health_at)}.` : ""}
-      ${c.last_used_at ? ` Last used ${relTime(c.last_used_at)}.` : ""}
-    </div>
-
-    <h4>Permissions</h4>
-    <ul class="scope-list">${c.scopes.map((s) => `<li>✓ ${esc(s)}</li>`).join("")}</ul>
-    ${c.state === "available" ? "" : `<div class="btn-row"><button class="btn-ghost" id="cd-revoke">Revoke access</button></div>`}
-
-    <h4>Setup</h4>
-    <div class="callout ${noteCls}">${esc(c.note || "")} ${c.docs_url ? `<a href="${esc(c.docs_url)}" target="_blank" rel="noopener">Docs ↗</a>` : ""}</div>
-    <ol class="setup-steps">${c.setup_steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
-    ${authHTML}
-
-    ${c.has_credentials ? `<div class="btn-row">
-      <button class="btn-ghost" id="cd-test">↻ Test connection</button>
-      <button class="btn-danger-ghost" id="cd-revoke2">Revoke &amp; delete credentials</button>
-    </div>` : ""}
-
-    ${c.has_credentials && c.defaults && c.defaults.length ? `<h4>Defaults</h4>
-      <div class="cred-form" id="cd-defaults">
-      ${c.defaults.map((d) => `<label><b>${esc(d.label)}</b>
-        <input data-key="${esc(d.key)}" placeholder="${esc(d.placeholder || "")}"></label>`).join("")}
-      <button class="btn-ghost" id="cd-save-defaults">Save defaults</button>
-      </div>` : ""}
-
-    ${c.try_it && c.try_it.length ? `<h4>Try it</h4>
-      <p class="muted small">Send one of these in chat — OS does the real thing.</p>
-      <div class="try-list">${c.try_it.map((t) =>
-        `<button class="try-chip" data-try="${esc(t)}">“${esc(t)}”</button>`).join("")}</div>` : ""}
-
-    ${c.has_credentials && c.actions && c.actions.length ? `<h4>What OS can do here</h4>
-      <ul class="action-list">${c.actions.map((a) =>
-        `<li><b>${esc(a.label)}</b><span class="muted small"> — ${esc(a.description)}</span>
-         ${a.needs_approval ? `<span class="pill pill-granted">asks approval</span>` : `<span class="pill">reads only</span>`}</li>`).join("")}</ul>` : ""}
-  `;
-
-  const rerender = () => loadConnectors();
-  const q = (s) => el.querySelector(s);
-  if (q("#cd-connect")) q("#cd-connect").addEventListener("click", () => openPermModal(c));
-  if (q("#cd-google")) q("#cd-google").addEventListener("click", async () => {
-    try {
-      const r = await api(`/api/connectors/${c.id}/oauth/start`);
-      window.open(r.url, "_blank", "width=520,height=680");
-    } catch (e) { toast("Couldn't start Google sign-in: " + e.message); }
-  });
-  if (q("#cd-save-creds")) q("#cd-save-creds").addEventListener("click", async () => {
-    const fields = {};
-    el.querySelectorAll("#cd-credform input").forEach((i) => { fields[i.dataset.key] = i.value; });
-    if (Object.values(fields).some((v) => !v.trim())) { toast("Fill every field"); return; }
-    try {
-      const r = await api(`/api/connectors/${c.id}/credentials`, {
-        method: "POST", body: JSON.stringify({ label: c.name, fields }),
-      });
-      toast(r.status.state === "connected" ? `${c.name} connected ✓` : `Saved — ${r.status.health_msg || r.status.state}`);
-    } catch (e) { toast("Couldn't save: " + e.message); }
-    rerender(); refreshChips();
-  });
-  const doRevoke = async () => {
-    if (!confirm(`Revoke OS access to ${c.name}?`)) return;
-    await api(`/api/connectors/${c.id}/revoke`, { method: "POST" });
-    toast(`${c.name} revoked`); rerender(); refreshChips();
-  };
-  if (q("#cd-revoke")) q("#cd-revoke").addEventListener("click", doRevoke);
-  if (q("#cd-revoke2")) q("#cd-revoke2").addEventListener("click", doRevoke);
-  if (q("#cd-test")) q("#cd-test").addEventListener("click", async () => {
-    const r = await api(`/api/connectors/${c.id}/test`, { method: "POST" });
-    toast(r.status.state === "connected" ? "Connection healthy ✓" : `Failed: ${r.status.health_msg}`);
-    rerender();
-  });
-  if (q("#cd-save-defaults")) q("#cd-save-defaults").addEventListener("click", async () => {
-    const defaults = {};
-    el.querySelectorAll("#cd-defaults input").forEach((i) => { if (i.value.trim()) defaults[i.dataset.key] = i.value.trim(); });
-    await api(`/api/connectors/${c.id}/settings`, { method: "POST", body: JSON.stringify({ settings: defaults }) });
-    toast("Defaults saved");
-  });
-  // prefill saved defaults
-  if (c.has_credentials && c.defaults && c.defaults.length) {
-    api(`/api/connectors/${c.id}/settings`).then((s) => {
-      const saved = s.settings || {};
-      el.querySelectorAll("#cd-defaults input").forEach((i) => { if (saved[i.dataset.key]) i.value = saved[i.dataset.key]; });
-    }).catch(() => {});
-  }
-  el.querySelectorAll("[data-try]").forEach((b) => b.addEventListener("click", () => {
-    closeSettings(); switchView("chat"); sendMessage(b.dataset.try);
-  }));
-}
-
-/* permission ask */
-function openPermModal(c) {
-  permTarget = c;
-  $("#perm-title").textContent = `Connect ${c.name}?`;
-  $("#perm-sub").textContent = "OS will only ever use what you check below.";
-  $("#perm-scopes").innerHTML = c.scopes.map((s) =>
-    `<label><input type="checkbox" checked value="${esc(s)}"> ${esc(s)}</label>`).join("");
-  $("#perm-modal").hidden = false;
-}
-$("#perm-deny").addEventListener("click", async () => {
-  if (permTarget) await api(`/api/connectors/${permTarget.id}/deny`, { method: "POST" });
-  $("#perm-modal").hidden = true; permTarget = null;
-  loadConnectors(); toast("Denied — nothing was shared");
-});
-$("#perm-allow").addEventListener("click", async () => {
-  const scopes = $$("#perm-scopes input:checked").map((i) => i.value);
-  if (!scopes.length) { toast("Grant at least one permission"); return; }
-  const target = permTarget;
-  await api(`/api/connectors/${target.id}/grant`, {
-    method: "POST", body: JSON.stringify({ scopes }),
-  });
-  $("#perm-modal").hidden = true; permTarget = null;
-  toast(`${target.name}: permission granted`);
-  loadConnectors();
-  openConnectorDetail(target.id);
-});
-
-/* ---------------- execution cards in chat ---------------- */
-function executionCardHTML(ex, approval) {
-  const st = ex.status;
-  if (st === "needs_connection") {
-    const cid = ex.connector_id, c = connectors.find((x) => x.id === cid);
-    const name = c ? c.name : ex.service;
-    return `<div class="exec-card needs-conn">
-      <div class="exec-head">🔌 <b>${esc(name)}</b> isn't connected</div>
-      <p>${esc(ex.error || "")}</p>
-      <button class="btn-primary btn-sm" data-exec-conn="${esc(cid)}">Connect ${esc(name)}</button>
-    </div>`;
-  }
-  if (st === "needs_info") {
-    return `<div class="exec-card needs-info">
-      <div class="exec-head">🤔 <b>One thing missing</b></div>
-      <p>To ${esc(ex.label || "do that")} I still need: <b>${esc((ex.missing || []).join(", "))}</b>.</p>
-    </div>`;
-  }
-  if (st === "pending_approval") {
-    const a = approval || {};
-    const params = a.params || {};
-    const rows = Object.entries(params).map(([k, v]) =>
-      `<div class="kv"><span>${esc(k)}</span><b>${esc(String(v)).slice(0, 80)}</b></div>`).join("");
-    return `<div class="exec-card pending">
-      <div class="exec-head">🛡 <b>Waiting for approval</b></div>
-      <p><b>${esc(ex.label || "")}</b> — on <b>${esc(ex.service || "")}</b>. Nothing has run yet.</p>
-      ${rows ? `<div class="exec-params">${rows}</div>` : ""}
+/* ---------------- execution cards ---------------- */
+function executionCardHTML(exec, approval) {
+  const st = exec.status;
+  const params = exec.params || {};
+  const paramHTML = Object.entries(params).map(([k, v]) =>
+    `<div class="kv"><span>${esc(k)}:</span><b>${esc(typeof v === "object" ? JSON.stringify(v) : v)}</b></div>`
+  ).join("");
+  const actions = (exec.actions || []).map((a, i) =>
+    `<div class="aa-row"><span style="font-size:13.5px">${esc(a)}</span>
+     <button class="link-btn" data-aa="${i}">Run ✓</button></div>`
+  ).join("");
+  const ap = approval ? `
+    <div class="exec-card pending">
+      <div class="exec-head">🔒 Approval needed for "${esc(approval.tool)}"</div>
+      <div class="aa-row"><span class="muted" style="font-size:12.5px">${esc(approval.summary)}</span></div>
       <div class="btn-row">
-        <button class="btn-primary btn-sm" data-exec-approve="${esc(a.id || "")}">Approve &amp; run</button>
-        <button class="btn-danger-ghost btn-sm" data-exec-reject="${esc(a.id || "")}">Reject</button>
+        <button class="btn-primary" data-aa-approve="${approval.id}">Approve &amp; run</button>
+        <button class="btn-ghost" data-aa-reject="${approval.id}">Reject</button>
       </div>
-    </div>`;
-  }
-  if (st === "done") {
-    return `<div class="exec-card done">
-      <div class="exec-head">✅ <b>${esc(ex.label || "Done")}</b></div>
-      ${ex.summary ? `<p>${esc(ex.summary)}</p>` : ""}
-    </div>`;
-  }
-  return `<div class="exec-card err">
-    <div class="exec-head">⚠️ <b>Couldn't do that</b></div>
-    <p>${esc(ex.error || "Unknown error")}</p>
-  </div>`;
+    </div>` : "";
+  return `<div class="exec-card ${st}">
+    <div class="exec-head">${st === "done" ? "✅" : st === "err" ? "❌" : st === "needs_connector" ? "🔌" : "⏳"} ${esc(exec.summary || "Execution")}</div>
+    <p>${esc(exec.tool)}${exec.tool_label ? " — " + esc(exec.tool_label) : ""}</p>
+    <div class="exec-params">${paramHTML}</div>
+    ${actions}
+    ${exec.result ? `<p><b>Result:</b> ${esc(exec.result)}</p>` : ""}
+    ${exec.note ? `<p class="muted">${esc(exec.note)}</p>` : ""}
+    ${exec.connector_id ? `<p><button class="link-btn" data-open-conn="${esc(exec.connector_id)}">Connect ${esc(exec.connector_id)} →</button></p>` : ""}
+  </div>${ap}`;
 }
 
 function bindExecutionCard(scope, ev) {
-  scope.querySelectorAll("[data-exec-conn]").forEach((b) => b.addEventListener("click", () => {
-    openSettings("connectors"); openConnectorDetail(b.dataset.execConn);
-  }));
-  scope.querySelectorAll("[data-exec-approve]").forEach((b) => b.addEventListener("click", async () => {
-    try {
-      const r = await api(`/api/actions/${b.dataset.execApprove}/approve`, { method: "POST" });
-      b.closest(".exec-card").outerHTML = executionCardHTML({ status: "done", label: r.label || "Approved", summary: r.summary }, null);
-      toast("Approved — ran ✓");
-    } catch (e) { toast("Approve failed: " + e.message); }
-    refreshActionRail();
-  }));
-  scope.querySelectorAll("[data-exec-reject]").forEach((b) => b.addEventListener("click", async () => {
-    try {
-      await api(`/api/actions/${b.dataset.execReject}/reject`, { method: "POST" });
-      b.closest(".exec-card").outerHTML = `<div class="exec-card err"><div class="exec-head">🗑 <b>Rejected</b></div><p>Nothing ran.</p></div>`;
-      toast("Rejected — nothing ran");
-    } catch (e) { toast("Reject failed: " + e.message); }
-    refreshActionRail();
-  }));
+  scope.querySelectorAll("[data-aa]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const idx = parseInt(b.dataset.aa, 10);
+      try {
+        const r = await api("/api/actions/run", {
+          method: "POST", body: JSON.stringify({ run_id: ev.execution.run_id, action_idx: idx }),
+        });
+        addOsMsg().innerHTML = md(r.text || "Done.");
+      } catch (e) { toast("Action failed: " + e.message); }
+    })
+  );
+  scope.querySelectorAll("[data-open-conn]").forEach((b) =>
+    b.addEventListener("click", () => openConnectorDetail(b.dataset.openConn))
+  );
+  scope.querySelectorAll("[data-aa-approve]").forEach((b) => b.addEventListener("click", () => approveById(b.dataset.aaApprove)));
+  scope.querySelectorAll("[data-aa-reject]").forEach((b) => b.addEventListener("click", () => rejectById(b.dataset.aaReject)));
 }
 
-/* ---------------- connector action approval rail ---------------- */
-async function refreshActionRail() {
+async function approveById(id) {
   try {
-    const { pending } = await api("/api/actions/pending");
-    const card = $("#action-approval-card");
-    if (!pending.length) { card.hidden = true; return; }
-    card.hidden = false;
-    const a = pending[pending.length - 1];
-    const rows = Object.entries(a.params || {}).map(([k, v]) =>
-      `<div class="kv"><span>${esc(k)}</span><b>${esc(String(v)).slice(0, 80)}</b></div>`).join("");
-    $("#action-approval-body").innerHTML = `
-      <div class="aa-row"><b>${esc(a.connector_name || a.connector_id)}</b>
-        <span class="pill pill-granted">${esc(a.action_label)}</span></div>
-      <p class="muted">${esc(a.summary)}</p>
-      ${rows ? `<div class="exec-params">${rows}</div>` : ""}
-      <div class="btn-row">
-        <button class="btn-primary btn-sm" data-aa="approve" data-aid="${a.id}">Approve &amp; run</button>
-        <button class="btn-danger-ghost btn-sm" data-aa="reject" data-aid="${a.id}">Reject</button>
-      </div>`;
-  } catch {}
-}
-$("#action-approval-card").addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-aa]");
-  if (!b) return;
-  if (b.id === "action-approval-close") { $("#action-approval-card").hidden = true; return; }
-  const aid = b.dataset.aid;
-  try {
-    if (b.dataset.aa === "approve") {
-      await api(`/api/actions/${aid}/approve`, { method: "POST" });
-      toast("Approved — ran ✓");
-    } else {
-      await api(`/api/actions/${aid}/reject`, { method: "POST" });
-      toast("Rejected — nothing ran");
+    const r = await api(`/api/approvals/${id}/approve`, { method: "POST" });
+    const body = addOsMsg();
+    body.innerHTML = md(r.text);
+    if (r.execution) {
+      const wrap = document.createElement("div");
+      wrap.innerHTML = executionCardHTML(r.execution, null);
+      body.appendChild(wrap.firstChild);
     }
-  } catch (err) { toast("Failed: " + err.message); }
-  refreshActionRail();
+    toast("Approved ✓");
+  } catch (e) { toast("Approve failed: " + e.message); }
+  refreshApprovalRail(); refreshBadges();
+}
+async function rejectById(id) {
+  try {
+    const r = await api(`/api/approvals/${id}/reject`, { method: "POST" });
+    addOsMsg().innerHTML = md(r.text);
+    toast("Rejected");
+  } catch (e) { toast("Reject failed: " + e.message); }
+  refreshApprovalRail(); refreshBadges();
+}
+
+/* ---------------- tasks ---------------- */
+let taskTab = "all", allTasks = [];
+loaders.tasks = loadTasks;
+async function loadTasks() {
+  try { allTasks = (await api("/api/tasks")).tasks; } catch { allTasks = []; }
+  renderTasks();
+}
+function taskDone(t) { return t.status === "DONE" || t.status === "completed"; }
+function renderTasks() {
+  const list = $("#task-list");
+  let rows = allTasks;
+  if (taskTab === "completed") rows = allTasks.filter(taskDone);
+  else if (taskTab !== "all") rows = allTasks.filter((t) => !taskDone(t));
+  list.innerHTML = rows.length ? rows.map((t) => {
+    const done = taskDone(t);
+    return `
+    <div class="row-card ${done ? "done" : ""}">
+      <button class="task-check ${done ? "done" : ""}" data-task-toggle="${t.id}" aria-label="toggle">${done ? "✓" : ""}</button>
+      <span class="grow">${esc(t.title)}</span>
+      <span class="tag ${done ? "done" : "pending"}">${done ? "done" : "open"}</span>
+      <button class="mini-btn" data-task-del="${t.id}">Remove</button>
+    </div>`;}).join("")
+    : `<div class="empty">${taskTab === "completed" ? "Nothing completed yet — your wins will land here." : taskTab === "upcoming" ? "No upcoming tasks. Due dates aren't tracked yet — open tasks land here and in Today." : "No tasks. Hit “＋ New Task” to add your first one."}</div>`;
+  list.querySelectorAll("[data-task-toggle]").forEach((b) => b.addEventListener("click", async () => {
+    const t = allTasks.find((x) => String(x.id) === b.dataset.taskToggle);
+    await api(`/api/tasks/${b.dataset.taskToggle}`, {
+      method: "PUT", body: JSON.stringify({ status: t && taskDone(t) ? "PENDING" : "DONE" }),
+    }).catch((e) => toast("Update failed: " + e.message));
+    loadTasks(); refreshBadges();
+  }));
+  list.querySelectorAll("[data-task-del]").forEach((b) => b.addEventListener("click", async () => {
+    await api(`/api/tasks/${b.dataset.taskDel}`, { method: "DELETE" }).catch((e) => toast("Delete failed: " + e.message));
+    loadTasks(); refreshBadges();
+  }));
+}
+$$("#task-tabs .tab").forEach((b) => b.addEventListener("click", () => {
+  taskTab = b.dataset.tab;
+  $$("#task-tabs .tab").forEach((x) => x.classList.toggle("active", x === b));
+  renderTasks();
+}));
+$("#task-new-btn").addEventListener("click", () => {
+  $("#task-add").hidden = !$("#task-add").hidden;
+  if (!$("#task-add").hidden) $("#task-input").focus();
 });
-$("#action-approval-close").addEventListener("click", () => { $("#action-approval-card").hidden = true; });
-
-/* ---------------- smart chips from connected connectors ---------------- */
-async function refreshChips() {
+async function addTask() {
+  const title = $("#task-input").value.trim();
+  if (!title) return;
   try {
-    const { connectors: list } = await api("/api/connectors");
-    connectors = list;
-    const cmds = [];
-    for (const c of list) {
-      if (c.state === "connected" && c.try_it && c.try_it.length) cmds.push(c.try_it[0]);
-      if (cmds.length >= 4) break;
-    }
-    const el = $("#chips");
-    if (!cmds.length) return; // keep the defaults in HTML
-    el.innerHTML = cmds.map((cmd) =>
-      `<button data-chip="${esc(cmd)}">${esc(cmd.length > 34 ? cmd.slice(0, 33) + "…" : cmd)}</button>`).join("");
-    el.querySelectorAll("button").forEach((b) =>
-      b.addEventListener("click", () => { if (b.dataset.chip) sendMessage(b.dataset.chip); }));
-  } catch {}
+    await api("/api/tasks", { method: "POST", body: JSON.stringify({ title }) });
+    $("#task-input").value = "";
+    $("#task-add").hidden = true;
+    toast("Task added");
+  } catch (e) { toast("Add failed: " + e.message); }
+  loadTasks(); refreshBadges();
+}
+$("#task-add-btn").addEventListener("click", addTask);
+$("#task-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addTask(); });
+
+/* ---------------- calendar ---------------- */
+let calTab = "week", calCursor = new Date(), calEvents = [], calConnected = false;
+loaders.calendar = loadCalendar;
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function calKeyLocal(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function parseEvDate(e) { const d = new Date(e.start || e.date); return isNaN(d) ? null : d; }
+function evTime(e) { const d = new Date(e.start); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+async function loadCalendar() {
+  try {
+    const r = await api("/api/calendar");
+    calConnected = r.connected;
+    calEvents = r.events || [];
+  } catch { calConnected = false; calEvents = []; }
+  renderCalendar();
+}
+function renderCalendar() {
+  const wrap = $("#calendar-body");
+  if (!calConnected) {
+    wrap.innerHTML = `<div class="empty">Calendar isn't connected yet — nothing to show here. <button class="btn-primary" id="cal-connect">Connect Google Calendar</button></div>`;
+    $("#cal-connect").addEventListener("click", () => openConnectorDetail("google_calendar"));
+    return;
+  }
+  const byDate = {};
+  calEvents.forEach((e) => {
+    const d = parseEvDate(e);
+    if (!d) return;
+    const k = calKeyLocal(d);
+    (byDate[k] = byDate[k] || []).push(e);
+  });
+  if (calTab === "day") {
+    const k = calKeyLocal(calCursor);
+    const evs = (byDate[k] || []).sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    $("#cal-month").textContent = calCursor.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+    wrap.innerHTML = evs.length ? `<div class="list">` + evs.map((e, i) => `
+      <div class="row-card"><div class="cal-event ev-c${i % 5}" style="margin:0;min-width:160px"><b>${esc(e.title)}</b><span class="ev-time">${esc(evTime(e))}</span></div>
+      <span class="grow muted">${e.end ? "ends " + esc(evTime({ start: e.end })) : ""}</span></div>`).join("") + `</div>`
+      : `<div class="empty">Nothing scheduled for this day.</div>`;
+  } else if (calTab === "week") {
+    const start = new Date(calCursor);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    $("#cal-month").textContent = `${start.toLocaleDateString([], { month: "long", day: "numeric" })} – ${new Date(start.getTime() + 6 * 864e5).toLocaleDateString([], { month: "long", day: "numeric" })}`;
+    const todayK = calKeyLocal(new Date());
+    wrap.innerHTML = `<div class="week-strip">` + Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start); d.setDate(d.getDate() + i);
+      const k = calKeyLocal(d);
+      const evs = byDate[k] || [];
+      return `<div class="day-col ${k === todayK ? "today" : ""}">
+        <div class="day-name">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]}</div>
+        <div class="day-num">${d.getDate()}</div>
+        ${evs.slice(0, 4).map((e, j) => `<div class="cal-event ev-c${j % 5}"><b>${esc(e.title)}</b><span class="ev-time">${esc(evTime(e))}</span></div>`).join("")}
+        ${evs.length > 4 ? `<div class="muted">+${evs.length - 4} more</div>` : ""}
+      </div>`;
+    }).join("") + `</div>`;
+  } else {
+    const y = calCursor.getFullYear(), m = calCursor.getMonth();
+    $("#cal-month").textContent = `${MONTHS[m]} ${y}`;
+    const first = new Date(y, m, 1);
+    const lead = (first.getDay() + 6) % 7;
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push(null);
+    const days = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) cells.push(new Date(y, m, d));
+    const todayK = calKeyLocal(new Date());
+    wrap.innerHTML = `<div class="month-grid">` + cells.map((d) => {
+      if (!d) return `<div class="month-cell dim"></div>`;
+      const k = calKeyLocal(d);
+      const n = (byDate[k] || []).length;
+      return `<div class="month-cell ${k === todayK ? "today" : ""}"><b>${d.getDate()}</b><div>${n ? `<span class="ev-dot"></span><span class="muted">${n} event${n > 1 ? "s" : ""}</span>` : ""}</div></div>`;
+    }).join("") + `</div>`;
+  }
+}
+$$("#cal-tabs .tab").forEach((b) => b.addEventListener("click", () => {
+  calTab = b.dataset.tab;
+  $$("#cal-tabs .tab").forEach((x) => x.classList.toggle("active", x === b));
+  renderCalendar();
+}));
+$("#cal-prev").addEventListener("click", () => {
+  if (calTab === "month") calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
+  else calCursor.setDate(calCursor.getDate() - 7);
+  renderCalendar();
+});
+$("#cal-next").addEventListener("click", () => {
+  if (calTab === "month") calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
+  else calCursor.setDate(calCursor.getDate() + 7);
+  renderCalendar();
+});
+$("#cal-add").addEventListener("click", () => {
+  switchView("chat");
+  $("#chat-input").value = "Schedule ";
+  $("#chat-input").focus();
+});
+
+/* ---------------- projects ---------------- */
+const PROJ_ICONS = [["💻","blue"],["✒️","purple"],["🔍","green"],["🎨","pink"],["⚡","orange"]];
+let allProjects = [];
+loaders.projects = loadProjects;
+async function loadProjects() {
+  try { allProjects = (await api("/api/projects")).projects || []; } catch { allProjects = []; }
+  renderProjects();
+}
+function renderProjects() {
+  const g = $("#project-grid");
+  g.innerHTML = allProjects.length ? allProjects.map((p, i) => {
+    const [ico, cls] = PROJ_ICONS[i % PROJ_ICONS.length];
+    return `<div class="proj-card">
+      <button class="proj-menu" data-proj-ask="${esc(p.title)}" aria-label="options">⋯</button>
+      <div class="proj-ico ${cls}">${ico}</div>
+      <h4>${esc(p.title)}</h4>
+      <p>${esc(p.description || "")}</p>
+    </div>`;
+  }).join("") : `<div class="empty">No projects yet. Start one from the chat.</div>`;
+  g.querySelectorAll("[data-proj-ask]").forEach((b) => b.addEventListener("click", () => {
+    switchView("chat");
+    sendMessage(`Tell me about my project: ${b.dataset.projAsk}`);
+  }));
+}
+$("#proj-new").addEventListener("click", () => {
+  switchView("chat");
+  $("#chat-input").value = "Help me start a new project: ";
+  $("#chat-input").focus();
+});
+
+/* ---------------- memory ---------------- */
+let memTab = "all", allMemories = [];
+loaders.memory = loadMemories;
+async function loadMemories() {
+  try { allMemories = (await api("/api/memory")).memories; } catch { allMemories = []; }
+  renderMemories();
+}
+function renderMemories() {
+  const list = $("#memory-list");
+  const rows = memTab === "all" ? allMemories : allMemories.filter((m) =>
+    String(m.memory_type || m.type || m.key || "").toLowerCase().includes(memTab));
+  list.innerHTML = rows.length ? rows.map((m) => `
+    <div class="mem-row">
+      <div class="mem-ico">🧠</div>
+      <div class="grow"><b>${esc(m.key)}</b><div style="font-size:13px;color:var(--ink-2)">${esc(String(m.value)).slice(0, 120)}</div></div>
+      <span class="mem-time">${esc(relTimeAny(m.updated_at))}</span>
+      <button class="mini-btn" data-mem-del="${esc(m.key)}">Forget</button>
+    </div>`).join("") : `<div class="empty">No memories here yet. Things you ask me to remember will land here.</div>`;
+  list.querySelectorAll("[data-mem-del]").forEach((b) => b.addEventListener("click", async () => {
+    await api(`/api/memory/${encodeURIComponent(b.dataset.memDel)}`, { method: "DELETE" }).catch((e) => toast("Forget failed: " + e.message));
+    toast("Forgotten");
+    loadMemories();
+  }));
+}
+$$("#memory-tabs .tab").forEach((b) => b.addEventListener("click", () => {
+  memTab = b.dataset.tab;
+  $$("#memory-tabs .tab").forEach((x) => x.classList.toggle("active", x === b));
+  renderMemories();
+}));
+
+/* ---------------- skills ---------------- */
+let skillTab = "all", allSkills = [];
+loaders.skills = loadSkills;
+async function loadSkills() {
+  try { allSkills = (await api("/api/skills")).skills; } catch { allSkills = []; }
+  renderSkills();
+}
+function skillIcon(s) {
+  const c = String(s.category || "").toLowerCase();
+  if (c.includes("dev")) return ["💻", "blue"];
+  if (c.includes("content")) return ["✒️", "purple"];
+  if (c.includes("research")) return ["🔍", "green"];
+  if (c.includes("auto")) return ["⚡", "orange"];
+  return ["🛠️", "pink"];
+}
+function renderSkills() {
+  const g = $("#skill-grid");
+  const rows = skillTab === "all" ? allSkills : allSkills.filter((s) =>
+    String(s.category || "").toLowerCase().includes(skillTab));
+  g.innerHTML = rows.length ? rows.map((s) => {
+    const [ico, cls] = skillIcon(s);
+    return `<button class="skill-card" data-skill="${esc(s.name)}">
+      <span class="proj-menu" aria-label="options">⋯</span>
+      <div class="skill-ico ${cls}">${ico}</div>
+      <h4>${esc(s.name)}</h4>
+      <p>${esc(s.description || "")}</p>
+      <div class="skill-meta"><span class="pill">${esc(s.category || "general")}</span>${s.enabled ? `<span class="pill pill-ok">enabled</span>` : ""}</div>
+    </button>`;
+  }).join("") : `<div class="empty">No skills in this lane yet.</div>`;
+  g.querySelectorAll("[data-skill]").forEach((b) => b.addEventListener("click", () => {
+    switchView("chat");
+    sendMessage(`Use the ${b.dataset.skill} skill`);
+  }));
+}
+$$("#skill-tabs .tab").forEach((b) => b.addEventListener("click", () => {
+  skillTab = b.dataset.tab;
+  $$("#skill-tabs .tab").forEach((x) => x.classList.toggle("active", x === b));
+  renderSkills();
+}));
+
+/* ---------------- watchers ---------------- */
+const WATCH_ICONS = { gmail: ["📧", "red"], gcal: ["📅", "blue"], weather: ["🌤️", "orange"], github: ["🐙", "purple"], telegram: ["✈️", "blue"] };
+loaders.watchers = loadWatchers;
+async function loadWatchers() {
+  let list = [];
+  try { list = (await api("/api/watchers")).suggestions || []; } catch {}
+  const wrap = $("#watcher-list");
+  wrap.innerHTML = list.length ? list.map((s) => {
+    const [ico, cls] = WATCH_ICONS[s.kind] || ["🔔", "purple"];
+    return `<div class="watcher-row">
+      <div class="watcher-ico ${cls}">${ico}</div>
+      <div class="grow"><b>${esc(s.title)}</b><div class="muted">${esc(s.text)}</div></div>
+      <button class="link-btn" data-dismiss="${s.id}">Dismiss</button>
+    </div>`;
+  }).join("") : `<div class="empty">No suggestions right now — watchers will nudge you here when something needs attention.</div>`;
+  wrap.querySelectorAll("[data-dismiss]").forEach((b) => b.addEventListener("click", async () => {
+    await api(`/api/watchers/${b.dataset.dismiss}`, { method: "DELETE" }).catch(() => {});
+    loadWatchers(); refreshBadges();
+  }));
 }
 
-/* ---------------- OAuth callback page ---------------- */
+/* ---------------- files ---------------- */
+let fileTab = "all", allFiles = [], filesRoot = "";
+loaders.files = loadFiles;
+async function loadFiles() {
+  try {
+    const r = await api("/api/files");
+    allFiles = r.files || [];
+    filesRoot = r.root || "";
+  } catch { allFiles = []; }
+  $("#files-root").textContent = filesRoot ? `Workspace: ${filesRoot}` : "";
+  renderFiles();
+}
+function fileName(f) { const p = f.path || f.name || ""; return p.split("/").pop(); }
+function fileCat(f) {
+  const n = fileName(f).toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|svg)$/.test(n)) return "images";
+  if (/\.(pdf|docx?|txt|md|xlsx?|csv)$/.test(n)) return "docs";
+  return "other";
+}
+function fileIcon(f) {
+  const c = fileCat(f), n = fileName(f).toLowerCase();
+  if (c === "images") return ["🖼️", "pink"];
+  if (/\.pdf$/.test(n)) return ["📕", "red"];
+  if (/\.(xlsx?|csv)$/.test(n)) return ["📗", "green"];
+  return ["📄", "blue"];
+}
+function fmtSize(b) {
+  if (!b) return "";
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+function renderFiles() {
+  const g = $("#file-list");
+  const rows = fileTab === "all" ? allFiles : allFiles.filter((f) => fileCat(f) === fileTab);
+  g.innerHTML = rows.length ? rows.map((f) => {
+    const [ico, cls] = fileIcon(f);
+    const name = fileName(f);
+    return `<div class="file-card">
+      <div class="file-ico ${cls}">${ico}</div>
+      <b title="${esc(f.path || "")}">${esc(name)}</b>
+      <span class="muted">${f.type === "dir" ? "folder" : esc(fmtSize(f.size))}</span>
+      ${f.type !== "dir" ? `<a class="mini-btn" style="display:inline-block;text-decoration:none" href="/api/files/download?path=${encodeURIComponent(f.path)}" download="${esc(name)}">Download</a>` : ""}
+    </div>`;
+  }).join("") : `<div class="empty">No files here yet. Upload something with the button above.</div>`;
+}
+$$("#file-tabs .tab").forEach((b) => b.addEventListener("click", () => {
+  fileTab = b.dataset.tab;
+  $$("#file-tabs .tab").forEach((x) => x.classList.toggle("active", x === b));
+  renderFiles();
+}));
+$("#files-upload").addEventListener("click", () => $("#upload-input").click());
+$("#upload-input").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("file", f);
+  try {
+    await fetch("/api/upload", { method: "POST", body: fd });
+    toast("Uploaded " + f.name);
+    loadFiles();
+  } catch { toast("Upload failed."); }
+  e.target.value = "";
+});
+
+/* ---------------- analytics ---------------- */
+loaders.analytics = loadAnalytics;
+async function loadAnalytics() {
+  let a = {};
+  try { a = await api("/api/analytics"); } catch {}
+  const tiles = [
+    ["📅", "blue", a.events ?? 0, "Events logged"],
+    ["✅", "green", a.tasks_done ?? 0, "Tasks done"],
+    ["🔔", "purple", a.approvals_approved ?? 0, "Approvals granted"],
+    ["🧠", "orange", a.memories ?? 0, "Memories stored"],
+  ];
+  $("#analytics-tiles").innerHTML = tiles.map(([ico, cls, num, lbl]) => `
+    <div class="tile"><div class="tile-ico ${cls}">${ico}</div>
+    <div><div class="tile-num">${esc(num)}</div><div class="tile-lbl">${esc(lbl)}</div></div></div>`).join("");
+  const keys = ["events", "tasks_open", "tasks_done", "memories", "approvals_approved"];
+  const vals = keys.map((k) => a[k] ?? 0);
+  const max = Math.max(1, ...vals);
+  $("#chart-bars").innerHTML = `<div class="bars">` + keys.map((k, i) => `
+    <div class="bar-col"><div class="bar" style="height:${Math.round((vals[i] / max) * 100)}%"></div>
+    <div class="bar-lbl">${k.split("_")[0]}</div></div>`).join("") + `</div>`;
+  const open = a.tasks_open ?? 0, done = a.tasks_done ?? 0, tot = Math.max(1, open + done);
+  const pct = Math.round((done / tot) * 100);
+  const circ = 2 * Math.PI * 54;
+  $("#chart-donut").innerHTML = `<div class="donut-wrap">
+    <svg width="130" height="130" viewBox="0 0 130 130">
+      <circle cx="65" cy="65" r="54" fill="none" stroke="var(--line)" stroke-width="14"/>
+      <circle cx="65" cy="65" r="54" fill="none" stroke="url(#dg)" stroke-width="14" stroke-linecap="round"
+        stroke-dasharray="${(pct / 100) * circ} ${circ}" transform="rotate(-90 65 65)"/>
+      <defs><linearGradient id="dg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d5ef0"/></linearGradient></defs>
+      <text x="65" y="72" text-anchor="middle" font-size="20" font-weight="800" fill="var(--ink)">${pct}%</text>
+    </svg>
+    <div class="donut-legend">
+      <div><span class="legend-dot" style="background:#8b5cf6"></span>Completed — ${done}</div>
+      <div><span class="legend-dot" style="background:var(--line)"></span>Open — ${open}</div>
+    </div></div>`;
+}
+
+/* ---------------- settings + connectors ---------------- */
+function openSettings(tab = "general") {
+  $("#settings-modal").hidden = false;
+  switchSettingsTab(tab);
+}
+$("#settings-close").addEventListener("click", () => { $("#settings-modal").hidden = true; });
+$("#settings-modal").addEventListener("click", (e) => { if (e.target === $("#settings-modal")) $("#settings-modal").hidden = true; });
+$$(".sm-nav-item").forEach((b) => b.addEventListener("click", () => switchSettingsTab(b.dataset.dtab)));
+function switchSettingsTab(name) {
+  $$(".sm-nav-item").forEach((b) => b.classList.toggle("active", b.dataset.dtab === name));
+  $$(".dtab").forEach((t) => t.classList.toggle("active", t.id === `dtab-${name}`));
+  if (name === "connectors") loadConnectors();
+  if (name === "general") loadGeneral();
+}
+async function loadGeneral() {
+  try {
+    const me = await api("/api/me");
+    $("#set-model").textContent = me.model ? `${me.model} · local` : "Local";
+    const pill = $("#set-model-pill");
+    pill.textContent = me.model_ok ? "online" : "offline";
+    pill.className = "pill " + (me.model_ok ? "pill-ok" : "pill-err");
+  } catch {}
+}
+$("#revoke-all").addEventListener("click", async () => {
+  if (!confirm("Disconnect every connector and delete all stored credentials?")) return;
+  try {
+    const { connectors } = await api("/api/connectors");
+    for (const c of connectors.filter((c) => c.state !== "available")) {
+      await api(`/api/connectors/${c.id}/revoke`, { method: "DELETE" }).catch(() => {});
+    }
+    toast("Everything revoked");
+  } catch (e) { toast("Revoke failed: " + e.message); }
+  loadConnectors($("#conn-search").value);
+});
+
+let connCatalog = [];
+async function loadConnectors(q = "") {
+  $("#conn-list-view").hidden = false;
+  $("#conn-detail-view").hidden = true;
+  try {
+    connCatalog = (await api("/api/connectors")).connectors;
+  } catch { connCatalog = []; }
+  const filt = (c) => !q || c.name.toLowerCase().includes(q.toLowerCase()) || c.tagline.toLowerCase().includes(q.toLowerCase());
+  const conn = connCatalog.filter((c) => c.state === "connected" && filt(c));
+  const avail = connCatalog.filter((c) => c.state !== "connected" && filt(c));
+  const row = (c) => `
+    <button class="conn-row" data-conn="${esc(c.id)}">
+      <div class="conn-ico" style="background:${c.color}">${c.icon}</div>
+      <div class="conn-meta"><b>${esc(c.name)}</b><p>${esc(c.tagline)}</p></div>
+      <div class="conn-right">
+        ${c.state === "connected" ? `<span class="pill pill-ok">Connected</span>` : `<span class="pill">Available</span>`}
+        <span class="conn-chev">›</span>
+      </div>
+    </button>`;
+  $("#conn-connected").innerHTML = conn.length ? conn.map(row).join("")
+    : `<div class="conn-empty">Nothing connected yet. Grant access below to unlock automations.</div>`;
+  $("#conn-available").innerHTML = avail.length ? avail.map(row).join("")
+    : `<div class="conn-empty">No matches.</div>`;
+  $$("#dtab-connectors [data-conn]").forEach((b) =>
+    b.addEventListener("click", () => openConnectorDetail(b.dataset.conn))
+  );
+}
+$("#conn-search").addEventListener("input", (e) => loadConnectors(e.target.value));
+$("#conn-back").addEventListener("click", () => {
+  $("#conn-detail-view").hidden = true;
+  $("#conn-list-view").hidden = false;
+});
+
+async function openConnectorDetail(id) {
+  const c = await api(`/api/connectors/${id}`).catch((e) => { toast("Failed to load: " + e.message); return null; });
+  if (!c) return;
+  $("#conn-list-view").hidden = true;
+  const view = $("#conn-detail-view");
+  view.hidden = false;
+  const d = $("#conn-detail");
+  const st = c.state;
+  const pill = st === "connected" ? `<span class="pill pill-ok">Connected</span>`
+    : st === "permission_granted" ? `<span class="pill pill-granted">Permission granted</span>`
+    : `<span class="pill">Available</span>`;
+  let statusNote = "";
+  if (st === "connected") statusNote = `<div class="callout ok">Connected — reads can run and writes will ask for your approval first.</div>`;
+  else if (st === "permission_granted") statusNote = `<div class="callout warn">Permission granted. Add your credentials below to go live.</div>`;
+  else if (st === "credential_added") statusNote = `<div class="callout warn">Credentials saved. Run a test to verify the connection.</div>`;
+  else if (st === "auth_error") statusNote = `<div class="callout err">The last health check failed. Re-enter credentials or reconnect with Google.</div>`;
+
+  const scopes = (c.scopes || []).map((s) => `<li>${esc(s)}</li>`).join("");
+  const setupSteps = (c.setup_steps || []).map((s, i) => `<li>${i + 1}. ${esc(s)}</li>`).join("");
+  const credFields = (c.credential_fields || []).map((f) => `
+    <label>${esc(f.label || f.name)}<input type="${f.secret ? "password" : "text"}" data-cred="${esc(f.name)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off"></label>`).join("");
+  const defaults = (c.defaults || []).map((f) => `
+    <label>${esc(f.label || f.name)}<input type="text" data-def="${esc(f.name)}" value="${esc(f.value || "")}"></label>`).join("");
+  const authHTML = c.oauth_url
+    ? `<div class="btn-row"><button class="btn-primary" id="cd-google">🔗 Connect with Google</button></div>
+       <p class="muted small" style="margin-top:8px">OAuth signs you in at Google — OS only stores the tokens, encrypted on this machine.</p>`
+    : `<div class="cred-form">${credFields || '<p class="muted">No credentials needed for this connector.</p>'}
+       ${credFields ? `<div class="btn-row"><button class="btn-primary" id="cd-save-creds">Save credentials</button></div>` : ""}</div>`;
+  const grantBtn = st === "available" ? `<button class="btn-primary" id="cd-connect">Grant permission</button>` : "";
+  const revokeSmall = st === "permission_granted" ? `<button class="btn-ghost" id="cd-revoke">Revoke permission</button>` : "";
+  const tryHTML = (c.try_it || []).map((t) => `<button class="try-chip" data-try="${esc(t.prompt)}">${esc(t.label)}</button>`).join("");
+  const actionsHTML = (c.actions || []).map((a) => `<li>🔧 ${esc(a)}</li>`).join("");
+
+  d.innerHTML = `
+    <div class="cd-head">
+      <div class="conn-ico lg" style="background:${c.color}">${c.icon}</div>
+      <div class="grow"><h3>${esc(c.name)}</h3><p class="muted">${esc(c.tagline)}</p></div>
+      ${pill}
+    </div>
+    ${statusNote}
+    ${c.free_note ? `<div class="callout ok">${esc(c.free_note)}</div>` : ""}
+    ${c.cost_note ? `<div class="callout warn">${esc(c.cost_note)}</div>` : ""}
+    <div class="cd-tabs">
+      <button class="cd-tab active" data-cdtab="permissions">Permissions</button>
+      <button class="cd-tab" data-cdtab="setup">Setup</button>
+      <button class="cd-tab" data-cdtab="defaults">Defaults</button>
+      <button class="cd-tab" data-cdtab="try">Try it</button>
+    </div>
+    <div class="cd-panel active" data-cdpanel="permissions">
+      <h4 style="margin:6px 0">What this connector can do</h4>
+      <ul class="scope-list">${scopes || '<li class="muted">No special permissions listed.</li>'}</ul>
+      ${grantBtn}${revokeSmall}
+    </div>
+    <div class="cd-panel" data-cdpanel="setup">
+      <h4 style="margin:6px 0">Setup</h4>
+      <ol class="setup-steps">${setupSteps || "<li>Follow the connector's own setup docs, then add credentials below.</li>"}</ol>
+      ${authHTML}
+      <div class="btn-row"><button class="btn-ghost" id="cd-test">🧪 Run health check</button></div>
+    </div>
+    <div class="cd-panel" data-cdpanel="defaults">
+      <h4 style="margin:6px 0">Defaults</h4>
+      ${defaults ? `<div class="cred-form">${defaults}<div class="btn-row"><button class="btn-primary" id="cd-save-defaults">Save defaults</button></div></div>`
+        : `<p class="muted">No defaults for this connector.</p>`}
+    </div>
+    <div class="cd-panel" data-cdpanel="try">
+      <h4 style="margin:6px 0">Try it</h4>
+      <p class="muted small">Reads run now. Anything that writes asks for approval first.</p>
+      <div class="try-list">${tryHTML || '<span class="muted">No quick examples for this connector.</span>'}</div>
+      ${actionsHTML ? `<h4 style="margin:14px 0 4px">Available actions</h4><ul class="action-list">${actionsHTML}</ul>` : ""}
+    </div>
+    ${st !== "available" ? `<button class="revoke-big" id="cd-revoke-big">Disconnect ${esc(c.name)}</button>` : ""}
+  `;
+  d.querySelectorAll(".cd-tab").forEach((t) => t.addEventListener("click", () => {
+    d.querySelectorAll(".cd-tab").forEach((x) => x.classList.toggle("active", x === t));
+    d.querySelectorAll(".cd-panel").forEach((p) => p.classList.toggle("active", p.dataset.cdpanel === t.dataset.cdtab));
+  }));
+  d.querySelector("#cd-connect")?.addEventListener("click", async () => {
+    await api(`/api/connectors/${id}/grant`, { method: "POST" }).catch((e) => toast("Grant failed: " + e.message));
+    toast("Permission granted — add credentials in Setup");
+    openConnectorDetail(id); loadConnectors($("#conn-search").value);
+  });
+  const doRevoke = async () => {
+    if (!confirm(`Disconnect ${c.name}?`)) return;
+    await api(`/api/connectors/${id}/revoke`, { method: "DELETE" }).catch((e) => toast("Revoke failed: " + e.message));
+    toast("Disconnected");
+    openConnectorDetail(id); loadConnectors($("#conn-search").value); refreshBadges();
+  };
+  d.querySelector("#cd-revoke")?.addEventListener("click", doRevoke);
+  d.querySelector("#cd-revoke-big")?.addEventListener("click", doRevoke);
+  d.querySelector("#cd-google")?.addEventListener("click", () => startOAuth(id, c.oauth_url));
+  d.querySelector("#cd-save-creds")?.addEventListener("click", async () => {
+    const vals = {};
+    d.querySelectorAll("[data-cred]").forEach((i) => { vals[i.dataset.cred] = i.value; });
+    try {
+      await api(`/api/connectors/${id}/credentials`, { method: "POST", body: JSON.stringify({ values: vals }) });
+      toast("Credentials saved — running health check…");
+    } catch (e) { toast("Save failed: " + e.message); return; }
+    openConnectorDetail(id); loadConnectors($("#conn-search").value);
+  });
+  d.querySelector("#cd-test")?.addEventListener("click", async () => {
+    try {
+      const r = await api(`/api/connectors/${id}/test`, { method: "POST" });
+      toast(r.ok ? "Health check passed ✓" : "Health check failed: " + (r.error || "unknown"));
+    } catch (e) { toast("Health check failed: " + e.message); }
+    openConnectorDetail(id); loadConnectors($("#conn-search").value);
+  });
+  d.querySelector("#cd-save-defaults")?.addEventListener("click", async () => {
+    const vals = {};
+    d.querySelectorAll("[data-def]").forEach((i) => { vals[i.dataset.def] = i.value; });
+    await api(`/api/connectors/${id}/defaults`, { method: "POST", body: JSON.stringify({ values: vals }) }).catch((e) => toast("Save failed: " + e.message));
+    toast("Defaults saved");
+  });
+  d.querySelectorAll("[data-try]").forEach((b) => b.addEventListener("click", () => {
+    $("#settings-modal").hidden = true;
+    switchView("chat");
+    sendMessage(b.dataset.try);
+  }));
+}
+
+function startOAuth(id, url) {
+  const w = window.open(url, "oauth", "width=520,height=640");
+  const onMsg = (e) => {
+    if (e.data && e.data.oauth_done) {
+      window.removeEventListener("message", onMsg);
+      w && w.close();
+      toast("Google connected ✓");
+      openConnectorDetail(id); loadConnectors($("#conn-search").value);
+    }
+  };
+  window.addEventListener("message", onMsg);
+}
+
+/* ---------------- permission modal ---------------- */
+let pendingPerms = [];
+async function refreshPerms() {
+  try { pendingPerms = (await api("/api/permissions/pending")).pending; } catch { pendingPerms = []; }
+  const row = $("#perm-row");
+  if (pendingPerms.length) {
+    row.hidden = false;
+    $("#perm-count").textContent = `${pendingPerms.length} waiting`;
+  } else row.hidden = true;
+}
+$("#perm-banner").addEventListener("click", () => {
+  if (!pendingPerms.length) return;
+  const p = pendingPerms[0];
+  $("#perm-title").textContent = p.title;
+  $("#perm-sub").textContent = p.description;
+  $("#perm-scopes").innerHTML = (p.scopes || []).map((s) =>
+    `<label><input type="checkbox" checked> ${esc(s)}</label>`).join("");
+  $("#perm-modal").hidden = false;
+});
+$("#perm-deny").addEventListener("click", () => { $("#perm-modal").hidden = true; });
+$("#perm-allow").addEventListener("click", async () => {
+  const p = pendingPerms[0];
+  $("#perm-modal").hidden = true;
+  await api(`/api/permissions/${p.id}/grant`, { method: "POST" }).catch((e) => toast("Grant failed: " + e.message));
+  refreshPerms(); loadConnectors($("#conn-search").value); refreshBadges();
+});
+
+/* ---------------- credential modal ---------------- */
+let credTarget = null;
+async function openCredModal(connId, credGroup) {
+  credTarget = { connId, credGroup };
+  const c = await api(`/api/connectors/${connId}`);
+  $("#cred-title").textContent = `Connect ${c.name}`;
+  const fields = (c.credential_fields || []).filter((f) =>
+    !credGroup || !f.group || f.group === credGroup);
+  $("#cred-fields").innerHTML = fields.map((f) => `
+    <label>${esc(f.label || f.name)}
+      <input type="${f.secret ? "password" : "text"}" data-cf="${esc(f.name)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off">
+    </label>`).join("") || `<p class="muted">No credentials needed.</p>`;
+  $("#cred-modal").hidden = false;
+}
+$("#cred-cancel").addEventListener("click", () => { $("#cred-modal").hidden = true; });
+$("#cred-save").addEventListener("click", async () => {
+  const vals = {};
+  $("#cred-fields").querySelectorAll("[data-cf]").forEach((i) => { vals[i.dataset.cf] = i.value; });
+  $("#cred-modal").hidden = true;
+  try {
+    await api(`/api/connectors/${credTarget.connId}/credentials`, {
+      method: "POST", body: JSON.stringify({ values: vals, group: credTarget.credGroup }),
+    });
+    toast("Credentials saved — running health check…");
+  } catch (e) { toast("Save failed: " + e.message); }
+  refreshBadges();
+});
 
 /* ---------------- command palette ---------------- */
-const paletteItems = [
-  ["💬 Go to Chat", "chat"], ["☑ Go to Tasks", "tasks"], ["📅 Go to Calendar", "calendar"],
-  ["📁 Go to Projects", "projects"], ["🧠 Go to Memory", "memory"], ["🛠 Go to Skills", "skills"],
-  ["🔔 Go to Watchers", "watchers"], ["🗂 Go to Files", "files"], ["📊 Go to Analytics", "analytics"],
-  ["🔌 Go to Connectors", "connectors"],
-  ["✒ Draft a LinkedIn post", null, "draft a linkedin post about shipping early"],
-  ["🧠 Remember something", null, null, "remember that "],
+const PALETTE = [
+  ["💬", "New chat", "Start a fresh conversation", "N", () => { messagesEl.innerHTML = ""; showHero(); switchView("chat"); }],
+  ["✨", "Plan my day", "Send prompt", "P", () => sendMessage("Plan my day")],
+  ["✒️", "Draft a LinkedIn post", "Send prompt", "", () => sendMessage("Draft a linkedin post about shipping early")],
+  ["☑️", "Go to Tasks", "Navigate", "T", () => switchView("tasks")],
+  ["📅", "Go to Calendar", "Navigate", "C", () => switchView("calendar")],
+  ["📁", "Go to Projects", "Navigate", "", () => switchView("projects")],
+  ["🧠", "Go to Memory", "Navigate", "M", () => switchView("memory")],
+  ["🔌", "Connectors", "Settings", "G", () => openSettings("connectors")],
+  ["⚙️", "Settings", "Open settings", "", () => openSettings("general")],
+  ["🌙", "Toggle theme", "Light / dark", "", () => { const cur = document.documentElement.dataset.theme; applyTheme(cur === "dark" ? "light" : "dark"); }],
+  ["🔗", "Connect Google", "OAuth", "", () => openSettings("connectors")],
 ];
+function renderPalette(q = "") {
+  const r = $("#palette-results");
+  const items = PALETTE.filter((p) => (p[1] + " " + p[2]).toLowerCase().includes(q.toLowerCase()));
+  r.innerHTML = items.length ? items.map((p) => `
+    <button class="palette-item" data-pal="${PALETTE.indexOf(p)}">
+      <span class="palette-ico pink">${p[0]}</span>
+      <span class="grow"><b>${esc(p[1])}</b><small>${esc(p[2])}</small></span>
+      ${p[3] ? `<span class="palette-hint">${esc(p[3])}</span>` : ""}
+    </button>`).join("") : `<div class="empty">No matches.</div>`;
+  r.querySelectorAll("[data-pal]").forEach((b) => b.addEventListener("click", () => {
+    $("#palette").hidden = true;
+    PALETTE[parseInt(b.dataset.pal, 10)][4]();
+  }));
+}
 function openPalette() {
   $("#palette").hidden = false;
   $("#palette-input").value = "";
-  renderPalette("");
+  renderPalette();
   setTimeout(() => $("#palette-input").focus(), 30);
 }
-function renderPalette(q) {
-  const el = $("#palette-results");
-  el.innerHTML = "";
-  for (const [label, view, prompt, prefill] of paletteItems) {
-    if (q && !label.toLowerCase().includes(q.toLowerCase())) continue;
-    const b = document.createElement("button");
-    b.className = "palette-item";
-    b.textContent = label;
-    b.addEventListener("click", () => {
-      $("#palette").hidden = true;
-      if (view) switchView(view);
-      else if (prompt) { switchView("chat"); sendMessage(prompt); }
-      else if (prefill) { switchView("chat"); $("#chat-input").value = prefill; $("#chat-input").focus(); }
-    });
-    el.appendChild(b);
-  }
-}
-$("#open-palette").addEventListener("click", openPalette);
+$("#palette").addEventListener("click", (e) => { if (e.target === $("#palette")) $("#palette").hidden = true; });
 $("#palette-input").addEventListener("input", (e) => renderPalette(e.target.value));
-$("#palette").addEventListener("click", (e) => { if (e.target.id === "palette") $("#palette").hidden = true; });
+$("#open-palette").addEventListener("click", openPalette);
 document.addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); }
-  if (e.key === "Escape") $$(".modal-backdrop").forEach((m) => (m.hidden = true));
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); }
+  if (e.key === "Escape") { $("#palette").hidden = true; $("#settings-modal").hidden = true; }
 });
 
 /* ---------------- boot ---------------- */
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    $("#boot").classList.add("done");
+    setTimeout(() => $("#boot").remove(), 600);
+  }, 900);
+});
+
+/* ---------------- init ---------------- */
 loadMe();
 refreshBadges();
 refreshApprovalRail();
-refreshActionRail();
-refreshChips();
-setInterval(() => { refreshBadges(); refreshActionRail(); }, 30000);
+refreshPerms();
+setInterval(refreshApprovalRail, 15000);
+setInterval(refreshPerms, 20000);
+switchView("chat");
