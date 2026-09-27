@@ -68,6 +68,15 @@ class VoiceConfig:
 
 
 @dataclass
+class ApprovalsConfig:
+    # How long a pending approval waits before it auto-expires.
+    timeout_sec: int = 1800
+    # Max items in the pending-approval queue; the newest request is
+    # refused (fail closed) when the queue is full.
+    max_pending: int = 10
+
+
+@dataclass
 class MCPServerEntry:
     name: str = ""
     command: list[str] = field(default_factory=list)
@@ -89,6 +98,7 @@ class Config:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     voice: VoiceConfig = field(default_factory=VoiceConfig)
     mcp: MCPConfig = field(default_factory=MCPConfig)
+    approvals: ApprovalsConfig = field(default_factory=ApprovalsConfig)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -177,6 +187,10 @@ def load_config(config_dir: Path | None = None) -> Config:
                 for s in (get("mcp.servers", []) or [])
                 if isinstance(s, dict) and s.get("name") and s.get("command")
             ],
+        ),
+        approvals=ApprovalsConfig(
+            timeout_sec=int(get("approvals.timeout_sec", 1800)),
+            max_pending=int(get("approvals.max_pending", 10)),
         ),
         raw=data,
     )

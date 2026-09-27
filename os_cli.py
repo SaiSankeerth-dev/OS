@@ -9,6 +9,7 @@ Subcommands:
     os permissions   show skill permission table
     os allow|ask|deny <skill>
                      set a skill's permission
+    os approvals     show approval history (newest first)
 """
 from __future__ import annotations
 
@@ -260,6 +261,23 @@ def cmd_deny(args: argparse.Namespace) -> int:
     return _cmd_set_policy(args, "deny")
 
 
+def cmd_approvals(args: argparse.Namespace) -> int:
+    """Phase 10: show the approval audit trail (newest first)."""
+    sys.path.insert(0, str(ROOT))
+    from server.approvals import ApprovalStore
+
+    store = ApprovalStore()
+    entries = store.recent(limit=max(1, int(args.limit or 10)))
+    if not entries:
+        print("approval log is empty - nothing approved or rejected yet.")
+        return 0
+    for e in entries:
+        ts = str(e["ts"])[:16].replace("T", " ")
+        status = str(e["status"]).replace("_", " ").title()
+        print(f"  {ts} | {e['skill']} | {status}")
+    return 0
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     cmd = [sys.executable, "-m", "pytest", "-q"] + args.passthrough
     print("$", " ".join(cmd))
@@ -291,6 +309,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_perm = sub.add_parser("permissions", help="show skill permission table")
     p_perm.set_defaults(func=cmd_permissions)
+
+    p_appr = sub.add_parser("approvals", help="show approval history (newest first)")
+    p_appr.add_argument("--limit", type=int, default=10, help="max entries to show")
+    p_appr.set_defaults(func=cmd_approvals)
 
     for name, func, help_text in [
         ("allow", cmd_allow, "always allow a skill's tools"),

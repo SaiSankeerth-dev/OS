@@ -5,15 +5,17 @@ nothing externally visible happens until the user approves the
 EXACT text they were shown. If that text changes after approval,
 the approval is invalid and the action is refused.
 
-A single pending approval lives on the ConversationManager at a
-time - this is a turn-based interface, so a human approves one
-thing before moving to the next, same as the rest of OS's design.
+Pending approvals live in a FIFO queue on the ConversationManager.
+Each one expires after config.approvals.timeout_sec (lazy expiry:
+pruned whenever the queue is touched) and is logged EXPIRED -
+nothing executes on an expired approval.
 """
 from __future__ import annotations
 
 import hashlib
 import sqlite3
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,6 +32,10 @@ class PendingApproval:
     draft: str
     approved_hash: str  # hash of `draft` at the moment it was shown to the user
     run_id: str = ""  # supervisor lifecycle run this approval belongs to
+    created_ts: float = field(default_factory=time.time)
+
+    def expired(self, timeout_sec: float) -> bool:
+        return (time.time() - self.created_ts) > timeout_sec
 
 
 class ApprovalStore:
@@ -80,5 +86,21 @@ class ApprovalStore:
                 ),
             )
             conn.commit()
+        finally:
+            conn.close()
+
+    def recent(self, limit: int = 10) -> list[dict]:
+        """Newest-first audit trail. Phase 10: 'what did I approve?'"""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            rows = conn.execute(
+                "SELECT ts, skill, input, status FROM runs "
+                "ORDER BY id DESC LIMIT ?",
+                (max(1, limit),),
+            ).fetchall()
+            return [
+                {"ts": r[0], "skill": r[1], "input": r[2], "status": r[3]}
+                for r in rows
+            ]
         finally:
             conn.close()

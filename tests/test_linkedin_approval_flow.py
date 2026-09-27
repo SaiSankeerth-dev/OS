@@ -29,8 +29,8 @@ def test_linkedin_draft_shows_exact_text_and_asks_for_approval(tmp_path):
         _collect_into(m, "draft a linkedin post about shipping a retry system")
     )
     assert "Approve and post this exact text?" in out
-    assert m._pending_approval is not None
-    assert m._pending_approval.skill == "linkedin"
+    assert len(m._pending) == 1
+    assert m._pending[0].skill == "linkedin"
 
 
 def test_approve_publishes_stub_and_clears_pending(tmp_path):
@@ -38,7 +38,7 @@ def test_approve_publishes_stub_and_clears_pending(tmp_path):
     asyncio.run(_collect_into(m, "draft a linkedin post about a small bugfix"))
     out = asyncio.run(_collect_into(m, "yes"))
     assert "[stub] Would post to LinkedIn now" in out
-    assert m._pending_approval is None
+    assert m._pending == []
 
 
 def test_reject_discards_and_clears_pending(tmp_path):
@@ -46,7 +46,7 @@ def test_reject_discards_and_clears_pending(tmp_path):
     asyncio.run(_collect_into(m, "draft a linkedin post about a small win"))
     out = asyncio.run(_collect_into(m, "no"))
     assert "discarded" in out.lower()
-    assert m._pending_approval is None
+    assert m._pending == []
 
 
 def test_content_changed_after_approval_is_refused_not_executed(tmp_path):
@@ -54,11 +54,11 @@ def test_content_changed_after_approval_is_refused_not_executed(tmp_path):
     asyncio.run(_collect_into(m, "draft a linkedin post about a launch"))
     # Simulate the draft being mutated after it was shown to the user -
     # the hash must no longer match, and publish must be refused.
-    m._pending_approval.draft += " EDITED AFTER APPROVAL"
+    m._pending[0].draft += " EDITED AFTER APPROVAL"
     out = asyncio.run(_collect_into(m, "yes"))
     assert "changed since I showed it" in out
     assert "[stub] Would post" not in out
-    assert m._pending_approval is None
+    assert m._pending == []
 
 
 def test_ambiguous_reply_keeps_pending_approval_alive(tmp_path):
@@ -66,7 +66,7 @@ def test_ambiguous_reply_keeps_pending_approval_alive(tmp_path):
     asyncio.run(_collect_into(m, "draft a linkedin post about a demo day"))
     out = asyncio.run(_collect_into(m, "make it shorter"))
     assert "still got a draft waiting" in out
-    assert m._pending_approval is not None  # nothing was silently dropped
+    assert len(m._pending) == 1  # nothing was silently dropped
 
 
 def test_every_run_is_logged_to_sqlite(tmp_path):

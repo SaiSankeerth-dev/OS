@@ -57,6 +57,15 @@ _REJECT_RE = re.compile(
     r"^\s*(no|n|reject|cancel|discard|stop|don'?t)\s*[.!]?\s*$",
     re.IGNORECASE,
 )
+# Phase 10: batch decisions over the pending-approval queue.
+_APPROVE_ALL_RE = re.compile(
+    r"^\s*(approve\s+all|yes\s+to\s+all)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
+_REJECT_ALL_RE = re.compile(
+    r"^\s*(reject\s+all|no\s+to\s+all|discard\s+all)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
 
 
 class ConversationState(str, enum.Enum):
@@ -131,7 +140,10 @@ class ConversationManager:
         self.cfg = cfg
         self.state: ConversationState = ConversationState.IDLE
         self.history: list[Message] = []
-        self._pending_approval: PendingApproval | None = None
+        # Phase 10: FIFO queue of pending approvals (was a single slot).
+        # Each expires after cfg.approvals.timeout_sec; the queue caps at
+        # cfg.approvals.max_pending (newest refused when full).
+        self._pending: list[PendingApproval] = []
         self._approval_store = approval_store or ApprovalStore()
         # Phase 3: Laya fast router. None = regex routing only (the safe
         # default used by tests). Pass LayaRouter() to enable the fast path.
@@ -216,13 +228,26 @@ class ConversationManager:
         # A pending approval takes priority over normal routing - the
         # user is answering a question OS just asked, not starting a
         # new request. Nothing external executes without going through
-        # this branch first.
-        if self._pending_approval is not None:
-            async for chunk in self._handle_pending_approval(user_text):
-                yield chunk
-            perf.mark("turn_end:text")
-            perf.flush("text_turn")
-            return
+        # this branch first. Phase 10: expired approvals are pruned here.
+        # Exception: a NEW tool-call request is allowed through while
+        # approvals are pending, so the queue can actually fill. Its
+        # result goes through the same approval gate (needs_approval)
+        # and enqueues like any other.
+        expired = self._prune_expired()
+        if self._pending or expired:
+            # `expired` covers the case where everything the user might
+            # have been answering lapsed: _handle_pending_approval says
+            # so plainly instead of misrouting "approve" as chat.
+            route_through = True
+            if self._pending:
+                early = self.intent_router.classify(user_text)
+                route_through = early.intent != Intent.TOOL_CALL
+            if route_through:
+                async for chunk in self._handle_pending_approval(user_text):
+                    yield chunk
+                perf.mark("turn_end:text")
+                perf.flush("text_turn")
+                return
 
         decision = self.intent_router.classify(user_text)
 
@@ -280,6 +305,15 @@ class ConversationManager:
             # Phase 9: permission changes. Local settings only - no tools,
             # no supervisor pipeline, no external effect.
             async for chunk in self._handle_permission(decision.args, perf):
+                yield chunk
+            perf.mark("turn_end:text")
+            perf.flush("text_turn")
+            return
+
+        if decision.intent == Intent.APPROVALS:
+            # Phase 10: approval audit trail. Read-only view of the
+            # immutable approvals log - no tools, no external effect.
+            async for chunk in self._handle_approvals(decision.args, perf):
                 yield chunk
             perf.mark("turn_end:text")
             perf.flush("text_turn")
@@ -349,18 +383,12 @@ class ConversationManager:
                 # Drafting skill with external effects (linkedin): stash
                 # the draft and wait for the next turn's approve/reject.
                 draft = data["draft"]
-                self._pending_approval = PendingApproval(
+                pending = PendingApproval(
                     skill="linkedin",
                     input_text=args.get("idea", user_text),
                     draft=draft,
                     approved_hash=content_hash(draft),
                     run_id=supervised.run_id,
-                )
-                self._approval_store.log(
-                    skill="linkedin",
-                    input_text=self._pending_approval.input_text,
-                    draft=draft,
-                    status="SHOWN",
                 )
             else:
                 # Phase 9: a local-only tool the user put in ask-mode.
@@ -369,19 +397,48 @@ class ConversationManager:
                 # APPROVE accepts it, REJECT discards it.
                 shown = fr.text
                 skill = self._supervisor.scope_guard.skill_for(tool_name)
-                self._pending_approval = PendingApproval(
+                pending = PendingApproval(
                     skill=skill or tool_name,
                     input_text=user_text,
                     draft=shown,
                     approved_hash=content_hash(shown),
                     run_id=supervised.run_id,
                 )
+            if not self._enqueue_pending(pending):
+                # Queue full: fail closed. The item is shown but cannot
+                # be approved - clear the queue and ask again.
                 self.history.append(
-                    Message(role="assistant", content=shown, ts=time.time())
+                    Message(role="assistant", content=fr.text, ts=time.time())
                 )
                 self.set_state(ConversationState.SPEAKING)
-                note = "\n\nThat's waiting on your approval - say 'approve' or 'reject'."
-                yield ChatChunk(delta=shown + note, done=True)
+                text = (
+                    f"{fr.text}\n\nMy approval queue is full "
+                    f"({len(self._pending)} waiting). I can't hold this one "
+                    f"for approval - approve or reject what's waiting, "
+                    f"then ask me again."
+                )
+                yield ChatChunk(delta=text, done=True)
+                self.set_state(ConversationState.READY)
+                return
+            if "draft" in data:
+                self._approval_store.log(
+                    skill="linkedin",
+                    input_text=pending.input_text,
+                    draft=pending.draft,
+                    status="SHOWN",
+                )
+            else:
+                self.history.append(
+                    Message(role="assistant", content=fr.text, ts=time.time())
+                )
+                self.set_state(ConversationState.SPEAKING)
+                n_more = len(self._pending) - 1
+                more = f" ({n_more} more waiting.)" if n_more else ""
+                note = (
+                    "\n\nThat's waiting on your approval - say 'approve' "
+                    f"or 'reject'.{more}"
+                )
+                yield ChatChunk(delta=fr.text + note, done=True)
                 self.set_state(ConversationState.READY)
                 return
 
@@ -390,6 +447,29 @@ class ConversationManager:
         )
         self.set_state(ConversationState.SPEAKING)
         yield ChatChunk(delta=fr.text, done=True)
+        self.set_state(ConversationState.READY)
+
+    async def _handle_approvals(self, args: dict[str, str], perf: PerfTrace):
+        """Phase 10: approval audit trail ('what did I approve?').
+
+        Read-only view over the immutable ApprovalStore log.
+        """
+        self.set_state(ConversationState.THINKING)
+        entries = self._approval_store.recent(limit=10)
+        if not entries:
+            text = "Nothing approved or rejected yet - the approval log is empty."
+        else:
+            lines = []
+            for e in entries:
+                ts = str(e["ts"])[:16].replace("T", " ")
+                status = str(e["status"]).replace("_", " ").title()
+                lines.append(f"- {ts} | {e['skill']} | {status}")
+            text = "Approval history (newest first):\n" + "\n".join(lines)
+        self.history.append(
+            Message(role="assistant", content=text, ts=time.time())
+        )
+        self.set_state(ConversationState.SPEAKING)
+        yield ChatChunk(delta=text, done=True)
         self.set_state(ConversationState.READY)
 
     async def _handle_permission(self, args: dict[str, str], perf: PerfTrace):
@@ -495,101 +575,149 @@ class ConversationManager:
         yield ChatChunk(delta=text, done=True)
         self.set_state(ConversationState.READY)
 
-    async def _handle_pending_approval(self, user_text: str):
-        pending = self._pending_approval
-        assert pending is not None
-
-        if _APPROVE_RE.match(user_text):
-            # Recompute the hash at execution time - if the draft was
-            # mutated after being shown, this stops matching and the
-            # approval is refused. No execution on a stale approval.
-            if content_hash(pending.draft) != pending.approved_hash:
-                text = (
-                    "That changed since I showed it - I won't approve "
-                    "something you didn't actually see. Ask me to do it again."
-                )
+    def _prune_expired(self) -> int:
+        """Drop expired pending approvals (fail closed). Returns count."""
+        timeout = float(self.cfg.approvals.timeout_sec)
+        kept: list[PendingApproval] = []
+        expired = 0
+        for p in self._pending:
+            if p.expired(timeout):
+                expired += 1
                 self._approval_store.log(
-                    pending.skill, pending.input_text, pending.draft,
-                    "REJECTED_HASH_MISMATCH",
+                    p.skill, p.input_text, p.draft, "EXPIRED"
                 )
-            elif pending.skill == "linkedin":
-                # STUB: no LinkedIn connector configured yet. Replace
-                # this branch with a real publish call when one exists -
-                # nothing else in this flow needs to change.
-                # Phase 4: the publish runs inside the supervisor as the
-                # APPROVE -> EXECUTE -> VERIFY -> REMEMBER tail of the
-                # lifecycle run that produced the draft.
-                def _publish() -> str:
-                    text = (
-                        "[stub] Would post to LinkedIn now:\n\n"
-                        f"{pending.draft}\n\n"
-                        "(No LinkedIn connector is wired up yet, so nothing "
-                        "actually went out.)"
-                    )
-                    self._approval_store.log(
-                        pending.skill, pending.input_text, pending.draft,
-                        "PUBLISHED_STUB",
-                    )
-                    return text
-
-                completed = await self._supervisor.complete_approved(
-                    pending.run_id, "linkedin_draft", _publish
-                )
-                text = completed.message
+                # Close the lifecycle run - discarded, nothing executed.
+                self._supervisor.reject_approved_run(p.run_id, p.skill)
             else:
-                # Phase 9: generic ask-mode confirmation. The result was
-                # local-only with no external effect - approval just
-                # accepts what was already shown.
-                self._approval_store.log(
-                    pending.skill, pending.input_text, pending.draft,
-                    "ACCEPTED_BY_USER",
-                )
-                self._supervisor.accept_approved_run(
-                    pending.run_id, pending.skill
-                )
-                text = "Approved."
-            self._pending_approval = None
-            self.history.append(
-                Message(role="assistant", content=text, ts=time.time())
-            )
-            self.set_state(ConversationState.SPEAKING)
-            yield ChatChunk(delta=text, done=True)
-            self.set_state(ConversationState.READY)
-            return
+                kept.append(p)
+        self._pending = kept
+        return expired
 
-        if _REJECT_RE.match(user_text):
+    def _enqueue_pending(self, pending: PendingApproval) -> bool:
+        """Add to the approval queue. False = queue full, item refused."""
+        self._prune_expired()
+        if len(self._pending) >= max(1, int(self.cfg.approvals.max_pending)):
+            return False
+        self._pending.append(pending)
+        return True
+
+    async def _approve_one(self, pending: PendingApproval) -> str:
+        """Approve a single pending item. Returns the reply text."""
+        # Recompute the hash at execution time - if the draft was
+        # mutated after being shown, this stops matching and the
+        # approval is refused. No execution on a stale approval.
+        if content_hash(pending.draft) != pending.approved_hash:
             self._approval_store.log(
                 pending.skill, pending.input_text, pending.draft,
-                "REJECTED_BY_USER",
+                "REJECTED_HASH_MISMATCH",
             )
-            # Phase 4: close the lifecycle run - discarded, nothing ran.
-            self._supervisor.reject_approved_run(pending.run_id, pending.skill)
-            self._pending_approval = None
+            return (
+                "That changed since I showed it - I won't approve "
+                "something you didn't actually see. Ask me to do it again."
+            )
+        if pending.skill == "linkedin":
+            # STUB: no LinkedIn connector configured yet. Replace
+            # this branch with a real publish call when one exists -
+            # nothing else in this flow needs to change.
+            # Phase 4: the publish runs inside the supervisor as the
+            # APPROVE -> EXECUTE -> VERIFY -> REMEMBER tail of the
+            # lifecycle run that produced the draft.
+            def _publish() -> str:
+                text = (
+                    "[stub] Would post to LinkedIn now:\n\n"
+                    f"{pending.draft}\n\n"
+                    "(No LinkedIn connector is wired up yet, so nothing "
+                    "actually went out.)"
+                )
+                self._approval_store.log(
+                    pending.skill, pending.input_text, pending.draft,
+                    "PUBLISHED_STUB",
+                )
+                return text
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, "linkedin_draft", _publish
+            )
+            return completed.message
+        # Phase 9: generic ask-mode confirmation. The result was
+        # local-only with no external effect - approval just
+        # accepts what was already shown.
+        self._approval_store.log(
+            pending.skill, pending.input_text, pending.draft,
+            "ACCEPTED_BY_USER",
+        )
+        self._supervisor.accept_approved_run(pending.run_id, pending.skill)
+        return "Approved."
+
+    def _reject_one(self, pending: PendingApproval) -> str:
+        """Reject a single pending item. Returns the reply text."""
+        self._approval_store.log(
+            pending.skill, pending.input_text, pending.draft,
+            "REJECTED_BY_USER",
+        )
+        # Phase 4: close the lifecycle run - discarded, nothing ran.
+        self._supervisor.reject_approved_run(pending.run_id, pending.skill)
+        if pending.skill == "linkedin":
+            return "Okay, discarded. Nothing was posted."
+        return "Okay, discarded."
+
+    async def _handle_pending_approval(self, user_text: str):
+        # Phase 10: the queue. Approve/reject act on the oldest item;
+        # "approve all" / "reject all" drain the whole queue in order.
+        self._prune_expired()
+        if not self._pending:
             text = (
-                "Okay, discarded. Nothing was posted."
-                if pending.skill == "linkedin"
-                else "Okay, discarded."
+                "The pending approvals expired while waiting - "
+                "nothing was executed."
             )
             self.history.append(
                 Message(role="assistant", content=text, ts=time.time())
             )
-            self.set_state(ConversationState.SPEAKING)
+            yield ChatChunk(delta=text, done=True)
+            return
+
+        if _APPROVE_ALL_RE.match(user_text):
+            parts = []
+            while self._pending:
+                parts.append(await self._approve_one(self._pending.pop(0)))
+            text = "\n\n".join(parts)
+        elif _APPROVE_RE.match(user_text):
+            text = await self._approve_one(self._pending.pop(0))
+            if self._pending:
+                text += f"\n\n({len(self._pending)} more waiting.)"
+        elif _REJECT_ALL_RE.match(user_text):
+            parts = []
+            while self._pending:
+                parts.append(self._reject_one(self._pending.pop(0)))
+            text = "\n\n".join(parts)
+        elif _REJECT_RE.match(user_text):
+            text = self._reject_one(self._pending.pop(0))
+            if self._pending:
+                text += f"\n\n({len(self._pending)} more waiting.)"
+        else:
+            # Ambiguous reply while something is pending - don't guess in
+            # either direction, don't silently drop the pending items.
+            pending = self._pending[0]
+            n = len(self._pending)
+            waiting = f" ({n} waiting)" if n > 1 else ""
+            if pending.skill == "linkedin":
+                text = (
+                    f"I've still got a draft waiting on your approval{waiting}. "
+                    "Say 'yes' to post it or 'no' to discard it."
+                )
+            else:
+                text = (
+                    f"I've still got something waiting on your approval{waiting}. "
+                    "Say 'approve' to accept it or 'reject' to discard it."
+                )
             yield ChatChunk(delta=text, done=True)
             self.set_state(ConversationState.READY)
             return
 
-        # Ambiguous reply while something is pending - don't guess in
-        # either direction, don't silently drop the pending item.
-        if pending.skill == "linkedin":
-            text = (
-                "I've still got a draft waiting on your approval. "
-                "Say 'yes' to post it or 'no' to discard it."
-            )
-        else:
-            text = (
-                "I've still got something waiting on your approval. "
-                "Say 'approve' to accept it or 'reject' to discard it."
-            )
+        self.history.append(
+            Message(role="assistant", content=text, ts=time.time())
+        )
+        self.set_state(ConversationState.SPEAKING)
         yield ChatChunk(delta=text, done=True)
         self.set_state(ConversationState.READY)
 

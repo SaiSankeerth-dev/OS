@@ -22,6 +22,7 @@ class Intent(str, enum.Enum):
     TASK = "task"
     PERSONA = "persona"
     PERMISSION = "permission"
+    APPROVALS = "approvals"
 
 
 @dataclass
@@ -170,6 +171,18 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         ),
         Intent.PERMISSION,
         "reset",
+    ),
+    (
+        # Phase 10: approval audit trail. "what did I approve",
+        # "show approval history".
+        re.compile(
+            r"^\s*(?:what\s+did\s+i\s+approve"
+            r"|show(?:\s+me)?(?:\s+my)?\s+approval\s+history"
+            r"|approval\s+history)\s*\??\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.APPROVALS,
+        "history",
     ),
     (
         # Phase 7: personality switching. Tone only - never a tool call,

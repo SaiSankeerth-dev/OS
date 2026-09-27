@@ -94,3 +94,10 @@ mcp:
     #   command: ["python", "server/mcpbus/servers/echo_server.py"]
     #   allowed_tools: ["echo", "add"]
     #   mode: allow
+
+approvals:
+  # Phase 10: approval engine. A pending approval auto-expires after
+  # timeout_sec (logged EXPIRED, nothing executes). max_pending caps the
+  # queue; the newest request is refused when the queue is full.
+  timeout_sec: 1800
+  max_pending: 10
