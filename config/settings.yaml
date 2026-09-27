@@ -82,3 +82,15 @@ voice:
   stt_language: null
   # TTS
   tts_engine: pocket-tts
+
+mcp:
+  # Phase 8: MCP tool bus. Local stdio subprocesses only - no remote
+  # transports. Disabled by default; each server allowlists exactly the
+  # tools OS may call. mode: "allow" or "approval" (default).
+  enabled: false
+  servers:
+    # Example (kept disabled by default):
+    # - name: echo
+    #   command: ["python", "server/mcpbus/servers/echo_server.py"]
+    #   allowed_tools: ["echo", "add"]
+    #   mode: allow

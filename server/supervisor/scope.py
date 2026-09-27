@@ -39,6 +39,14 @@ class ScopeGuard:
     def enable_skill(self, skill: str) -> None:
         self._disabled.discard(skill)
 
+    def register_tool(
+        self, tool_name: str, skill: str, scopes: tuple[str, ...]
+    ) -> None:
+        """Register a tool's skill mapping (Phase 8: MCP-bridged tools).
+        Each MCP server becomes its own skill, so disabling the skill
+        disables all of that server's tools."""
+        self._tool_skills[tool_name] = (skill, scopes)
+
     @property
     def disabled_skills(self) -> list[str]:
         return sorted(self._disabled)

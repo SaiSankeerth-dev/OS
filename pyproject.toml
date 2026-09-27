@@ -10,6 +10,8 @@ dependencies = [
     # Phase 4: Pydantic AI supervisor (primary orchestration layer).
     # Ollama provider = local model, no API keys, no cloud.
     "pydantic-ai-slim[ollama]>=2.0",
+    # Phase 8: MCP tool bus (official SDK, MIT). Local stdio only.
+    "mcp==2.2.0",
 ]
 
 [project.optional-dependencies]

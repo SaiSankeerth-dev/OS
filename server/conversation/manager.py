@@ -124,6 +124,7 @@ class ConversationManager:
         fast_router: LayaRouter | None = None,
         supervisor: Supervisor | None = None,
         state_store=None,
+        mcp_bus=None,
     ) -> None:
         self.cfg = cfg
         self.state: ConversationState = ConversationState.IDLE
@@ -153,6 +154,18 @@ class ConversationManager:
             approval_store=self._approval_store,
             state_store=self._state_store_param,
         )
+        # Phase 8: MCP tool bus. The bus must already be connected
+        # (bus.connect()); its allowlisted tools join the same
+        # registry, and their policies join the supervisor's permission
+        # table - the full safety pipeline applies to them.
+        self._mcp_bus = mcp_bus
+        if mcp_bus is not None:
+            bridged = mcp_bus.register_into(
+                self.tool_registry,
+                self._supervisor.permissions,
+                self._supervisor.scope_guard,
+            )
+            log.info("mcp tools registered: %s", bridged)
         # Phase 7: switchable personalities. Tone only - the safety
         # pipeline, tool formatters, and approvals are untouched.
         self._personality = PersonalityManager(self._state_store_param)

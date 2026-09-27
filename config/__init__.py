@@ -68,12 +68,27 @@ class VoiceConfig:
 
 
 @dataclass
+class MCPServerEntry:
+    name: str = ""
+    command: list[str] = field(default_factory=list)
+    allowed_tools: list[str] = field(default_factory=list)
+    mode: str = "approval"
+
+
+@dataclass
+class MCPConfig:
+    enabled: bool = False
+    servers: list[MCPServerEntry] = field(default_factory=list)
+
+
+@dataclass
 class Config:
     llm: LLMConfig = field(default_factory=LLMConfig)
     conversation: ConversationConfig = field(default_factory=ConversationConfig)
     personality: PersonalityConfig = field(default_factory=PersonalityConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     voice: VoiceConfig = field(default_factory=VoiceConfig)
+    mcp: MCPConfig = field(default_factory=MCPConfig)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -149,6 +164,19 @@ def load_config(config_dir: Path | None = None) -> Config:
             stt_compute_type=get("voice.stt_compute_type", "int8"),
             stt_language=get("voice.stt_language", None),
             tts_engine=get("voice.tts_engine", "pocket-tts"),
+        ),
+        mcp=MCPConfig(
+            enabled=bool(get("mcp.enabled", False)),
+            servers=[
+                MCPServerEntry(
+                    name=str(s.get("name", "")),
+                    command=list(s.get("command", []) or []),
+                    allowed_tools=list(s.get("allowed_tools", []) or []),
+                    mode=str(s.get("mode", "approval")),
+                )
+                for s in (get("mcp.servers", []) or [])
+                if isinstance(s, dict) and s.get("name") and s.get("command")
+            ],
         ),
         raw=data,
     )

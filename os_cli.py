@@ -185,6 +185,24 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         check("personality", False, f"{type(e).__name__}: {e}")
 
+    # MCP tool bus (Phase 8). Local stdio only; disabled by default.
+    try:
+        import mcp  # noqa: F401
+
+        from config import load_config
+
+        mcfg = load_config().mcp
+        detail = f"sdk={mcp.__version__ if hasattr(mcp, '__version__') else 'ok'}"
+        if mcfg.enabled:
+            detail += f" | enabled, {len(mcfg.servers)} server(s): " + ", ".join(
+                s.name for s in mcfg.servers
+            )
+        else:
+            detail += " | disabled (default)"
+        check("mcp", True, detail)
+    except Exception as e:  # noqa: BLE001
+        check("mcp", False, f"{type(e).__name__}: {e}")
+
     print(f"\ndoctor: {'all clear' if failures == 0 else f'{failures} problem(s) found'}")
     return 1 if failures else 0
 
