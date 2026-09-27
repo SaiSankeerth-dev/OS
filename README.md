@@ -107,6 +107,7 @@ This repo was completed on a headless machine, so live mic/speaker I/O is valida
 
 ## Docs
 
+- `docs/RELEASE_v1.md` — v1.0.0 foundation release notes (what's in, what's deferred, known limitations)
 - `AUDIT_REPORT.md` — full component audit with scores (74/100)
 - `COMPLETION_REPORT.md` — what was built to complete the voice pipeline
 - `HARDWARE_TEST.md` — laptop validation checklist

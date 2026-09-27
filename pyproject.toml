@@ -1,6 +1,6 @@
 [project]
 name = "os"
-version = "0.1.0"
+version = "1.0.0"
 description = "OS - a real-time voice-first AI assistant. Local-first, Python end-to-end."
 requires-python = ">=3.10"
 dependencies = [
