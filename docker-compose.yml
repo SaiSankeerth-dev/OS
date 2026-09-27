@@ -10,11 +10,12 @@ services:
       # All persistent state lives here: dashboard DB (with the encrypted
       # credential vault), the local vault key, memory and logs.
       - os-data:/app/data
-    environment:
-      # Optional: pin the vault encryption key instead of the generated
-      # machine-local one. Keep this value secret and backed up —
-      # losing it locks you out of stored credentials.
-      # - OS_DASHBOARD_KEY=${OS_DASHBOARD_KEY:-}
+    # To pin the vault encryption key instead of the generated machine-local
+    # one, add an environment block like:
+    #   environment:
+    #     OS_DASHBOARD_KEY: "your-secret-key"
+    # Keep the value secret and backed up — losing it locks you out of
+    # stored credentials.
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/me', timeout=4)"]
