@@ -21,6 +21,8 @@ dependencies = [
     # Dashboard connector vault (encrypted credentials) + date parsing.
     "cryptography>=42",
     "python-dateutil>=2.9",
+    # system_info tool (CPU/memory/disk stats used by dashboard + CLI).
+    "psutil>=5.9",
 ]
 [project.optional-dependencies]
 voice = [
