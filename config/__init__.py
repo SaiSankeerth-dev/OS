@@ -146,8 +146,12 @@ def load_config(config_dir: Path | None = None) -> Config:
     cfg = Config(
         llm=LLMConfig(
             provider=get("llm.provider", "ollama"),
-            base_url=get("llm.base_url", "http://localhost:11434"),
-            model=get("llm.model", "qwen3:8b"),
+            # OLLAMA_BASE_URL wins over YAML — this is how Docker points the
+            # container at Ollama on the host (http://host.docker.internal:11434).
+            base_url=os.environ.get("OLLAMA_BASE_URL")
+            or get("llm.base_url", "http://localhost:11434"),
+            model=os.environ.get("OLLAMA_MODEL")
+            or get("llm.model", "qwen3:8b"),
             temperature=float(get("llm.temperature", 0.6)),
             max_tokens=int(get("llm.max_tokens", 256)),
             stop=get("llm.stop", []) or [],

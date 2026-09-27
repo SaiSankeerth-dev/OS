@@ -26,6 +26,8 @@ class OllamaClient:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_sec = timeout_sec
+        self._health_ok = False
+        self._health_at = 0.0
 
     async def health(self) -> bool:
         try:
@@ -34,6 +36,16 @@ class OllamaClient:
                 return r.status_code == 200
         except Exception:
             return False
+
+    async def healthy_cached(self, ttl_sec: float = 30.0) -> bool:
+        """Health check cached for ttl_sec — avoids a slow probe on every chat
+        message when Ollama is down."""
+        now = time.monotonic()
+        if now - self._health_at < ttl_sec:
+            return self._health_ok
+        self._health_ok = await self.health()
+        self._health_at = now
+        return self._health_ok
 
     def _payload(
         self,

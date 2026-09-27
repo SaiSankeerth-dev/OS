@@ -814,6 +814,20 @@ class ConversationManager:
         client = self.router.client_for("conversation")
         self.set_state(ConversationState.THINKING)
 
+        # Pre-flight: if the model is unreachable, skip the stream attempt
+        # entirely — no 10s connect timeout, no traceback wall in the logs.
+        if not await client.healthy_cached():
+            log.warning("LLM unreachable at %s — serving no-model fallback",
+                        client.base_url)
+            fr = self.response_policy.apply_llm_chat("")
+            self.history.append(
+                Message(role="assistant", content=fr.text, ts=time.time())
+            )
+            self.set_state(ConversationState.SPEAKING)
+            yield ChatChunk(delta=fr.text, done=True)
+            self.set_state(ConversationState.READY)
+            return
+
         full_parts: list[str] = []
         self.set_state(ConversationState.SPEAKING)
         try:
@@ -830,7 +844,10 @@ class ConversationManager:
                 if chunk.done:
                     break
         except Exception as e:  # noqa: BLE001
-            log.exception("LLM stream failed: %s", e)
+            # One short line, not a traceback: the user already gets a
+            # friendly explanation from the fallback message itself.
+            log.warning("LLM stream failed (%s: %s) — serving no-model fallback",
+                        type(e).__name__, e)
             fr = self.response_policy.apply_llm_chat("")
             self.history.append(
                 Message(role="assistant", content=fr.text, ts=time.time())
