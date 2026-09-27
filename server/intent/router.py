@@ -5,6 +5,7 @@ Classifies user text into one of:
 - LLM_CHAT: regular conversational reply
 - TASK: deferred; reserved for the planner (not used in Phase 1)
 - TASK: multi-step requests, handled by a dynamic agent team (Phase 5)
+- PERSONA: personality switching, handled by the manager (Phase 7)
 
 Patterns are ordered; first match wins.
 """
@@ -19,6 +20,7 @@ class Intent(str, enum.Enum):
     TOOL_CALL = "tool_call"
     LLM_CHAT = "llm_chat"
     TASK = "task"
+    PERSONA = "persona"
 
 
 @dataclass
@@ -124,6 +126,18 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         Intent.TOOL_CALL,
         "calc",
     ),
+    (
+        # Phase 7: personality switching. Tone only - never a tool call,
+        # never through the supervisor pipeline.
+        re.compile(
+            r"^\s*(?:switch\s+to|use|activate|be)\s+"
+            r"(jarvis|nova|sage|coach)"
+            r"(?:\s+(?:mode|personality))?\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.PERSONA,
+        None,
+    ),
 ]
 
 
@@ -150,5 +164,7 @@ class IntentRouter:
                 args: dict[str, str] = {}
                 if tool in _TOOL_ARG and m.groups():
                     args[_TOOL_ARG[tool]] = m.group(1).strip()
+                elif intent == Intent.PERSONA and m.groups():
+                    args["persona"] = m.group(1).strip().lower()
                 return RouteDecision(intent=intent, tool_name=tool, args=args)
         return RouteDecision(intent=Intent.LLM_CHAT)

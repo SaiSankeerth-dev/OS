@@ -171,6 +171,20 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         check("skills", False, f"{type(e).__name__}: {e}")
 
+    # Personality (Phase 7). Tone only - safety pipeline untouched.
+    try:
+        from server.personality import PERSONAS, PersonalityManager
+
+        pm = PersonalityManager()
+        check(
+            "personality",
+            True,
+            f"current={pm.current_name} "
+            f"(available: {', '.join(sorted(PERSONAS))})",
+        )
+    except Exception as e:  # noqa: BLE001
+        check("personality", False, f"{type(e).__name__}: {e}")
+
     print(f"\ndoctor: {'all clear' if failures == 0 else f'{failures} problem(s) found'}")
     return 1 if failures else 0
 

@@ -36,6 +36,7 @@ from ..intent.router import Intent, IntentRouter, RouteDecision
 from ..routing.laya_router import TOOL_MAP as _LAYA_TOOL_MAP
 from ..routing.laya_router import LayaRouter
 from ..supervisor import Supervisor
+from ..personality import PersonalityManager
 from ..response.policy import ResponsePolicy
 from .context import build_context_messages
 from .personality import build_system_prompt
@@ -152,8 +153,11 @@ class ConversationManager:
             approval_store=self._approval_store,
             state_store=self._state_store_param,
         )
+        # Phase 7: switchable personalities. Tone only - the safety
+        # pipeline, tool formatters, and approvals are untouched.
+        self._personality = PersonalityManager(self._state_store_param)
         self.response_policy = response_policy or ResponsePolicy(
-            forbidden_prefixes=cfg.personality.forbidden_phrases
+            forbidden_prefixes=self._personality.current.forbidden_phrases
         )
         self.memory_retriever = memory_retriever
         self.memory = memory
@@ -200,12 +204,12 @@ class ConversationManager:
         # Phase 3: Laya fast path. Consulted only when the regex router
         # found no tool - exact regex hits stay authoritative. A confident
         # Laya skill pick becomes the decision; anything unsure falls
-        # through to the old path unchanged. Phase 5: TASK intents skip
-        # Laya - a multi-step request is not a single-skill decision.
+        # through to the old path unchanged. Phase 5/7: TASK and PERSONA
+        # intents skip Laya - neither is a single-skill decision.
         if (
             self._fast_router is not None
             and decision.tool_name is None
-            and decision.intent != Intent.TASK
+            and decision.intent not in (Intent.TASK, Intent.PERSONA)
         ):
             hit = self._fast_router.route(user_text)
             if hit is not None:
@@ -233,6 +237,15 @@ class ConversationManager:
             # Phase 5: multi-step request -> dynamic agent team under the
             # supervisor (plan -> parallel workers -> verify -> merge).
             async for chunk in self._handle_team(user_text, perf):
+                yield chunk
+            perf.mark("turn_end:text")
+            perf.flush("text_turn")
+            return
+
+        if decision.intent == Intent.PERSONA:
+            # Phase 7: personality switch. Tone only - no tools, no
+            # supervisor pipeline, no external effect.
+            async for chunk in self._handle_persona(decision.args, perf):
                 yield chunk
             perf.mark("turn_end:text")
             perf.flush("text_turn")
@@ -338,6 +351,33 @@ class ConversationManager:
         yield ChatChunk(delta=text, done=True)
         self.set_state(ConversationState.READY)
 
+    async def _handle_persona(self, args: dict[str, str], perf: PerfTrace):
+        """Phase 7: switch the active persona. Tone only."""
+        self.set_state(ConversationState.THINKING)
+        name = (args or {}).get("persona", "")
+        try:
+            persona = self._personality.set_persona(name)
+        except ValueError as e:
+            text = str(e)
+            self.history.append(
+                Message(role="assistant", content=text, ts=time.time())
+            )
+            yield ChatChunk(delta=text, done=True)
+            self.set_state(ConversationState.READY)
+            return
+        # Forbidden phrases follow the persona.
+        self.response_policy = ResponsePolicy(
+            forbidden_prefixes=persona.forbidden_phrases
+        )
+        perf.mark("persona_switched")
+        text = persona.confirm_template
+        self.history.append(
+            Message(role="assistant", content=text, ts=time.time())
+        )
+        self.set_state(ConversationState.SPEAKING)
+        yield ChatChunk(delta=text, done=True)
+        self.set_state(ConversationState.READY)
+
     async def _handle_pending_approval(self, user_text: str):
         pending = self._pending_approval
         assert pending is not None
@@ -419,7 +459,7 @@ class ConversationManager:
         if self.memory_retriever is not None:
             memories = self.memory_retriever.retrieve_relevant(user_text)
 
-        sys_prompt = build_system_prompt(self.cfg.personality)
+        sys_prompt = build_system_prompt(self._personality.to_config())
         messages = build_context_messages(
             self.history[:-1],
             conversation_cfg=self.cfg.conversation,
