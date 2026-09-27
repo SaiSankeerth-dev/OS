@@ -172,6 +172,13 @@ class Supervisor:
         t(LifecycleStage.APPROVE, "rejected by user")
         t(LifecycleStage.REMEMBER, "discarded, nothing executed")
 
+    def accept_approved_run(self, run_id: str, tool_name: str) -> None:
+        """Phase 9: close the lifecycle for a generic ask-mode approval.
+        The result was local-only - nothing external to execute."""
+        t = lambda s, d="": self.tracker.transition(run_id, s, d)  # noqa: E731
+        t(LifecycleStage.APPROVE, "accepted by user")
+        t(LifecycleStage.REMEMBER, "accepted, no external effect")
+
     # ---------- team entry: a multi-step task ---------------------------
 
     async def run_team(

@@ -6,6 +6,9 @@ Subcommands:
     os voice         voice mode (mic + speaker)
     os doctor        environment diagnostics
     os test          run the test suite
+    os permissions   show skill permission table
+    os allow|ask|deny <skill>
+                     set a skill's permission
 """
 from __future__ import annotations
 
@@ -207,6 +210,56 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _cli_permission_manager():
+    """Minimal stack for permission inspection/mutation (Phase 9)."""
+    sys.path.insert(0, str(ROOT))
+    from server.intent.registry import ToolRegistry
+    from server.permissions import PermissionManager
+    from server.supervisor import Supervisor
+
+    sup = Supervisor(ToolRegistry())
+    return PermissionManager(sup.permissions, sup.scope_guard)
+
+
+def _print_permission_table(pm) -> None:
+    print("skill: policy (* = changed from default)")
+    for row in pm.table():
+        marker = " *" if row["custom"] else ""
+        print(f"  {row['skill']}: {row['policy']}{marker}")
+
+
+def cmd_permissions(_args: argparse.Namespace) -> int:
+    pm = _cli_permission_manager()
+    _print_permission_table(pm)
+    return 0
+
+
+def _cmd_set_policy(args: argparse.Namespace, word: str) -> int:
+    from server.permissions import WORD_POLICIES, POLICY_WORDS
+
+    pm = _cli_permission_manager()
+    skill = pm.resolve_skill(args.skill)
+    if skill is None:
+        print(f"unknown skill '{args.skill}'. Known: {', '.join(pm.skills())}")
+        return 1
+    policy = WORD_POLICIES[word]
+    pm.set_skill_policy(skill, policy)
+    print(f"{skill}: {POLICY_WORDS[policy]}")
+    return 0
+
+
+def cmd_allow(args: argparse.Namespace) -> int:
+    return _cmd_set_policy(args, "allow")
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    return _cmd_set_policy(args, "ask")
+
+
+def cmd_deny(args: argparse.Namespace) -> int:
+    return _cmd_set_policy(args, "deny")
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     cmd = [sys.executable, "-m", "pytest", "-q"] + args.passthrough
     print("$", " ".join(cmd))
@@ -235,6 +288,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_test = sub.add_parser("test", help="run the test suite")
     p_test.add_argument("passthrough", nargs=argparse.REMAINDER, help="args for pytest")
     p_test.set_defaults(func=cmd_test)
+
+    p_perm = sub.add_parser("permissions", help="show skill permission table")
+    p_perm.set_defaults(func=cmd_permissions)
+
+    for name, func, help_text in [
+        ("allow", cmd_allow, "always allow a skill's tools"),
+        ("ask", cmd_ask, "ask before running a skill's tools"),
+        ("deny", cmd_deny, "deny a skill's tools"),
+    ]:
+        p = sub.add_parser(name, help=help_text)
+        p.add_argument("skill", help="skill name (e.g. calculator, linkedin)")
+        p.set_defaults(func=func)
 
     return ap
 

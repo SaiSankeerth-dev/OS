@@ -21,6 +21,7 @@ class Intent(str, enum.Enum):
     LLM_CHAT = "llm_chat"
     TASK = "task"
     PERSONA = "persona"
+    PERMISSION = "permission"
 
 
 @dataclass
@@ -127,6 +128,50 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "calc",
     ),
     (
+        # Phase 9: user-facing permissions. "allow the calculator",
+        # "ask me before linkedin", "deny the echo server".
+        # Order: before PERSONA; no overlap with existing patterns.
+        re.compile(
+            r"^\s*(?:always\s+)?allow\s+(?:the\s+)?(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.PERMISSION,
+        "allow",
+    ),
+    (
+        re.compile(
+            r"^\s*(?:ask(?:\s+me)?\s+before|require\s+approval\s+for)\s+"
+            r"(?:the\s+)?(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.PERMISSION,
+        "ask",
+    ),
+    (
+        re.compile(
+            r"^\s*(?:deny|block)\s+(?:the\s+)?(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.PERMISSION,
+        "deny",
+    ),
+    (
+        re.compile(
+            r"^\s*(?:show(?:\s+me)?|what\s+are)(?:\s+my)?\s+permissions\s*\??\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.PERMISSION,
+        "show",
+    ),
+    (
+        re.compile(
+            r"^\s*reset\s+permissions\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.PERMISSION,
+        "reset",
+    ),
+    (
         # Phase 7: personality switching. Tone only - never a tool call,
         # never through the supervisor pipeline.
         re.compile(
@@ -166,5 +211,11 @@ class IntentRouter:
                     args[_TOOL_ARG[tool]] = m.group(1).strip()
                 elif intent == Intent.PERSONA and m.groups():
                     args["persona"] = m.group(1).strip().lower()
+                elif intent == Intent.PERMISSION:
+                    # tool_name carries the action ("allow"/"ask"/...);
+                    # group(1) carries the skill target when present.
+                    args["action"] = tool or ""
+                    if m.groups():
+                        args["target"] = m.group(1).strip()
                 return RouteDecision(intent=intent, tool_name=tool, args=args)
         return RouteDecision(intent=Intent.LLM_CHAT)

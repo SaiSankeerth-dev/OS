@@ -64,3 +64,10 @@ class ScopeGuard:
     def skill_for(self, tool_name: str) -> str | None:
         entry = self._tool_skills.get(tool_name)
         return entry[0] if entry else None
+
+    def skill_tools(self) -> dict[str, list[str]]:
+        """skill name -> sorted tool names (Phase 9: permission manager)."""
+        out: dict[str, list[str]] = {}
+        for tool, (skill, _scopes) in self._tool_skills.items():
+            out.setdefault(skill, []).append(tool)
+        return {skill: sorted(tools) for skill, tools in out.items()}
