@@ -116,6 +116,30 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         check("state db integrity", False, f"{type(e).__name__}: {e}")
 
+    # Fast router (Phase 3: Laya). Optional - the OS works without it.
+    try:
+        from server.routing import LayaRouter
+
+        st = LayaRouter().status()
+        if st["available"]:
+            check("laya fast router", True, f"skills: {', '.join(st['skills'])}")
+        elif st["laya_installed"] and not st["checkpoint_cached"]:
+            check(
+                "laya fast router",
+                False,
+                "installed but checkpoint not cached - run: "
+                "pip install -r requirements-laya.txt && "
+                "python -m server.routing.preload",
+            )
+        else:
+            check(
+                "laya fast router",
+                False,
+                "not installed (optional) - pip install -r requirements-laya.txt",
+            )
+    except Exception as e:  # noqa: BLE001
+        check("laya fast router", False, f"{type(e).__name__}: {e}")
+
     print(f"\ndoctor: {'all clear' if failures == 0 else f'{failures} problem(s) found'}")
     return 1 if failures else 0
 

@@ -32,7 +32,9 @@ from ..tools.system_info_tool import (
 )
 from ..utils import PerfTrace
 from ..intent.registry import ExecutionMode, ToolRegistry
-from ..intent.router import Intent, IntentRouter
+from ..intent.router import Intent, IntentRouter, RouteDecision
+from ..routing.laya_router import TOOL_MAP as _LAYA_TOOL_MAP
+from ..routing.laya_router import LayaRouter
 from ..response.policy import ResponsePolicy
 from .context import build_context_messages
 from .personality import build_system_prompt
@@ -94,12 +96,16 @@ class ConversationManager:
         response_policy: ResponsePolicy | None = None,
         memory: MemoryManager | None = None,
         approval_store: ApprovalStore | None = None,
+        fast_router: LayaRouter | None = None,
     ) -> None:
         self.cfg = cfg
         self.state: ConversationState = ConversationState.IDLE
         self.history: list[Message] = []
         self._pending_approval: PendingApproval | None = None
         self._approval_store = approval_store or ApprovalStore()
+        # Phase 3: Laya fast router. None = regex routing only (the safe
+        # default used by tests). Pass LayaRouter() to enable the fast path.
+        self._fast_router = fast_router
         self.router = router or ModelRouter.from_config(
             base_url=cfg.llm.base_url,
             model=cfg.llm.model,
@@ -151,6 +157,24 @@ class ConversationManager:
             return
 
         decision = self.intent_router.classify(user_text)
+
+        # Phase 3: Laya fast path. Consulted only when the regex router
+        # found no tool - exact regex hits stay authoritative. A confident
+        # Laya skill pick becomes the decision; anything unsure falls
+        # through to the old path unchanged.
+        if self._fast_router is not None and decision.tool_name is None:
+            hit = self._fast_router.route(user_text)
+            if hit is not None:
+                skill, _confidence, _latency_ms = hit
+                tool_name = _LAYA_TOOL_MAP.get(skill)
+                if tool_name == "linkedin_draft":
+                    # No regex pattern matched, so no idea was extracted;
+                    # the whole message is the drafting prompt.
+                    decision = RouteDecision(
+                        intent=Intent.TOOL_CALL,
+                        tool_name=tool_name,
+                        args={"idea": user_text},
+                    )
 
         if decision.intent == Intent.TOOL_CALL and decision.tool_name:
             async for chunk in self._handle_tool(

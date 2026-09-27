@@ -30,6 +30,7 @@ from config import load_config  # noqa: E402
 from server.conversation import ConversationManager  # noqa: E402
 from server.jarvis_ui import boot_sequence, hud, print_banner  # noqa: E402
 from server.llm.router import ModelRouter  # noqa: E402
+from server.routing import LayaRouter  # noqa: E402
 from server.utils import setup_logging  # noqa: E402
 
 
@@ -74,7 +75,7 @@ async def amain(args: argparse.Namespace) -> int:
         model=cfg.llm.model,
         timeout_sec=float(cfg.llm.request_timeout_sec),
     )
-    mgr = ConversationManager(cfg, router)
+    mgr = ConversationManager(cfg, router, fast_router=LayaRouter())
     ok = await mgr.health()
     if not ok:
         print(f"  ! Could not reach Ollama at {cfg.llm.base_url}. Is it running?")

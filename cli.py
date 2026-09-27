@@ -27,6 +27,7 @@ from config import load_config  # noqa: E402
 from server.conversation import ConversationManager, ConversationState  # noqa: E402
 from server.jarvis_ui import hud, print_banner  # noqa: E402
 from server.llm.router import ModelRouter  # noqa: E402
+from server.routing import LayaRouter  # noqa: E402
 from server.utils import setup_logging  # noqa: E402
 
 
@@ -58,7 +59,7 @@ async def amain(args: argparse.Namespace) -> int:
         model=cfg.llm.model,
         timeout_sec=float(cfg.llm.request_timeout_sec),
     )
-    mgr = ConversationManager(cfg, router)
+    mgr = ConversationManager(cfg, router, fast_router=LayaRouter())
 
     print_banner()
     print(f"  JARVIS initializing... model={cfg.llm.model} | provider={cfg.llm.provider}")
