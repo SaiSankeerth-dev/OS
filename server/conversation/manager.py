@@ -221,6 +221,50 @@ class ConversationManager:
     # ---------- Phase 1: text conversation ------------------------------------
 
     async def respond_text(self, user_text: str) -> AsyncIterator[ChatChunk]:
+        """Public entry: inner turn, then any fresh watcher suggestions."""
+        async for chunk in self._respond_text_inner(user_text):
+            yield chunk
+        note = self._watcher_notes()
+        if note:
+            yield ChatChunk(delta=note, done=True)
+
+    def _watcher_notes(self) -> str:
+        """Phase 13: surface unseen watcher suggestions (max 2 per turn).
+
+        The watcher only suggests - this text is the entire extent of
+        its proactivity. Each suggestion is shown once per cooldown.
+        """
+        if not self.cfg.watcher.enabled:
+            return ""
+        if self._state_store_param is None:
+            return ""
+        from ..watcher import Watcher
+
+        watcher = Watcher(
+            state_store=self._state_store_param,
+            approval_store=self._approval_store,
+            nag_after_sec=float(self.cfg.watcher.nag_after_sec),
+            cooldown_sec=float(self.cfg.watcher.cooldown_sec),
+        )
+        try:
+            watcher.check()
+            unseen = watcher.unseen(limit=2)
+        except Exception:
+            return ""
+        if not unseen:
+            return ""
+        lines = []
+        for s in unseen:
+            lines.append(f"Heads up: {s['text']}")
+            try:
+                watcher.mark_seen(s["id"])
+            except Exception:
+                pass
+        return "\n\n" + "\n\n".join(lines)
+
+    async def _respond_text_inner(
+        self, user_text: str
+    ) -> AsyncIterator[ChatChunk]:
         perf = PerfTrace(self._perf_sink)
         perf.mark("turn_start:text")
 

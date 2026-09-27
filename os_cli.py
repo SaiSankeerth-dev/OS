@@ -10,6 +10,7 @@ Subcommands:
     os allow|ask|deny <skill>
                      set a skill's permission
     os approvals     show approval history (newest first)
+    os watch         show proactive watcher suggestions
 """
 from __future__ import annotations
 
@@ -278,6 +279,31 @@ def cmd_approvals(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_watch(_args: argparse.Namespace) -> int:
+    """Phase 13: show current proactive watcher suggestions."""
+    sys.path.insert(0, str(ROOT))
+    from config import load_config
+    from server.approvals import ApprovalStore
+    from server.state.store import StateStore
+    from server.watcher import Watcher
+
+    cfg = load_config()
+    watcher = Watcher(
+        state_store=StateStore(),
+        approval_store=ApprovalStore(),
+        nag_after_sec=float(cfg.watcher.nag_after_sec),
+        cooldown_sec=float(cfg.watcher.cooldown_sec),
+    )
+    fresh = watcher.check()
+    unseen = watcher.unseen(limit=10)
+    if not unseen:
+        print("watcher: all quiet - nothing needs your attention.")
+        return 0
+    for s in unseen:
+        print(f"  [{s['kind']}] {s['text']}")
+    return 0
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     cmd = [sys.executable, "-m", "pytest", "-q"] + args.passthrough
     print("$", " ".join(cmd))
@@ -311,6 +337,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_perm.set_defaults(func=cmd_permissions)
 
     p_appr = sub.add_parser("approvals", help="show approval history (newest first)")
+    p_watch = sub.add_parser("watch", help="show proactive watcher suggestions")
+    p_watch.set_defaults(func=cmd_watch)
     p_appr.add_argument("--limit", type=int, default=10, help="max entries to show")
     p_appr.set_defaults(func=cmd_approvals)
 

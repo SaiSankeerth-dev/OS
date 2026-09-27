@@ -22,6 +22,7 @@ Design rules:
 from __future__ import annotations
 
 import sqlite3
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,6 +64,16 @@ CREATE TABLE IF NOT EXISTS approvals (
     draft       TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     status      TEXT NOT NULL
+);
+-- Phase 13: proactive watcher suggestions. Watchers may only suggest;
+-- this table is the watcher's own bookkeeping (seen/unseen), not a
+-- side effect on the user's world.
+CREATE TABLE IF NOT EXISTS suggestions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    text        TEXT NOT NULL,
+    seen        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id);
 CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
@@ -263,6 +274,72 @@ class StateStore:
         conn = self._connect()
         try:
             conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+    # ---- watcher suggestions (Phase 13) --------------------------------
+    # The watcher's own bookkeeping. Watchers may only suggest; these
+    # rows track what was suggested and seen, nothing else.
+
+    def save_suggestion(self, kind: str, text: str) -> int:
+        conn = self._connect()
+        try:
+            cur = conn.execute(
+                "INSERT INTO suggestions (ts, kind, text, seen) "
+                "VALUES (?,?,?,0)",
+                (_now(), kind, text),
+            )
+            conn.commit()
+            return int(cur.lastrowid)
+        finally:
+            conn.close()
+
+    def recent_suggestion(
+        self, kind: str, text: str, within_sec: float
+    ) -> bool:
+        """True if the same suggestion was made within the window."""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT ts FROM suggestions WHERE kind = ? AND text = ? "
+                "ORDER BY id DESC LIMIT 5",
+                (kind, text),
+            ).fetchall()
+            now = time.time()
+            for r in rows:
+                try:
+                    ts = datetime.fromisoformat(r[0]).timestamp()
+                except ValueError:
+                    continue
+                if now - ts < within_sec:
+                    return True
+            return False
+        finally:
+            conn.close()
+
+    def unseen_suggestions(self, limit: int = 5) -> list[dict]:
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT id, ts, kind, text FROM suggestions "
+                "WHERE seen = 0 ORDER BY id ASC LIMIT ?",
+                (max(1, limit),),
+            ).fetchall()
+            return [
+                {"id": r[0], "ts": r[1], "kind": r[2], "text": r[3]}
+                for r in rows
+            ]
+        finally:
+            conn.close()
+
+    def mark_suggestion_seen(self, suggestion_id: int) -> None:
+        conn = self._connect()
+        try:
+            conn.execute(
+                "UPDATE suggestions SET seen = 1 WHERE id = ?",
+                (suggestion_id,),
+            )
             conn.commit()
         finally:
             conn.close()

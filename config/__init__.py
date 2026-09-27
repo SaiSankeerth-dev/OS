@@ -77,6 +77,16 @@ class ApprovalsConfig:
 
 
 @dataclass
+class WatcherConfig:
+    # Phase 13: proactive watcher. May only suggest - never acts.
+    enabled: bool = True
+    # Suggest about a pending approval still unanswered after this long.
+    nag_after_sec: int = 600
+    # Don't repeat the same suggestion within this window.
+    cooldown_sec: int = 86400
+
+
+@dataclass
 class MCPServerEntry:
     name: str = ""
     command: list[str] = field(default_factory=list)
@@ -99,6 +109,7 @@ class Config:
     voice: VoiceConfig = field(default_factory=VoiceConfig)
     mcp: MCPConfig = field(default_factory=MCPConfig)
     approvals: ApprovalsConfig = field(default_factory=ApprovalsConfig)
+    watcher: WatcherConfig = field(default_factory=WatcherConfig)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -191,6 +202,11 @@ def load_config(config_dir: Path | None = None) -> Config:
         approvals=ApprovalsConfig(
             timeout_sec=int(get("approvals.timeout_sec", 1800)),
             max_pending=int(get("approvals.max_pending", 10)),
+        ),
+        watcher=WatcherConfig(
+            enabled=bool(get("watcher.enabled", True)),
+            nag_after_sec=int(get("watcher.nag_after_sec", 600)),
+            cooldown_sec=int(get("watcher.cooldown_sec", 86400)),
         ),
         raw=data,
     )
