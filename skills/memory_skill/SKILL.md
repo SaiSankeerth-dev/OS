@@ -1,7 +1,7 @@
 ---
 name: memory
 description: Saves and recalls notes in local SQLite memory.
-version: 1.0.0
+version: 1.1.0
 status: active
 ---
 
@@ -14,6 +14,8 @@ Provides long-term memory consolidation and retrieval for OS.
 - `extract_memories(conversation_turns: list[str]) -> list[MemoryRecord]`
 - `retrieve_memories(query: str, limit: int = 4) -> list[MemoryRecord]`
 - `consolidate() -> int` - affected memories
+- `memory_save(note)` / `memory_recall(query)` / `memory_forget(query)` -
+  save, recall, and delete notes in local SQLite memory (Phase 12).
 
 ## Heuristics
 - Extract preferences, projects, names, important facts

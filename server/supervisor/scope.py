@@ -20,6 +20,7 @@ TOOL_SKILLS: dict[str, tuple[str, tuple[str, ...]]] = {
     "get_system_info": ("system", ("system:read",)),
     "memory_save": ("memory", ("memory:write",)),
     "memory_recall": ("memory", ("memory:read",)),
+    "memory_forget": ("memory", ("memory:write",)),
     "calc": ("calc", ("calc:eval",)),
 }
 

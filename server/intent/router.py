@@ -113,11 +113,22 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
     (
         re.compile(
             r"^\s*(?:recall|what\s+do\s+you\s+remember|do\s+you\s+remember)"
-            r"\b\s*(.*?)\s*\??\s*$",
+            r"\b\s*(?:about\s+)?(.*?)\s*\??\s*$",
             re.IGNORECASE,
         ),
         Intent.TOOL_CALL,
         "memory_recall",
+    ),
+    (
+        # Phase 12: forgetting a saved note.
+        re.compile(
+            r"^\s*(?:forget|do\s+not\s+remember|don't\s+remember)"
+            r"\b\s*(?:that\s+)?(?:what\s+i\s+told\s+you\s+about\s+)?"
+            r"(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "memory_forget",
     ),
     (
         # Phase 6: calculator skill.
@@ -204,6 +215,7 @@ _TOOL_ARG = {
     "linkedin_draft": "idea",
     "memory_save": "note",
     "memory_recall": "query",
+    "memory_forget": "query",
     "calc": "expression",
 }
 

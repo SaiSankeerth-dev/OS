@@ -33,6 +33,7 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     # pure arithmetic - no external effect, so no approval needed.
     "memory_save": ToolPolicy.ALLOW,
     "memory_recall": ToolPolicy.ALLOW,
+    "memory_forget": ToolPolicy.ALLOW,
     "calc": ToolPolicy.ALLOW,
 }
 

@@ -62,7 +62,7 @@ def test_set_skill_policy_applies_to_all_its_tools(tmp_path):
     perms = ToolPermission()
     pm = _pm(tmp_path, perms=perms)
     changed = pm.set_skill_policy("memory", ToolPolicy.DENIED)
-    assert set(changed) == {"memory_save", "memory_recall"}
+    assert set(changed) == {"memory_save", "memory_recall", "memory_forget"}
     assert perms.check("memory_save")[0] == ToolPolicy.DENIED
     assert perms.check("memory_recall")[0] == ToolPolicy.DENIED
     assert pm.policy_for_skill("memory") == ToolPolicy.DENIED

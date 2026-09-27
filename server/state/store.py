@@ -258,6 +258,15 @@ class StateStore:
         finally:
             conn.close()
 
+    def delete_event(self, event_id: int) -> None:
+        """Delete one event row. Phase 12: memory_forget."""
+        conn = self._connect()
+        try:
+            conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
     # ---- sessions -------------------------------------------------
     def save_session(self, session_id: str, state: str) -> None:
         conn = self._connect()

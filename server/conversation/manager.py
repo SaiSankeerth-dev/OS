@@ -143,8 +143,13 @@ class ConversationManager:
         # Phase 10: FIFO queue of pending approvals (was a single slot).
         # Each expires after cfg.approvals.timeout_sec; the queue caps at
         # cfg.approvals.max_pending (newest refused when full).
-        self._pending: list[PendingApproval] = []
+        # Phase 12: restored from SQLite - a restart never loses or
+        # silently drops a waiting approval.
         self._approval_store = approval_store or ApprovalStore()
+        self._pending: list[PendingApproval] = (
+            self._approval_store.load_pending()
+        )
+        self._prune_expired()
         # Phase 3: Laya fast router. None = regex routing only (the safe
         # default used by tests). Pass LayaRouter() to enable the fast path.
         self._fast_router = fast_router
@@ -598,8 +603,14 @@ class ConversationManager:
                 self._approval_store.log(
                     p.skill, p.input_text, p.draft, "EXPIRED"
                 )
+                if p.pending_id:
+                    self._approval_store.remove_pending(p.pending_id)
                 # Close the lifecycle run - discarded, nothing executed.
-                self._supervisor.reject_approved_run(p.run_id, p.skill)
+                # At startup (restoring the queue) there is no live
+                # supervisor yet; the run died with the old process.
+                sup = getattr(self, "_supervisor", None)
+                if sup is not None:
+                    sup.reject_approved_run(p.run_id, p.skill)
             else:
                 kept.append(p)
         self._pending = kept
@@ -611,10 +622,16 @@ class ConversationManager:
         if len(self._pending) >= max(1, int(self.cfg.approvals.max_pending)):
             return False
         self._pending.append(pending)
+        # Phase 12: write-through so the queue survives a restart.
+        pending.pending_id = self._approval_store.save_pending(pending)
         return True
 
     async def _approve_one(self, pending: PendingApproval) -> str:
         """Approve a single pending item. Returns the reply text."""
+        # Phase 12: the item leaves the persisted queue the moment it is
+        # processed, whatever the outcome.
+        if pending.pending_id:
+            self._approval_store.remove_pending(pending.pending_id)
         # Recompute the hash at execution time - if the draft was
         # mutated after being shown, this stops matching and the
         # approval is refused. No execution on a stale approval.
@@ -667,6 +684,8 @@ class ConversationManager:
             pending.skill, pending.input_text, pending.draft,
             "REJECTED_BY_USER",
         )
+        if pending.pending_id:
+            self._approval_store.remove_pending(pending.pending_id)
         # Phase 4: close the lifecycle run - discarded, nothing ran.
         self._supervisor.reject_approved_run(pending.run_id, pending.skill)
         if pending.skill == "linkedin":

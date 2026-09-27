@@ -33,6 +33,7 @@ class PendingApproval:
     approved_hash: str  # hash of `draft` at the moment it was shown to the user
     run_id: str = ""  # supervisor lifecycle run this approval belongs to
     created_ts: float = field(default_factory=time.time)
+    pending_id: int = 0  # Phase 12: row id in the pending table (0 = not persisted)
 
     def expired(self, timeout_sec: float) -> bool:
         return (time.time() - self.created_ts) > timeout_sec
@@ -63,6 +64,21 @@ class ApprovalStore:
                     draft TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
                     status TEXT NOT NULL
+                )
+                """
+            )
+            # Phase 12: the live approval queue, so a restart never loses
+            # (or silently drops) a waiting approval.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS pending (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    skill TEXT NOT NULL,
+                    input TEXT NOT NULL,
+                    draft TEXT NOT NULL,
+                    approved_hash TEXT NOT NULL,
+                    run_id TEXT NOT NULL DEFAULT '',
+                    created_ts REAL NOT NULL
                 )
                 """
             )
@@ -102,5 +118,70 @@ class ApprovalStore:
                 {"ts": r[0], "skill": r[1], "input": r[2], "status": r[3]}
                 for r in rows
             ]
+        finally:
+            conn.close()
+
+    # ---- pending queue persistence (Phase 12) ----------------------------
+
+    def save_pending(self, p: PendingApproval) -> int:
+        """Persist a queued approval. Returns the row id."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.execute(
+                "INSERT INTO pending "
+                "(skill, input, draft, approved_hash, run_id, created_ts) "
+                "VALUES (?,?,?,?,?,?)",
+                (
+                    p.skill,
+                    p.input_text,
+                    p.draft,
+                    p.approved_hash,
+                    p.run_id,
+                    p.created_ts,
+                ),
+            )
+            conn.commit()
+            return int(cur.lastrowid)
+        finally:
+            conn.close()
+
+    def load_pending(self) -> list[PendingApproval]:
+        """Restore the queue in FIFO order after a restart."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            rows = conn.execute(
+                "SELECT id, skill, input, draft, approved_hash, run_id, "
+                "created_ts FROM pending ORDER BY id ASC"
+            ).fetchall()
+            return [
+                PendingApproval(
+                    skill=r[1],
+                    input_text=r[2],
+                    draft=r[3],
+                    approved_hash=r[4],
+                    run_id=r[5],
+                    created_ts=r[6],
+                    pending_id=r[0],
+                )
+                for r in rows
+            ]
+        finally:
+            conn.close()
+
+    def remove_pending(self, pending_id: int) -> None:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute(
+                "DELETE FROM pending WHERE id = ?", (pending_id,)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def clear_pending(self) -> None:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute("DELETE FROM pending")
+            conn.commit()
         finally:
             conn.close()

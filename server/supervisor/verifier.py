@@ -59,6 +59,15 @@ def _check_memory_recall(data: dict) -> VerificationResult:
     return VerificationResult(True, "notes list present")
 
 
+def _check_memory_forget(data: dict) -> VerificationResult:
+    # A successful forget deleted at least one note - nothing deleted
+    # is a failure upstream, never a "success".
+    deleted = data.get("deleted")
+    if not isinstance(deleted, list) or not deleted:
+        return VerificationResult(False, "forget deleted nothing")
+    return VerificationResult(True, f"{len(deleted)} note(s) deleted")
+
+
 def _check_datetime(data: dict) -> VerificationResult:
     if not _nonempty_str(data.get("date")) or not _nonempty_str(
         data.get("time")
@@ -92,6 +101,7 @@ _CONTRACTS: list[tuple[str, Any]] = [
     ("linkedin_draft", _check_linkedin_draft),
     ("memory_save", _check_memory_save),
     ("memory_recall", _check_memory_recall),
+    ("memory_forget", _check_memory_forget),
     ("get_current_datetime", _check_datetime),
     ("get_system_info", _check_system_info),
 ]
