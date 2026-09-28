@@ -16,16 +16,23 @@ from .base import Adapter, AdapterError
 from .manifests import get_manifest
 
 _TIMEOUT = 25
+# Health checks block the UI (grant / save-credentials responses), so they
+# get a shorter budget than real actions like file uploads.
+_HEALTH_TIMEOUT = 10
 
 
 def _req(method: str, url: str, *, headers=None, json=None, params=None,
-         data=None, content=None) -> httpx.Response:
+         data=None, content=None, timeout: float | None = None) -> httpx.Response:
     try:
         return httpx.request(
             method, url, headers=headers, json=json, params=params,
-            data=data, content=content, timeout=_TIMEOUT,
+            data=data, content=content, timeout=timeout or _TIMEOUT,
         )
-    except httpx.HTTPError as e:
+    except AdapterError:
+        raise
+    except Exception as e:
+        # httpx.InvalidURL, proxy misconfiguration, SSL errors, etc. are NOT
+        # httpx.HTTPError subclasses — never let them escape raw.
         raise AdapterError(f"Couldn't reach the service: {e}") from e
 
 
@@ -287,7 +294,7 @@ class GitHubAdapter(Adapter):
                 "Accept": "application/vnd.github+json"}
 
     def health_check(self, creds):
-        me = _ok(_req("GET", f"{self._API}/user", headers=self._h(creds)), "GitHub login")
+        me = _ok(_req("GET", f"{self._API}/user", headers=self._h(creds), timeout=_HEALTH_TIMEOUT), "GitHub login")
         return True, f"GitHub is reachable (@{me.get('login', '')})"
 
     def run_action(self, action, params, creds):
@@ -320,7 +327,7 @@ class NotionAdapter(Adapter):
                 "Content-Type": "application/json"}
 
     def health_check(self, creds):
-        me = _ok(_req("GET", f"{self._API}/users/me", headers=self._h(creds)),
+        me = _ok(_req("GET", f"{self._API}/users/me", headers=self._h(creds), timeout=_HEALTH_TIMEOUT),
                  "Notion check")
         return True, f"Notion is reachable ({me.get('name', 'integration')})"
 
@@ -357,10 +364,11 @@ class TelegramAdapter(Adapter):
         return f"https://api.telegram.org/bot{creds['bot_token']}"
 
     def health_check(self, creds):
-        me = _ok(_req("GET", f"{self._base(creds)}/getMe"), "Telegram check")
+        me = _ok(_req("GET", f"{self._base(creds)}/getMe", timeout=_HEALTH_TIMEOUT), "Telegram check")
         if not me.get("ok"):
             raise AdapterError(f"Telegram rejected the token: {me.get('description')}")
-        return True, f"Bot is live (@{me['result'].get('username', '')})"
+        username = (me.get("result") or {}).get("username", "")
+        return True, f"Bot is live (@{username})"
 
     def run_action(self, action, params, creds):
         if action != "send_message":
@@ -385,7 +393,7 @@ class SlackAdapter(Adapter):
                 "Content-Type": "application/json"}
 
     def health_check(self, creds):
-        res = _ok(_req("POST", f"{self._API}/auth.test", headers=self._h(creds)),
+        res = _ok(_req("POST", f"{self._API}/auth.test", headers=self._h(creds), timeout=_HEALTH_TIMEOUT),
                   "Slack check")
         if not res.get("ok"):
             raise AdapterError(f"Slack said: {res.get('error')}")
@@ -413,7 +421,7 @@ class DiscordAdapter(Adapter):
         return url
 
     def health_check(self, creds):
-        info = _ok(_req("GET", self._url(creds)), "Discord webhook check")
+        info = _ok(_req("GET", self._url(creds), timeout=_HEALTH_TIMEOUT), "Discord webhook check")
         return True, f"Webhook is live (#{info.get('channel_id', '?')})"
 
     def run_action(self, action, params, creds):
@@ -432,7 +440,7 @@ class SpotifyAdapter(Adapter):
         return {"Authorization": f"Bearer {creds['token']}"}
 
     def health_check(self, creds):
-        me = _ok(_req("GET", f"{self._API}/me", headers=self._h(creds)),
+        me = _ok(_req("GET", f"{self._API}/me", headers=self._h(creds), timeout=_HEALTH_TIMEOUT),
                  "Spotify check")
         return True, f"Spotify is reachable ({me.get('display_name', '')})"
 
@@ -467,7 +475,7 @@ class WhatsAppAdapter(Adapter):
         info = _ok(_req(
             "GET", f"{self._API}/{creds['phone_number_id']}",
             params={"fields": "display_phone_number,verified_name",
-                    "access_token": creds["token"]}), "WhatsApp check")
+                    "access_token": creds["token"]}, timeout=_HEALTH_TIMEOUT), "WhatsApp check")
         return True, f"WhatsApp number {info.get('display_phone_number', '')} is live"
 
     def run_action(self, action, params, creds):
@@ -494,13 +502,14 @@ class LinkedInAdapter(Adapter):
                 "X-Restli-Protocol-Version": "2.0.0",
                 "Content-Type": "application/json"}
 
-    def _person_id(self, creds):
-        me = _ok(_req("GET", f"{self._API}/userinfo", headers=self._h(creds)),
+    def _person_id(self, creds, timeout: float | None = None):
+        me = _ok(_req("GET", f"{self._API}/userinfo", headers=self._h(creds),
+                      timeout=timeout),
                  "LinkedIn check")
         return me.get("sub")
 
     def health_check(self, creds):
-        pid = self._person_id(creds)
+        pid = self._person_id(creds, timeout=_HEALTH_TIMEOUT)
         if not pid:
             raise AdapterError("LinkedIn didn't return a profile — check the token scope.")
         return True, "LinkedIn is reachable"
@@ -562,7 +571,7 @@ class XAdapter(Adapter):
         self._check(creds)
         url = f"{self._API}/users/me"
         auth = _oauth1_header("GET", url, {}, creds)
-        me = _ok(_req("GET", url, headers={"Authorization": auth}), "X check")
+        me = _ok(_req("GET", url, headers={"Authorization": auth}, timeout=_HEALTH_TIMEOUT), "X check")
         return True, f"X is reachable (@{me.get('data', {}).get('username', '')})"
 
     def run_action(self, action, params, creds):
@@ -580,16 +589,17 @@ class XAdapter(Adapter):
 class InstagramAdapter(Adapter):
     _API = "https://graph.instagram.com/v21.0"
 
-    def _uid(self, creds):
+    def _uid(self, creds, timeout: float | None = None):
         self._require(creds, "access_token")
         me = _ok(_req("GET", f"{self._API}/me",
                       params={"fields": "id,username",
-                              "access_token": creds["access_token"]}),
+                              "access_token": creds["access_token"]},
+                      timeout=timeout),
                  "Instagram check")
         return me.get("id"), me.get("username")
 
     def health_check(self, creds):
-        _uid, username = self._uid(creds)
+        _uid, username = self._uid(creds, timeout=_HEALTH_TIMEOUT)
         return True, f"Instagram is reachable (@{username})"
 
     def run_action(self, action, params, creds):

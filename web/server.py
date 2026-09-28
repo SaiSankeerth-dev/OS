@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 import sqlite3
 import time
 import uuid
@@ -574,6 +575,10 @@ def _creds_for(cid: str) -> dict:
     return get_dash().load_credentials(m.cred_group)
 
 
+# Pending Google OAuth flows: state -> {"cid", "created"}. Single-use, 10 min.
+_OAUTH_STATES: dict[str, dict] = {}
+
+
 def _run_health(cid: str) -> tuple[bool, str]:
     adapter = get_adapter(cid)
     if adapter is None:
@@ -699,8 +704,15 @@ async def oauth_start(cid: str, request: Request) -> dict:
     if not creds.get("client_id") or not creds.get("client_secret"):
         raise HTTPException(400, "save your Google OAuth Client ID and Secret first")
     redirect_uri = str(request.base_url).rstrip("/") + "/api/connectors/google/oauth/callback"
-    url, _ = oauth_google.authorization_url(
-        creds["client_id"], creds["client_secret"], redirect_uri, state=cid)
+    # Random single-use state prevents CSRF on the callback (valid 10 min).
+    state = secrets.token_urlsafe(16)
+    _OAUTH_STATES[state] = {"cid": cid, "created": time.time()}
+    try:
+        url, _ = oauth_google.authorization_url(
+            creds["client_id"], creds["client_secret"], redirect_uri, state=state)
+    except RuntimeError as e:
+        _OAUTH_STATES.pop(state, None)
+        raise HTTPException(400, str(e))
     return {"url": url}
 
 
@@ -709,17 +721,27 @@ async def oauth_callback(request: Request) -> HTMLResponse:
     params = dict(request.query_params)
     if "error" in params:
         raise HTTPException(400, f"Google said no: {params.get('error')}")
+    state = params.get("state", "")
+    rec = _OAUTH_STATES.pop(state, None)
+    if rec is None or time.time() - rec["created"] > 600:
+        raise HTTPException(
+            400, "This sign-in link expired or is invalid — start over from the Connectors page.")
     code = params.get("code")
-    cid = params.get("state") or "google_calendar"
+    cid = rec["cid"]
     if not code:
         raise HTTPException(400, "missing code")
     m = get_manifest(cid) or get_manifest("google_calendar")
     dash = get_dash()
     existing = dash.load_credentials("google")
+    client_id = existing.get("client_id")
+    client_secret = existing.get("client_secret")
+    if not client_id or not client_secret:
+        raise HTTPException(
+            400, "Your Google OAuth client was removed — save it again, then reconnect.")
     redirect_uri = str(request.base_url).rstrip("/") + "/api/connectors/google/oauth/callback"
     try:
         tokens = oauth_google.exchange_code(
-            existing["client_id"], existing["client_secret"],
+            client_id, client_secret,
             redirect_uri, str(request.url))
     except Exception as e:
         raise HTTPException(400, f"Token exchange failed: {e}")

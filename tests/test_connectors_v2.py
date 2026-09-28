@@ -287,3 +287,90 @@ def test_mcp_read_executes(client, monkeypatch):
 def test_mcp_unknown_method(client):
     r = client.post("/mcp", json={"jsonrpc": "2.0", "id": 4, "method": "bogus"})
     assert "error" in r.json()
+
+
+# ---- backend hardening (2026-09-28) --------------------------------------
+
+def test_req_wraps_non_http_errors():
+    """httpx.InvalidURL etc. must become AdapterError, never escape raw."""
+    import httpx
+    from web.connectors.adapters import _req
+    from web.connectors.base import AdapterError
+
+    real = httpx.request
+
+    def boom(*a, **k):
+        raise httpx.InvalidURL("Invalid port: ':1]'")
+
+    httpx.request = boom
+    try:
+        with pytest.raises(AdapterError, match="Couldn't reach the service"):
+            _req("GET", "https://example.com")
+    finally:
+        httpx.request = real
+
+
+def test_health_checks_use_short_timeout():
+    """Every non-Google health check must bound its wait so the UI never hangs."""
+    import inspect
+    from web.connectors.adapters import _HEALTH_TIMEOUT, get_adapter
+    from web.connectors.manifests import MANIFESTS
+
+    google = {m.id for m in MANIFESTS if m.auth_kind == "google_oauth"}
+    for m in MANIFESTS:
+        if m.id in google:
+            continue
+        src = inspect.getsource(get_adapter(m.id).health_check)
+        assert "_HEALTH_TIMEOUT" in src, f"{m.id} health_check has no short timeout"
+
+
+def test_oauth_state_csrf(client, monkeypatch):
+    """Forged, missing, or reused OAuth states are rejected with 400."""
+    import urllib.parse
+    import web.server as srv
+    import web.connectors.oauth_google as og
+
+    monkeypatch.setattr(
+        og, "authorization_url",
+        lambda *a, **k: (f"https://accounts.google.com/x?state={k.get('state', '')}",
+                         k.get("state", "")))
+    client.post("/api/connectors/google_calendar/grant", json={})
+    client.post("/api/connectors/google_calendar/credentials",
+                json={"fields": {"client_id": "c", "client_secret": "s"}})
+
+    # forged state
+    r = client.get("/api/connectors/google/oauth/callback?code=x&state=forged")
+    assert r.status_code == 400
+
+    # valid state, missing code -> 400 and single-use consumption
+    r = client.get("/api/connectors/google_calendar/oauth/start")
+    state = urllib.parse.parse_qs(
+        urllib.parse.urlparse(r.json()["url"]).query)["state"][0]
+    assert len(state) >= 16 and state != "google_calendar"
+    r = client.get(f"/api/connectors/google/oauth/callback?state={state}")
+    assert r.status_code == 400
+    # reuse -> 400
+    r = client.get(f"/api/connectors/google/oauth/callback?code=x&state={state}")
+    assert r.status_code == 400
+
+
+def test_oauth_callback_without_client_creds(client, monkeypatch):
+    """Callback with a valid state but wiped vault fails cleanly, not 500."""
+    import urllib.parse
+    import web.connectors.oauth_google as og
+
+    monkeypatch.setattr(
+        og, "authorization_url",
+        lambda *a, **k: (f"https://accounts.google.com/x?state={k.get('state', '')}",
+                         k.get("state", "")))
+    client.post("/api/connectors/gmail/grant", json={})
+    client.post("/api/connectors/gmail/credentials",
+                json={"fields": {"client_id": "c", "client_secret": "s"}})
+    r = client.get("/api/connectors/gmail/oauth/start")
+    state = urllib.parse.parse_qs(
+        urllib.parse.urlparse(r.json()["url"]).query)["state"][0]
+    # wipe the vault between start and callback
+    client.post("/api/connectors/gmail/revoke")
+    client.post("/api/connectors/gmail/grant", json={})
+    r = client.get(f"/api/connectors/google/oauth/callback?code=x&state={state}")
+    assert r.status_code == 400
