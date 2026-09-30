@@ -23,6 +23,8 @@ dependencies = [
     "python-dateutil>=2.9",
     # system_info tool (CPU/memory/disk stats used by dashboard + CLI).
     "psutil>=5.9",
+    # Documents tab (PDF view/fill/export, OpenMuse port). Pure Python, local.
+    "pypdf>=6",
 ]
 [project.optional-dependencies]
 voice = [

@@ -150,6 +150,15 @@ async def _collect_text(mgr, text: str) -> str:
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
+# OpenMuse feature port (web/om): computer, browser, activity, ideas, goals,
+# finance, documents, threads, notifications. See docs/OPENMUSE_PORT.md.
+try:
+    from web.om.routes import router as _om_router
+
+    app.include_router(_om_router)
+except Exception as _om_err:  # pragma: no cover - never break the dashboard
+    log.warning("om routes unavailable: %s", _om_err)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:

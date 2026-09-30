@@ -40,6 +40,13 @@
       <button class="nav-item" data-view="files"><span class="nav-ico">🗂</span>Files</button>
       <button class="nav-item" data-view="analytics"><span class="nav-ico">📊</span>Analytics</button>
       <button class="nav-item" data-view="connectors"><span class="nav-ico">🔌</span>Connectors</button>
+      <button class="nav-item" data-view="computer"><span class="nav-ico">💻</span>Computer</button>
+      <button class="nav-item" data-view="browser"><span class="nav-ico">🌐</span>Browser</button>
+      <button class="nav-item" data-view="activity"><span class="nav-ico">🏃</span>Activity</button>
+      <button class="nav-item" data-view="finance"><span class="nav-ico">💰</span>Finance</button>
+      <button class="nav-item" data-view="documents"><span class="nav-ico">📄</span>Documents</button>
+      <button class="nav-item" data-view="threads"><span class="nav-ico">🧵</span>Threads</button>
+      <button class="nav-item" data-view="notifications"><span class="nav-ico">🔔</span>Inbox<span class="badge" id="badge-notif"></span></button>
     </nav>
 
     <div class="quick-label">QUICK ACTIONS</div>
@@ -289,6 +296,169 @@
             <div id="chart-donut"></div>
           </div>
         </div>
+      </section>
+
+      <!-- ===== COMPUTER ===== -->
+      <section class="view" id="view-computer">
+        <div class="page-head">
+          <div><h2>Computer</h2><p class="page-sub">A sandboxed Linux computer: run commands, keep receipts, edit workspace files.</p></div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="comp-start">▶ Start</button>
+            <button class="btn-ghost btn-auto" id="comp-stop">⏹ Stop</button>
+          </div>
+        </div>
+        <div class="card"><div class="card-title">Status</div><div id="comp-status" class="muted">…</div></div>
+        <div class="card">
+          <div class="card-title">Run a command</div>
+          <div class="row gap">
+            <input id="comp-cmd" class="grow" placeholder="e.g. python3 --version" autocomplete="off" />
+            <input id="comp-cwd" style="width:10rem" value="/workspace" title="Working directory" />
+            <button class="btn-primary btn-auto" id="comp-run">Run</button>
+          </div>
+          <p class="muted small">Commands time out after 30s. Output is capped at 128KB. Paths stay inside the workspace — use <code>$WORKSPACE</code> or relative paths in commands.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Command receipts</div>
+          <div id="comp-receipts" class="stack"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Workspace files</div>
+          <div class="row gap">
+            <input id="comp-path" class="grow" value="/workspace" />
+            <button class="btn-ghost btn-auto" id="comp-ls">List</button>
+            <button class="btn-ghost btn-auto" id="comp-mkdir">＋ Folder</button>
+          </div>
+          <div id="comp-files" class="stack"></div>
+          <div id="comp-editor" hidden>
+            <div class="row gap"><strong id="comp-edit-path" class="grow"></strong>
+              <button class="btn-primary btn-auto" id="comp-save">Save</button></div>
+            <textarea id="comp-text" rows="12" class="code"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== BROWSER ===== -->
+      <section class="view" id="view-browser">
+        <div class="page-head">
+          <div><h2>Browser</h2><p class="page-sub">Persistent browser sessions. Open pages, read them, take screenshots.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">New session</div>
+          <div class="row gap">
+            <input id="br-url" class="grow" placeholder="https://example.com" autocomplete="off" />
+            <button class="btn-primary btn-auto" id="br-open">Open</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Sessions</div>
+          <div id="br-list" class="stack"></div>
+        </div>
+        <div class="card" id="br-read-card" hidden>
+          <div class="card-title" id="br-read-title">Page</div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="br-shot">📸 Screenshot</button>
+            <button class="btn-ghost btn-auto" id="br-close">Close session</button>
+          </div>
+          <div id="br-shot-wrap" class="center"></div>
+          <pre id="br-text" class="code wrap"></pre>
+        </div>
+      </section>
+
+      <!-- ===== ACTIVITY ===== -->
+      <section class="view" id="view-activity">
+        <div class="page-head">
+          <div><h2>Activity</h2><p class="page-sub">Durable runs with pause / resume / cancel / retry, plus ideas and goals.</p></div>
+          <button class="btn-primary btn-auto" id="act-new">＋ New run</button>
+        </div>
+        <div id="act-runs" class="stack"></div>
+        <div class="card">
+          <div class="card-title">💡 Ideas</div>
+          <div class="row gap">
+            <input id="idea-title" class="grow" placeholder="New idea…" />
+            <button class="btn-ghost btn-auto" id="idea-add">Add</button>
+          </div>
+          <div id="idea-list" class="stack"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🎯 Goals</div>
+          <div class="row gap">
+            <input id="goal-title" class="grow" placeholder="New goal…" />
+            <button class="btn-ghost btn-auto" id="goal-add">Add</button>
+          </div>
+          <div id="goal-list" class="stack"></div>
+        </div>
+      </section>
+
+      <!-- ===== FINANCE ===== -->
+      <section class="view" id="view-finance">
+        <div class="page-head">
+          <div><h2>Finance</h2><p class="page-sub">Upload a bank/statement CSV and get a spending summary. All local.</p></div>
+          <label class="btn-primary btn-auto" style="cursor:pointer">＋ Upload CSV
+            <input type="file" id="fin-file" accept=".csv" hidden />
+          </label>
+        </div>
+        <div id="fin-reports" class="stack"></div>
+      </section>
+
+      <!-- ===== DOCUMENTS ===== -->
+      <section class="view" id="view-documents">
+        <div class="page-head">
+          <div><h2>Documents</h2><p class="page-sub">PDF library — view, inspect form fields, fill, export.</p></div>
+          <label class="btn-primary btn-auto" style="cursor:pointer">＋ Upload PDF
+            <input type="file" id="doc-file" accept=".pdf" hidden />
+          </label>
+        </div>
+        <div id="doc-list" class="stack"></div>
+        <div class="card" id="doc-detail" hidden>
+          <div class="card-title" id="doc-detail-title">Document</div>
+          <div id="doc-fields" class="stack"></div>
+          <div class="row gap">
+            <button class="btn-primary btn-auto" id="doc-fill">Fill &amp; save copy</button>
+            <button class="btn-ghost btn-auto" id="doc-download">⬇ Download</button>
+            <button class="btn-ghost btn-auto" id="doc-text">📝 Page text</button>
+            <button class="btn-ghost btn-auto" id="doc-del">Delete</button>
+          </div>
+          <pre id="doc-textout" class="code wrap" hidden></pre>
+        </div>
+      </section>
+
+      <!-- ===== THREADS ===== -->
+      <section class="view" id="view-threads">
+        <div class="page-head">
+          <div><h2>Threads</h2><p class="page-sub">Local conversations — rename, archive, restore, replay.</p></div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="thr-arch-toggle">Archived</button>
+            <button class="btn-primary btn-auto" id="thr-new">＋ New thread</button>
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <div id="thr-list" class="stack" style="width:16rem"></div>
+          <div class="card grow" id="thr-detail" hidden>
+            <div class="row gap"><strong id="thr-title" class="grow"></strong>
+              <button class="btn-ghost btn-auto" id="thr-rename">Rename</button>
+              <button class="btn-ghost btn-auto" id="thr-replay">↻ Replay</button>
+              <button class="btn-ghost btn-auto" id="thr-archive">Archive</button>
+              <button class="btn-ghost btn-auto" id="thr-del">Delete</button>
+            </div>
+            <div id="thr-msgs" class="stack"></div>
+            <div class="row gap">
+              <input id="thr-input" class="grow" placeholder="Write a message…" />
+              <button class="btn-primary btn-auto" id="thr-send">Send</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== NOTIFICATIONS ===== -->
+      <section class="view" id="view-notifications">
+        <div class="page-head">
+          <div><h2>Inbox</h2><p class="page-sub">Notifications from watchers, runs, and reminders.</p></div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="notif-readall">Mark all read</button>
+            <button class="btn-ghost btn-auto" id="notif-clear">Clear read</button>
+          </div>
+        </div>
+        <div id="notif-list" class="stack"></div>
       </section>
 
     </div>

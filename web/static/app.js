@@ -1193,6 +1193,479 @@ $("#ob-google").addEventListener("click", async () => {
 });
 $("#ob-skip").addEventListener("click", () => { onboardDone(); toast("Skipped — connect Google anytime from Connectors."); });
 
+/* ---------------- computer (OpenMuse port) ---------------- */
+function pillFor(status) {
+  const map = { succeeded: "ok", running: "info", failed: "bad", timed_out: "warn", interrupted: "warn" };
+  return `<span class="pill ${map[status] || "info"}">${esc(status)}</span>`;
+}
+async function loadComputer() {
+  try {
+    const s = await api("/api/om/computer");
+    $("#comp-status").innerHTML =
+      `<b>Mode:</b> ${esc(s.mode)} &nbsp; <b>Status:</b> ${esc(s.status)} &nbsp; <b>Workspace:</b> ${esc(s.workspacePath)}` +
+      (s.message ? `<br><span class="muted">${esc(s.message)}</span>` : "");
+    $("#comp-receipts").innerHTML = s.commands.length ? s.commands.map((c) => `
+      <details class="receipt">
+        <summary>${pillFor(c.status)} <code>${esc(c.command.slice(0, 80))}</code>
+          <span class="muted">· exit ${c.exitCode ?? "–"}</span></summary>
+        ${c.stdout ? `<div class="muted small">stdout</div><pre class="code wrap">${esc(c.stdout.slice(0, 4000))}</pre>` : ""}
+        ${c.stderr ? `<div class="muted small">stderr</div><pre class="code wrap">${esc(c.stderr.slice(0, 4000))}</pre>` : ""}
+      </details>`).join("") : `<p class="muted">No commands yet.</p>`;
+    compListFiles($("#comp-path").value || "/workspace");
+  } catch (e) { $("#comp-status").textContent = "Computer unavailable: " + e.message; }
+}
+async function compListFiles(path) {
+  try {
+    const d = await api(`/api/om/computer/files?path=${encodeURIComponent(path)}`);
+    $("#comp-path").value = d.path;
+    $("#comp-files").innerHTML = d.entries.map((e) => `
+      <div class="row gap"><span>${e.dir ? "📁" : "📄"}</span>
+        <button class="link-btn grow" data-p="${esc(d.path === "/workspace" ? "" : d.path)}/${esc(e.name)}"
+          style="text-align:left">${esc(e.name)}</button>
+        ${e.dir ? "" : `<span class="muted small">${e.size} B</span>`}
+      </div>`).join("") || `<p class="muted">Empty folder.</p>`;
+    $$("#comp-files [data-p]").forEach((b) => b.addEventListener("click", () => compOpenPath(b.dataset.p)));
+  } catch (e) { $("#comp-files").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+async function compOpenPath(p) {
+  if (p.endsWith("/")) return compListFiles(p);
+  try {
+    const f = await api("/api/om/computer/files/read", { method: "POST", body: JSON.stringify({ path: p }) });
+    $("#comp-editor").hidden = false;
+    $("#comp-edit-path").textContent = f.path;
+    $("#comp-text").value = f.text;
+  } catch (e) {
+    // maybe a directory
+    compListFiles(p);
+  }
+}
+$("#comp-run").addEventListener("click", async () => {
+  const cmd = $("#comp-cmd").value.trim();
+  if (!cmd) return;
+  $("#comp-run").disabled = true;
+  try {
+    await api("/api/om/computer/commands", { method: "POST",
+      body: JSON.stringify({ command: cmd, cwd: $("#comp-cwd").value || "/workspace" }) });
+    $("#comp-cmd").value = "";
+    toast("Command finished — receipt saved.");
+  } catch (e) { toast("Command failed: " + e.message); }
+  $("#comp-run").disabled = false;
+  loadComputer();
+});
+$("#comp-cmd").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#comp-run").click(); });
+$("#comp-start").addEventListener("click", async () => { try { await api("/api/om/computer/start", { method: "POST" }); toast("Computer started."); } catch (e) { toast(e.message); } loadComputer(); });
+$("#comp-stop").addEventListener("click", async () => { try { await api("/api/om/computer/stop", { method: "POST" }); toast("Computer stopped."); } catch (e) { toast(e.message); } loadComputer(); });
+$("#comp-ls").addEventListener("click", () => compListFiles($("#comp-path").value || "/workspace"));
+$("#comp-mkdir").addEventListener("click", async () => {
+  const p = prompt("New folder path:", ($("#comp-path").value || "/workspace") + "/");
+  if (!p) return;
+  try { await api("/api/om/computer/files/mkdir", { method: "POST", body: JSON.stringify({ path: p }) }); compListFiles($("#comp-path").value); }
+  catch (e) { toast(e.message); }
+});
+$("#comp-save").addEventListener("click", async () => {
+  try {
+    await api("/api/om/computer/files/write", { method: "POST",
+      body: JSON.stringify({ path: $("#comp-edit-path").textContent, text: $("#comp-text").value }) });
+    toast("Saved.");
+    compListFiles($("#comp-path").value);
+  } catch (e) { toast("Save failed: " + e.message); }
+});
+loaders.computer = loadComputer;
+
+/* ---------------- browser (OpenMuse port) ---------------- */
+let brCurrent = null;
+async function loadBrowser() {
+  try {
+    const list = await api("/api/om/browsers");
+    $("#br-list").innerHTML = list.length ? list.map((s) => `
+      <div class="row gap">
+        ${pillFor(s.status === "active" ? "succeeded" : s.status === "error" ? "failed" : "running")}
+        <div class="grow"><b>${esc(s.title)}</b><br><span class="muted small">${esc(s.url)}</span></div>
+        <button class="btn-ghost btn-auto" data-act="read" data-id="${s.id}">Read</button>
+        <button class="btn-ghost btn-auto" data-act="nav" data-id="${s.id}">Go to…</button>
+        <button class="btn-ghost btn-auto" data-act="del" data-id="${s.id}">✕</button>
+      </div>`).join("") : `<p class="muted">No sessions yet. Open a page above.</p>`;
+    $$("#br-list [data-act]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.dataset.id, act = b.dataset.act;
+      if (act === "read") brRead(id);
+      else if (act === "del") brDelete(id);
+      else if (act === "nav") {
+        const url = prompt("Navigate to URL:");
+        if (url) api(`/api/om/browsers/${id}/navigate`, { method: "POST", body: JSON.stringify({ url }) }).then(loadBrowser).catch((e) => toast(e.message));
+      }
+    }));
+  } catch (e) { $("#br-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+$("#br-open").addEventListener("click", async () => {
+  const url = $("#br-url").value.trim();
+  if (!url) return;
+  try {
+    const s = await api("/api/om/browsers", { method: "POST", body: JSON.stringify({ url }) });
+    $("#br-url").value = "";
+    toast(`Session opened (${s.engine}).`);
+    loadBrowser();
+    brRead(s.id);
+  } catch (e) { toast("Could not open: " + e.message); }
+});
+async function brRead(id) {
+  brCurrent = id;
+  try {
+    const p = await api(`/api/om/browsers/${id}/read`, { method: "POST" });
+    $("#br-read-card").hidden = false;
+    $("#br-read-title").textContent = p.title || p.url;
+    $("#br-text").textContent = p.text + (p.truncated ? "\n…[truncated]" : "");
+    $("#br-shot-wrap").innerHTML = "";
+  } catch (e) { toast("Read failed: " + e.message); }
+}
+async function brDelete(id) {
+  try { await api(`/api/om/browsers/${id}`, { method: "DELETE" }); loadBrowser(); }
+  catch (e) { toast(e.message); }
+}
+$("#br-shot").addEventListener("click", async () => {
+  if (!brCurrent) return;
+  try {
+    const r = await fetch(`/api/om/browsers/${brCurrent}/screenshot`);
+    if (!r.ok) throw new Error(await r.text());
+    const blob = await r.blob();
+    $("#br-shot-wrap").innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="screenshot" />`;
+  } catch (e) { toast("Screenshot failed: " + e.message); }
+});
+$("#br-close").addEventListener("click", async () => {
+  if (!brCurrent) return;
+  try { await api(`/api/om/browsers/${brCurrent}/close`, { method: "POST" }); toast("Session closed."); loadBrowser(); }
+  catch (e) { toast(e.message); }
+});
+loaders.browser = loadBrowser;
+
+/* ---------------- activity (OpenMuse port) ---------------- */
+const ACT_COLORS = { planned: "info", running: "ok", paused: "warn", done: "ok", cancelled: "", failed: "bad" };
+async function loadActivity() {
+  try {
+    const runs = await api("/api/om/activity/runs");
+    $("#act-runs").innerHTML = runs.length ? runs.map((r) => `
+      <div class="card"><div class="row gap">
+        <span class="pill ${ACT_COLORS[r.status] || ""}">${esc(r.status)}</span>
+        <strong class="grow">${esc(r.title)}</strong>
+        <span class="muted small">${r.plan.filter((s) => s.status === "done").length}/${r.plan.length} steps</span>
+      </div>
+      <div class="stack" style="margin:8px 0">${r.plan.map((s, i) => `
+        <div class="row gap"><span>${s.status === "done" ? "✅" : s.status === "failed" ? "❌" : s.status === "running" ? "▶️" : "⬜"}</span>
+          <span class="grow">${esc(s.name)}</span>
+          ${r.status === "running" || r.status === "planned" ? `
+            <button class="btn-ghost btn-auto" data-run="${r.id}" data-step="${i}" data-to="done">Done</button>
+            <button class="btn-ghost btn-auto" data-run="${r.id}" data-step="${i}" data-to="failed">Fail</button>` : ""}
+        </div>`).join("")}</div>
+      <div class="row gap">
+        ${r.status === "planned" ? `<button class="btn-ghost btn-auto" data-tr="${r.id}" data-to="running">▶ Start</button>` : ""}
+        ${r.status === "running" ? `<button class="btn-ghost btn-auto" data-tr="${r.id}" data-to="paused">⏸ Pause</button>` : ""}
+        ${r.status === "paused" ? `<button class="btn-ghost btn-auto" data-tr="${r.id}" data-to="running">▶ Resume</button>` : ""}
+        ${r.status === "failed" ? `<button class="btn-ghost btn-auto" data-tr="${r.id}" data-to="running">↻ Retry</button>` : ""}
+        ${r.status === "running" ? `<button class="btn-ghost btn-auto" data-tr="${r.id}" data-to="done">✔ Finish</button>` : ""}
+        ${!["done", "cancelled"].includes(r.status) ? `<button class="btn-ghost btn-auto" data-tr="${r.id}" data-to="cancelled">✕ Cancel</button>` : ""}
+        <button class="btn-ghost btn-auto" data-delrun="${r.id}">Delete</button>
+      </div></div>`).join("") : `<p class="muted">No runs yet.</p>`;
+    $$("#act-runs [data-tr]").forEach((b) => b.addEventListener("click", async () => {
+      try { await api(`/api/om/activity/runs/${b.dataset.tr}/transition`, { method: "POST", body: JSON.stringify({ to: b.dataset.to }) }); loadActivity(); }
+      catch (e) { toast(e.message); }
+    }));
+    $$("#act-runs [data-step]").forEach((b) => b.addEventListener("click", async () => {
+      try { await api(`/api/om/activity/runs/${b.dataset.run}/steps`, { method: "POST", body: JSON.stringify({ index: +b.dataset.step, status: b.dataset.to }) }); loadActivity(); }
+      catch (e) { toast(e.message); }
+    }));
+    $$("#act-runs [data-delrun]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Delete this run?")) return;
+      await api(`/api/om/activity/runs/${b.dataset.delrun}`, { method: "DELETE" }); loadActivity();
+    }));
+  } catch (e) { $("#act-runs").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+  loadIdeas(); loadGoals();
+}
+$("#act-new").addEventListener("click", async () => {
+  const title = prompt("Run title:");
+  if (!title) return;
+  const steps = (prompt("Steps (comma separated):") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  try { await api("/api/om/activity/runs", { method: "POST", body: JSON.stringify({ title, steps }) }); loadActivity(); }
+  catch (e) { toast(e.message); }
+});
+async function loadIdeas() {
+  try {
+    const ideas = await api("/api/om/ideas");
+    $("#idea-list").innerHTML = ideas.length ? ideas.map((i) => `
+      <div class="row gap"><span class="pill ${i.status === "new" ? "info" : i.status === "accepted" ? "ok" : ""}">${esc(i.status)}</span>
+        <div class="grow"><b>${esc(i.title)}</b>${i.prompt ? `<br><span class="muted small">${esc(i.prompt)}</span>` : ""}</div>
+        ${i.status === "new" ? `<button class="btn-ghost btn-auto" data-accept="${i.id}">Accept → goal</button>
+          <button class="btn-ghost btn-auto" data-dismiss="${i.id}">Dismiss</button>` : ""}
+        <button class="btn-ghost btn-auto" data-delidea="${i.id}">✕</button>
+      </div>`).join("") : `<p class="muted">No ideas yet.</p>`;
+    $$("#idea-list [data-accept]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/ideas/${b.dataset.accept}/accept`, { method: "POST" }); loadActivity(); toast("Idea accepted → goal created.");
+    }));
+    $$("#idea-list [data-dismiss]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/ideas/${b.dataset.dismiss}`, { method: "PATCH", body: JSON.stringify({ status: "dismissed" }) }); loadActivity();
+    }));
+    $$("#idea-list [data-delidea]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/ideas/${b.dataset.delidea}`, { method: "DELETE" }); loadActivity();
+    }));
+  } catch (e) { $("#idea-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+$("#idea-add").addEventListener("click", async () => {
+  const title = $("#idea-title").value.trim();
+  if (!title) return;
+  await api("/api/om/ideas", { method: "POST", body: JSON.stringify({ title }) });
+  $("#idea-title").value = ""; loadIdeas();
+});
+async function loadGoals() {
+  try {
+    const goals = await api("/api/om/goals");
+    $("#goal-list").innerHTML = goals.length ? goals.map((g) => `
+      <div class="card"><div class="row gap">
+        <span class="pill ${g.status === "active" ? "ok" : ""}">${esc(g.status)}</span>
+        <strong class="grow">${esc(g.title)}</strong>
+        ${g.status === "active" ? `<button class="btn-ghost btn-auto" data-goaldone="${g.id}">✔ Done</button>` : ""}
+      </div>
+      <div class="stack" style="margin:8px 0">${g.milestones.map((m) => `
+        <div class="row gap"><input type="checkbox" data-ms="${m.id}" ${m.done ? "checked" : ""} />
+          <span class="grow" style="${m.done ? "text-decoration:line-through" : ""}">${esc(m.title)}</span></div>`).join("")}</div>
+      <div class="row gap"><input class="grow" placeholder="Add milestone…" data-msinput="${g.id}" />
+        <button class="btn-ghost btn-auto" data-msadd="${g.id}">Add</button></div>
+      </div>`).join("") : `<p class="muted">No goals yet.</p>`;
+    $$("#goal-list [data-ms]").forEach((c) => c.addEventListener("change", async () => {
+      await api(`/api/om/milestones/${c.dataset.ms}`, { method: "PATCH", body: JSON.stringify({ done: c.checked }) }); loadGoals();
+    }));
+    $$("#goal-list [data-msadd]").forEach((b) => b.addEventListener("click", async () => {
+      const inp = document.querySelector(`[data-msinput="${b.dataset.msadd}"]`);
+      if (!inp.value.trim()) return;
+      await api(`/api/om/goals/${b.dataset.msadd}/milestones`, { method: "POST", body: JSON.stringify({ title: inp.value.trim() }) });
+      loadGoals();
+    }));
+    $$("#goal-list [data-goaldone]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/goals/${b.dataset.goaldone}`, { method: "PATCH", body: JSON.stringify({ status: "done" }) }); loadGoals();
+    }));
+  } catch (e) { $("#goal-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+$("#goal-add").addEventListener("click", async () => {
+  const title = $("#goal-title").value.trim();
+  if (!title) return;
+  await api("/api/om/goals", { method: "POST", body: JSON.stringify({ title }) });
+  $("#goal-title").value = ""; loadGoals();
+});
+loaders.activity = loadActivity;
+
+/* ---------------- finance (OpenMuse port) ---------------- */
+function inr(n) { return "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 }); }
+async function loadFinance() {
+  try {
+    const reps = await api("/api/om/finance/reports");
+    $("#fin-reports").innerHTML = reps.length ? reps.map((r) => {
+      const s = r.report.summary || {};
+      return `<div class="card"><div class="row gap">
+        <strong class="grow">📊 ${esc(r.name)}</strong>
+        <span class="muted small">${new Date(r.created_at * 1000).toLocaleDateString()}</span>
+        <button class="btn-ghost btn-auto" data-findel="${r.id}">Delete</button></div>
+      <div class="row gap" style="margin:10px 0">
+        <div class="tile"><div><div class="tile-num" style="color:#157347">${inr(s.total_in || 0)}</div><div class="tile-lbl">In</div></div>
+        <div class="tile"><div><div class="tile-num" style="color:#b42318">${inr(s.total_out || 0)}</div><div class="tile-lbl">Out</div></div>
+        <div class="tile"><div><div class="tile-num">${inr(s.net || 0)}</div><div class="tile-lbl">Net</div></div>
+        <div class="tile"><div><div class="tile-num">${s.transactions || 0}</div><div class="tile-lbl">Transactions</div></div>
+      </div>
+      ${(s.by_category || []).length ? `<div class="card-title">By category</div>` +
+        s.by_category.map((c) => `<div class="row gap"><span class="grow">${esc(c.category)}</span><b>${inr(c.spent)}</b></div>`).join("") : ""}
+      ${(s.top_merchants || []).length ? `<div class="card-title" style="margin-top:8px">Top merchants</div>` +
+        s.top_merchants.slice(0, 5).map((m) => `<div class="row gap"><span class="grow muted small">${esc(m.merchant)}</span><b>${inr(m.spent)}</b></div>`).join("") : ""}
+      </div>`;
+    }).join("") : `<p class="muted">No reports yet — upload a CSV above.</p>`;
+    $$("#fin-reports [data-findel]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Delete this report?")) return;
+      await api(`/api/om/finance/reports/${b.dataset.findel}`, { method: "DELETE" }); loadFinance();
+    }));
+  } catch (e) { $("#fin-reports").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+$("#fin-file").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("file", f);
+  try {
+    const r = await fetch("/api/om/finance/upload", { method: "POST", body: fd });
+    if (!r.ok) throw new Error(await r.text());
+    toast("Report ready.");
+  } catch (err) { toast("Upload failed: " + err.message); }
+  e.target.value = ""; loadFinance();
+});
+loaders.finance = loadFinance;
+
+/* ---------------- documents (OpenMuse port) ---------------- */
+let docCurrent = null;
+async function loadDocuments() {
+  try {
+    const docs = await api("/api/om/documents");
+    $("#doc-list").innerHTML = docs.length ? docs.map((d) => `
+      <div class="row gap"><span>📄</span>
+        <div class="grow"><b>${esc(d.name)}</b><br>
+          <span class="muted small">${(d.size / 1024).toFixed(1)} KB · ${esc(d.source)} · ${new Date(d.created_at * 1000).toLocaleDateString()}</span></div>
+        <button class="btn-ghost btn-auto" data-docopen="${d.id}">Open</button>
+      </div>`).join("") : `<p class="muted">No documents yet — upload a PDF above.</p>`;
+    $$("#doc-list [data-docopen]").forEach((b) => b.addEventListener("click", () => openDoc(b.dataset.docopen)));
+  } catch (e) { $("#doc-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+$("#doc-file").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("file", f);
+  try {
+    const r = await fetch("/api/om/documents/upload", { method: "POST", body: fd });
+    if (!r.ok) throw new Error(await r.text());
+    toast("PDF uploaded.");
+  } catch (err) { toast("Upload failed: " + err.message); }
+  e.target.value = ""; loadDocuments();
+});
+async function openDoc(id) {
+  docCurrent = id;
+  try {
+    const info = await api(`/api/om/documents/${id}/info`);
+    $("#doc-detail").hidden = false;
+    $("#doc-textout").hidden = true;
+    $("#doc-detail-title").textContent = `${info.name} — ${info.pages} page(s), ${info.fields.length} field(s)`;
+    $("#doc-fields").innerHTML = info.fields.length ? info.fields.map((f, i) => `
+      <div class="row gap"><span class="grow"><b>${esc(f.name)}</b> <span class="muted small">(${esc(f.type)})</span></span>
+        <input data-fname="${esc(f.name)}" value="${esc(f.value)}" placeholder="value…" style="width:14rem" /></div>`
+    ).join("") : `<p class="muted">No fillable fields in this PDF.</p>`;
+    $("#doc-detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) { toast(e.message); }
+}
+$("#doc-fill").addEventListener("click", async () => {
+  if (!docCurrent) return;
+  const values = {};
+  $$("#doc-fields [data-fname]").forEach((i) => { if (i.value) values[i.dataset.fname] = i.value; });
+  try {
+    const r = await api(`/api/om/documents/${docCurrent}/fill`, { method: "POST", body: JSON.stringify({ values }) });
+    toast(`Filled ${r.filled} field(s) — saved as "${r.name}".`);
+    loadDocuments(); openDoc(r.id);
+  } catch (e) { toast("Fill failed: " + e.message); }
+});
+$("#doc-download").addEventListener("click", () => { if (docCurrent) window.open(`/api/om/documents/${docCurrent}/file`); });
+$("#doc-text").addEventListener("click", async () => {
+  if (!docCurrent) return;
+  try {
+    const t = await api(`/api/om/documents/${docCurrent}/text?page=0`);
+    $("#doc-textout").hidden = false;
+    $("#doc-textout").textContent = t.text + (t.truncated ? "\n…[truncated]" : "");
+  } catch (e) { toast(e.message); }
+});
+$("#doc-del").addEventListener("click", async () => {
+  if (!docCurrent || !confirm("Delete this document?")) return;
+  await api(`/api/om/documents/${docCurrent}`, { method: "DELETE" });
+  docCurrent = null; $("#doc-detail").hidden = true; loadDocuments();
+});
+loaders.documents = loadDocuments;
+
+/* ---------------- threads (OpenMuse port) ---------------- */
+let thrCurrent = null, thrShowArchived = false;
+async function loadThreads() {
+  try {
+    const list = await api(`/api/om/threads?archived=${thrShowArchived ? "1" : "0"}`);
+    $("#thr-arch-toggle").textContent = thrShowArchived ? "Active" : "Archived";
+    $("#thr-list").innerHTML = list.length ? list.map((t) => `
+      <button class="btn-ghost" data-thr="${t.id}" style="text-align:left;${thrCurrent === t.id ? "border-color:var(--accent)" : ""}">
+        <b>${esc(t.title)}</b><br><span class="muted small">${t.message_count} msgs</span>
+      </button>`).join("") : `<p class="muted">No threads.</p>`;
+    $$("#thr-list [data-thr]").forEach((b) => b.addEventListener("click", () => openThread(b.dataset.thr)));
+    if (thrCurrent) openThread(thrCurrent, true);
+  } catch (e) { $("#thr-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+async function openThread(id, silent) {
+  thrCurrent = id;
+  try {
+    const t = await api(`/api/om/threads/${id}`);
+    $("#thr-detail").hidden = false;
+    $("#thr-title").textContent = t.title + (t.archived ? " (archived)" : "");
+    $("#thr-archive").textContent = t.archived ? "Restore" : "Archive";
+    $("#thr-msgs").innerHTML = t.messages.map((m) => `
+      <div class="row gap"><span class="pill ${m.role === "user" ? "info" : "ok"}">${esc(m.role)}</span>
+        <div class="grow">${esc(m.content)}</div></div>`).join("") || `<p class="muted">No messages yet.</p>`;
+    if (!silent) loadThreads();
+  } catch (e) { toast(e.message); }
+}
+$("#thr-new").addEventListener("click", async () => {
+  const title = prompt("Thread title:") || "New conversation";
+  const t = await api("/api/om/threads", { method: "POST", body: JSON.stringify({ title }) });
+  thrCurrent = t.id; loadThreads(); openThread(t.id, true);
+});
+$("#thr-arch-toggle").addEventListener("click", () => { thrShowArchived = !thrShowArchived; thrCurrent = null; $("#thr-detail").hidden = true; loadThreads(); });
+$("#thr-send").addEventListener("click", async () => {
+  const v = $("#thr-input").value.trim();
+  if (!v || !thrCurrent) return;
+  await api(`/api/om/threads/${thrCurrent}/messages`, { method: "POST", body: JSON.stringify({ role: "user", content: v }) });
+  $("#thr-input").value = ""; openThread(thrCurrent, true);
+});
+$("#thr-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#thr-send").click(); });
+$("#thr-rename").addEventListener("click", async () => {
+  if (!thrCurrent) return;
+  const title = prompt("New title:");
+  if (!title) return;
+  await api(`/api/om/threads/${thrCurrent}`, { method: "PATCH", body: JSON.stringify({ title }) });
+  openThread(thrCurrent, true); loadThreads();
+});
+$("#thr-replay").addEventListener("click", async () => {
+  if (!thrCurrent) return;
+  const t = await api(`/api/om/threads/${thrCurrent}/replay`, { method: "POST" });
+  thrCurrent = t.id; toast("Replayed into a new thread."); loadThreads(); openThread(t.id, true);
+});
+$("#thr-archive").addEventListener("click", async () => {
+  if (!thrCurrent) return;
+  const t = await api(`/api/om/threads/${thrCurrent}`);
+  await api(`/api/om/threads/${thrCurrent}/${t.archived ? "restore" : "archive"}`, { method: "POST" });
+  thrCurrent = null; $("#thr-detail").hidden = true; loadThreads();
+});
+$("#thr-del").addEventListener("click", async () => {
+  if (!thrCurrent || !confirm("Delete this thread?")) return;
+  await api(`/api/om/threads/${thrCurrent}`, { method: "DELETE" });
+  thrCurrent = null; $("#thr-detail").hidden = true; loadThreads();
+});
+loaders.threads = loadThreads;
+
+/* ---------------- notifications (OpenMuse port) ---------------- */
+async function loadNotifications() {
+  try {
+    const items = await api("/api/om/notifications");
+    $("#notif-list").innerHTML = items.length ? items.map((n) => `
+      <div class="card" style="${n.read ? "opacity:.65" : ""}"><div class="row gap">
+        ${n.read ? "" : `<span class="pill info">new</span>`}
+        <div class="grow"><b>${esc(n.title)}</b>
+          ${n.body ? `<br><span class="muted">${esc(n.body)}</span>` : ""}
+          <br><span class="muted small">${esc(n.source || "os")} · ${new Date(n.created_at * 1000).toLocaleString()}</span></div>
+        ${n.link ? `<a class="btn-ghost btn-auto" href="${esc(n.link)}">Open</a>` : ""}
+        ${n.read ? "" : `<button class="btn-ghost btn-auto" data-nread="${n.id}">Mark read</button>`}
+        <button class="btn-ghost btn-auto" data-ndel="${n.id}">✕</button>
+      </div></div>`).join("") : `<p class="muted">Inbox zero. 🎉</p>`;
+    $$("#notif-list [data-nread]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/notifications/${b.dataset.nread}/read`, { method: "POST" });
+      loadNotifications(); refreshNotifBadge();
+    }));
+    $$("#notif-list [data-ndel]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/notifications/${b.dataset.ndel}`, { method: "DELETE" });
+      loadNotifications(); refreshNotifBadge();
+    }));
+  } catch (e) { $("#notif-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+async function refreshNotifBadge() {
+  try {
+    const { unread } = await api("/api/om/notifications/unread-count");
+    const el = $("#badge-notif");
+    el.textContent = unread > 0 ? unread : "";
+    el.style.display = unread > 0 ? "" : "none";
+  } catch { /* ignore */ }
+}
+$("#notif-readall").addEventListener("click", async () => {
+  await api("/api/om/notifications/read-all", { method: "POST" });
+  loadNotifications(); refreshNotifBadge();
+});
+$("#notif-clear").addEventListener("click", async () => {
+  await api("/api/om/notifications/clear-read", { method: "POST" });
+  loadNotifications(); refreshNotifBadge();
+});
+loaders.notifications = loadNotifications;
+
 /* ---------------- init ---------------- */
 loadMe();
 refreshBadges();
@@ -1201,4 +1674,6 @@ refreshPerms();
 maybeOnboard();
 setInterval(refreshApprovalRail, 15000);
 setInterval(refreshPerms, 20000);
+setInterval(refreshNotifBadge, 30000);
+refreshNotifBadge();
 switchView("chat");
