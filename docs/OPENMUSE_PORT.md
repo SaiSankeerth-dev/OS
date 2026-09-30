@@ -68,3 +68,21 @@ web/om/
 - 21 HTTP route checks via FastAPI TestClient: all passed (create/transition/step/pause/bad-transition/events, idea accept→goal, milestone done, finance upload/summary, PDF upload/info/fill/download, thread replay/archive/restore, notification read/unread-count).
 - Headless Chromium against the live dashboard: all 7 new tabs render with real data, zero JS console errors; full UI round-trip verified (new thread → send message → message appears).
 - Broader OS regression suite: see commit message.
+
+## Free-local batch (2026-09-30, same day)
+
+Closed the cheapest OpenMuse gaps with ₹0, local-only tools:
+
+- **Browser console takeover**: per-session JS console + page-error capture (Playwright `console`/`pageerror` listeners, capped at 200 entries), new `GET /api/om/browsers/{sid}/console`, "⌨ Console" button in the Browser tab.
+- **Browser PDF download**: `page.pdf()` export, new `GET /api/om/browsers/{sid}/pdf`, "🖨 PDF" button downloads the file.
+- **OCR for scanned PDFs**: Tesseract 5 + poppler `pdftoppm` (both installed locally). `page_text` falls back to OCR when a page has no embedded text; responses carry `source: "embedded"|"ocr"` and `ocr_available`. UI shows an "(read with OCR)" note.
+- **Telegram push**: `NotifyService.notify(..., telegram=True)` also pushes via the existing Telegram connector (bot token from the credential vault). `GET /api/om/notifications/telegram-status` reports connection state; Inbox tab has a Telegram status line + "Send test" card. Only fires on the user's explicit click.
+- **Bug fix found by this batch**: `get_browser()` created a new `BrowserService` (and a new Chromium) per HTTP request, leaking browsers and making console state useless across requests. Routes now share one process-wide `BrowserService` (`_browser()` in `web/om/routes.py`).
+
+Verification:
+
+- `tests/test_om_batch2.py`: 10 passed (console 404/200, real console.log capture + %PDF export via Playwright, OCR toolchain present, blank-page pipeline, rendered-text OCR read, embedded-text source, scanned fallback, telegram not-configured graceful, inbox save unaffected, telegram wiring via stub adapter).
+- 10 live HTTP route checks: all passed (console 200/schema/404, pdf 200/%PDF/404, doc upload, page_text source+ocr_available, info ocr_available, telegram-status schema, notify+telegram graceful, unread count).
+- Headless Chromium UI check: new buttons (Console, PDF, Telegram status/send) present, zero page errors.
+- `tests/test_om_phase1.py::test_browser_session_lifecycle_http` fails in this sandbox both before and after the change (egress-proxy URL parsing in the HTTP fallback path) — pre-existing environment issue, not a regression.
+"""

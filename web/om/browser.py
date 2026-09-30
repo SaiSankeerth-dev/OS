@@ -6,8 +6,9 @@ driven by Playwright/Chromium when available, otherwise a plain HTTP fetch
 fallback extracts title + text. Reads are data-only (never instructions).
 
 Manual takeover: the dashboard shows each session's URL/title/status and the
-user can open the URL in their own browser; the agent side only reads pages
-and takes screenshots. No autonomous interactive browsing.
+user can open the URL in their own browser; the agent side reads pages,
+captures the JS console (console takeover view), takes screenshots, and
+exports pages to PDF. No autonomous interactive browsing.
 """
 from __future__ import annotations
 
@@ -46,6 +47,7 @@ class _PlaywrightDriver:
         self._pw = None
         self._browser = None
         self._pages: dict[str, object] = {}
+        self._console: dict[str, list[dict]] = {}
         self._ok: bool | None = None
 
     def available(self) -> bool:
@@ -67,7 +69,42 @@ class _PlaywrightDriver:
                 ctx = self._browser.new_context(viewport={"width": 1280, "height": 800})
                 page = ctx.new_page()
                 self._pages[sid] = page
+                self._attach_console(sid, page)
             return page
+
+    def _attach_console(self, sid: str, page) -> None:
+        """Capture console messages + page errors (console takeover view)."""
+        buf = self._console.setdefault(sid, [])
+
+        def _push(entry: dict) -> None:
+            buf.append(entry)
+            del buf[:-200]  # cap memory
+
+        def _on_console(msg) -> None:
+            try:
+                _push({"type": msg.type, "text": str(msg.text)[:2000]})
+            except Exception:
+                pass
+
+        def _on_error(exc) -> None:
+            _push({"type": "pageerror", "text": str(exc)[:2000]})
+
+        try:
+            page.on("console", _on_console)
+            page.on("pageerror", _on_error)
+        except Exception:
+            pass
+
+    def console_logs(self, sid: str) -> list[dict]:
+        # ensure the page (and listeners) exist if the browser is available
+        try:
+            self._page(sid)
+        except Exception:
+            pass
+        return list(self._console.get(sid, []))
+
+    def pdf(self, sid: str) -> bytes:
+        return self._page(sid).pdf()
 
     def open(self, sid: str, url: str) -> None:
         self._page(sid).goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -110,6 +147,12 @@ class _HttpDriver:
 
     def screenshot(self, sid: str) -> bytes:
         raise BrowserError("Screenshots need Playwright/Chromium installed", 503)
+
+    def console_logs(self, sid: str) -> list[dict]:
+        raise BrowserError("Console logs need Playwright/Chromium installed", 503)
+
+    def pdf(self, sid: str) -> bytes:
+        raise BrowserError("PDF export needs Playwright/Chromium installed", 503)
 
     def close(self, sid: str) -> None:
         pass
@@ -218,6 +261,32 @@ class BrowserService:
             png = self._pw.screenshot(sid)
         return f"browser-{sid}.png", png
 
+    def console(self, sid: str) -> dict:
+        if not self.store.get("browser_sessions", sid):
+            raise BrowserError("Browser session not found", 404)
+        if not self._pw.available():
+            raise BrowserError(
+                "Console logs need Playwright/Chromium installed", 503)
+        with self._lock_for(sid):
+            try:
+                logs = self._pw.console_logs(sid)
+            except Exception as e:
+                raise BrowserError(f"Could not read console: {type(e).__name__}", 502)
+        return {"id": sid, "logs": logs, "count": len(logs)}
+
+    def page_pdf(self, sid: str) -> tuple[str, bytes]:
+        if not self.store.get("browser_sessions", sid):
+            raise BrowserError("Browser session not found", 404)
+        if not self._pw.available():
+            raise BrowserError(
+                "PDF export needs Playwright/Chromium installed", 503)
+        with self._lock_for(sid):
+            try:
+                raw = self._pw.pdf(sid)
+            except Exception as e:
+                raise BrowserError(f"Could not export PDF: {type(e).__name__}", 502)
+        return f"browser-{sid}.pdf", raw
+
     def close(self, sid: str) -> dict:
         row = self.store.get("browser_sessions", sid)
         if not row:
@@ -226,6 +295,7 @@ class BrowserService:
             try:
                 if self._pw.available():
                     self._pw.close(sid)
+                    self._pw._console.pop(sid, None)
                 else:
                     self._http.close(sid)
             finally:

@@ -1315,6 +1315,7 @@ async function brRead(id) {
     $("#br-read-title").textContent = p.title || p.url;
     $("#br-text").textContent = p.text + (p.truncated ? "\n…[truncated]" : "");
     $("#br-shot-wrap").innerHTML = "";
+    $("#br-console-wrap").hidden = true;
   } catch (e) { toast("Read failed: " + e.message); }
 }
 async function brDelete(id) {
@@ -1334,6 +1335,29 @@ $("#br-close").addEventListener("click", async () => {
   if (!brCurrent) return;
   try { await api(`/api/om/browsers/${brCurrent}/close`, { method: "POST" }); toast("Session closed."); loadBrowser(); }
   catch (e) { toast(e.message); }
+});
+$("#br-console").addEventListener("click", async () => {
+  if (!brCurrent) return;
+  try {
+    const c = await api(`/api/om/browsers/${brCurrent}/console`);
+    $("#br-console-wrap").hidden = false;
+    $("#br-console-text").textContent = c.logs.length
+      ? c.logs.map((l) => `[${l.type}] ${l.text}`).join("\n")
+      : "(no console messages captured yet — interact with the page, then click Console again)";
+  } catch (e) { toast("Console failed: " + e.message); }
+});
+$("#br-pdf").addEventListener("click", async () => {
+  if (!brCurrent) return;
+  try {
+    const r = await fetch(`/api/om/browsers/${brCurrent}/pdf`);
+    if (!r.ok) throw new Error(await r.text());
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `browser-${brCurrent}.pdf`;
+    a.click();
+    toast("PDF downloaded.");
+  } catch (e) { toast("PDF failed: " + e.message); }
 });
 loaders.browser = loadBrowser;
 
@@ -1549,7 +1573,8 @@ $("#doc-text").addEventListener("click", async () => {
   try {
     const t = await api(`/api/om/documents/${docCurrent}/text?page=0`);
     $("#doc-textout").hidden = false;
-    $("#doc-textout").textContent = t.text + (t.truncated ? "\n…[truncated]" : "");
+    const src = t.source === "ocr" ? " (read with OCR — scanned page)" : t.text ? "" : " (no text on this page" + (t.ocr_available ? "" : "; OCR tools not installed") + ")";
+    $("#doc-textout").textContent = t.text + (t.truncated ? "\n…[truncated]" : "") + src;
   } catch (e) { toast(e.message); }
 });
 $("#doc-del").addEventListener("click", async () => {
@@ -1664,7 +1689,22 @@ $("#notif-clear").addEventListener("click", async () => {
   await api("/api/om/notifications/clear-read", { method: "POST" });
   loadNotifications(); refreshNotifBadge();
 });
-loaders.notifications = loadNotifications;
+async function loadTgStatus() {
+  try {
+    const s = await api("/api/om/notifications/telegram-status");
+    $("#tg-status").textContent = s.connected ? `✅ ${s.detail}` : `⚠️ ${s.detail}`;
+  } catch (e) { $("#tg-status").textContent = "could not check"; }
+}
+$("#tg-send").addEventListener("click", async () => {
+  const title = $("#tg-title").value.trim() || "OS test ping";
+  try {
+    const r = await api("/api/om/notifications", { method: "POST", body: JSON.stringify({ title, source: "inbox-test", telegram: true }) });
+    if (r.telegram && r.telegram.sent) toast("Sent to Telegram ✅ (also saved in inbox).");
+    else toast("Saved in inbox, but Telegram failed: " + ((r.telegram && r.telegram.reason) || "unknown"));
+    loadNotifications(); refreshNotifBadge();
+  } catch (e) { toast("Send failed: " + e.message); }
+});
+loaders.notifications = (...a) => { loadTgStatus(); return loadNotifications(...a); };
 
 /* ---------------- init ---------------- */
 loadMe();

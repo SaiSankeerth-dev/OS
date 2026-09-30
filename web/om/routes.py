@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from .activity import ActivityError, ActivityService
-from .browser import BrowserError, get_browser
+from .browser import BrowserError, BrowserService
 from .computer import ComputerError, get_computer
 from .documents import DocumentError, DocumentService
 from .finance import FinanceError, FinanceService
@@ -16,6 +16,7 @@ from .threads import ThreadError, ThreadService
 router = APIRouter(prefix="/api/om")
 
 _store: OmStore | None = None
+_browser_svc: BrowserService | None = None
 
 
 def _store_get() -> OmStore:
@@ -23,6 +24,14 @@ def _store_get() -> OmStore:
     if _store is None:
         _store = OmStore()
     return _store
+
+
+def _browser() -> BrowserService:
+    """Process-wide browser service: one Chromium shared by all requests."""
+    global _browser_svc
+    if _browser_svc is None:
+        _browser_svc = BrowserService(_store_get())
+    return _browser_svc
 
 
 def _activity() -> ActivityService:
@@ -161,7 +170,7 @@ async def computer_export_pdf(request: Request):
 @router.get("/browsers")
 def browsers_list():
     try:
-        return get_browser(_store_get()).list()
+        return _browser().list()
     except Exception as e:
         raise _err(e)
 
@@ -170,7 +179,7 @@ def browsers_list():
 async def browsers_create(request: Request):
     body = await request.json()
     try:
-        return get_browser(_store_get()).create(body.get("url", ""))
+        return _browser().create(body.get("url", ""))
     except Exception as e:
         raise _err(e)
 
@@ -178,7 +187,7 @@ async def browsers_create(request: Request):
 @router.get("/browsers/{sid}")
 def browsers_get(sid: str):
     try:
-        return get_browser(_store_get()).get(sid)
+        return _browser().get(sid)
     except Exception as e:
         raise _err(e)
 
@@ -187,7 +196,7 @@ def browsers_get(sid: str):
 async def browsers_navigate(sid: str, request: Request):
     body = await request.json()
     try:
-        return get_browser(_store_get()).navigate(sid, body.get("url", ""))
+        return _browser().navigate(sid, body.get("url", ""))
     except Exception as e:
         raise _err(e)
 
@@ -195,7 +204,7 @@ async def browsers_navigate(sid: str, request: Request):
 @router.post("/browsers/{sid}/read")
 def browsers_read(sid: str):
     try:
-        return get_browser(_store_get()).read(sid)
+        return _browser().read(sid)
     except Exception as e:
         raise _err(e)
 
@@ -203,9 +212,27 @@ def browsers_read(sid: str):
 @router.get("/browsers/{sid}/screenshot")
 def browsers_screenshot(sid: str):
     try:
-        name, png = get_browser(_store_get()).screenshot(sid)
+        name, png = _browser().screenshot(sid)
         return Response(content=png, media_type="image/png",
                         headers={"Content-Disposition": f'inline; filename="{name}"'})
+    except Exception as e:
+        raise _err(e)
+
+
+@router.get("/browsers/{sid}/console")
+def browsers_console(sid: str):
+    try:
+        return _browser().console(sid)
+    except Exception as e:
+        raise _err(e)
+
+
+@router.get("/browsers/{sid}/pdf")
+def browsers_pdf(sid: str):
+    try:
+        name, raw = _browser().page_pdf(sid)
+        return Response(content=raw, media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
     except Exception as e:
         raise _err(e)
 
@@ -213,7 +240,7 @@ def browsers_screenshot(sid: str):
 @router.post("/browsers/{sid}/close")
 def browsers_close(sid: str):
     try:
-        return get_browser(_store_get()).close(sid)
+        return _browser().close(sid)
     except Exception as e:
         raise _err(e)
 
@@ -221,7 +248,7 @@ def browsers_close(sid: str):
 @router.delete("/browsers/{sid}")
 def browsers_delete(sid: str):
     try:
-        return {"ok": get_browser(_store_get()).delete(sid)}
+        return {"ok": _browser().delete(sid)}
     except Exception as e:
         raise _err(e)
 
@@ -626,12 +653,21 @@ def notifications_unread():
         raise _err(e)
 
 
+@router.get("/notifications/telegram-status")
+def notifications_telegram_status():
+    try:
+        return _notify().telegram_status()
+    except Exception as e:
+        raise _err(e)
+
+
 @router.post("/notifications", status_code=201)
 async def notifications_create(request: Request):
     body = await _body(request)
     try:
         return _notify().notify(body.get("title", ""), body.get("body", ""),
-                                body.get("source", ""), body.get("link", ""))
+                                body.get("source", ""), body.get("link", ""),
+                                telegram=bool(body.get("telegram")))
     except Exception as e:
         raise _err(e)
 

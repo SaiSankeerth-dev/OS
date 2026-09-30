@@ -3,13 +3,22 @@
 Upload a PDF, inspect its pages and fillable form fields, fill the fields,
 and download the result. Everything runs locally with pypdf — no paid APIs.
 
+Scanned (image-only) PDFs get an OCR fallback: if a page has no embedded
+text and Tesseract + poppler are installed, the page is rasterised and
+OCR'd locally. Nothing leaves the machine.
+
 Documents are stored as blobs in the om.db `documents` table. Filled copies
 are saved as new documents (source = 'filled:<original-id>') so the
 original is never mutated.
 """
 from __future__ import annotations
 
+import glob
 import io
+import os
+import shutil
+import subprocess
+import tempfile
 
 from .store import OmStore, now
 
@@ -28,6 +37,31 @@ def _pypdf():
             "PDF support needs the 'pypdf' package (pip install pypdf)", 503
         ) from e
     return PdfReader, PdfWriter
+
+
+def ocr_available() -> bool:
+    """True when the local OCR toolchain (tesseract + pdftoppm) is present."""
+    return bool(shutil.which("tesseract") and shutil.which("pdftoppm"))
+
+
+def _ocr_page(raw: bytes, page: int) -> str:
+    """OCR one 0-based page via pdftoppm + tesseract. Returns '' on failure."""
+    with tempfile.TemporaryDirectory() as td:
+        src = os.path.join(td, "doc.pdf")
+        with open(src, "wb") as f:
+            f.write(raw)
+        subprocess.run(
+            ["pdftoppm", "-png", "-r", "200",
+             "-f", str(page + 1), "-l", str(page + 1),
+             src, os.path.join(td, "p")],
+            check=True, timeout=60, capture_output=True)
+        imgs = sorted(glob.glob(os.path.join(td, "p-*.png")))
+        if not imgs:
+            return ""
+        out = subprocess.run(
+            ["tesseract", imgs[0], "stdout", "-l", "eng"],
+            capture_output=True, text=True, timeout=120)
+        return (out.stdout or "").strip()
 
 
 class DocumentService:
@@ -93,6 +127,7 @@ class DocumentService:
             "pages": len(reader.pages),
             "fields": fields,
             "encrypted": bool(reader.is_encrypted),
+            "ocr_available": ocr_available(),
         }
 
     def page_text(self, did: str, page: int = 0,
@@ -103,9 +138,19 @@ class DocumentService:
         if not (0 <= page < len(reader.pages)):
             raise DocumentError("Page out of range")
         text = reader.pages[page].extract_text() or ""
+        source = "embedded"
+        if not text.strip() and ocr_available():
+            try:
+                ocr_text = _ocr_page(doc["bytes"], page)
+            except Exception:
+                ocr_text = ""
+            if ocr_text:
+                text, source = ocr_text, "ocr"
         return {"id": did, "page": page, "pages": len(reader.pages),
                 "text": text[:max_chars],
-                "truncated": len(text) > max_chars}
+                "truncated": len(text) > max_chars,
+                "source": source,
+                "ocr_available": ocr_available()}
 
     # -- fill & export ---------------------------------------------------
     def fill(self, did: str, values: dict[str, str]) -> dict:

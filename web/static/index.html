@@ -357,9 +357,12 @@
           <div class="card-title" id="br-read-title">Page</div>
           <div class="row gap">
             <button class="btn-ghost btn-auto" id="br-shot">📸 Screenshot</button>
+            <button class="btn-ghost btn-auto" id="br-console">⌨ Console</button>
+            <button class="btn-ghost btn-auto" id="br-pdf">🖨 PDF</button>
             <button class="btn-ghost btn-auto" id="br-close">Close session</button>
           </div>
           <div id="br-shot-wrap" class="center"></div>
+          <div id="br-console-wrap" hidden><div class="card-title">Console</div><pre id="br-console-text" class="code wrap"></pre></div>
           <pre id="br-text" class="code wrap"></pre>
         </div>
       </section>
@@ -459,6 +462,14 @@
           </div>
         </div>
         <div id="notif-list" class="stack"></div>
+        <div class="card">
+          <div class="card-title">📲 Telegram push <span class="muted small" id="tg-status">checking…</span></div>
+          <p class="muted small">Free phone notifications via your Telegram bot. Connect Telegram in the Connectors tab first (bot token + your chat ID), then send a test.</p>
+          <div class="row gap">
+            <input id="tg-title" class="grow" placeholder="Test title" value="OS test ping" />
+            <button class="btn-ghost btn-auto" id="tg-send">Send test</button>
+          </div>
+        </div>
       </section>
 
     </div>
