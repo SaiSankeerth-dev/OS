@@ -99,7 +99,7 @@ def test_google_keys_alone_are_not_connected(client, healthy):
                     json={"fields": {"client_id": "x", "client_secret": "y"}})
     body = r.json()["status"]
     assert body["state"] == "granted", body
-    assert "Connect with Google" in body["health_msg"]
+    assert "Sign in with Google" in body["health_msg"]
     conns = {c["id"]: c for c in client.get("/api/connectors").json()["connectors"]}
     assert conns["gmail"]["needs_oauth"] is True
     assert conns["gmail"]["state"] == "granted"
@@ -374,3 +374,101 @@ def test_oauth_callback_without_client_creds(client, monkeypatch):
     client.post("/api/connectors/gmail/grant", json={})
     r = client.get(f"/api/connectors/google/oauth/callback?code=x&state={state}")
     assert r.status_code == 400
+
+
+def test_microsoft_oauth_state_csrf(client, monkeypatch):
+    """Forged, missing, or reused Microsoft OAuth states are rejected with 400."""
+    import urllib.parse
+    import web.connectors.oauth_microsoft as om
+
+    monkeypatch.setattr(
+        om, "authorization_url",
+        lambda *a, **k: (f"https://login.microsoftonline.com/x?state={k.get('state', '')}",
+                         k.get("state", "")))
+    client.post("/api/connectors/microsoft_outlook/grant", json={})
+    client.post("/api/connectors/microsoft_outlook/credentials",
+                json={"fields": {"client_id": "c", "client_secret": "s"}})
+
+    # forged state
+    r = client.get("/api/connectors/microsoft/oauth/callback?code=x&state=forged")
+    assert r.status_code == 400
+
+    # valid state, missing code -> 400 and single-use consumption
+    r = client.get("/api/connectors/microsoft_outlook/oauth/start")
+    state = urllib.parse.parse_qs(
+        urllib.parse.urlparse(r.json()["url"]).query)["state"][0]
+    assert len(state) >= 16 and state != "microsoft_outlook"
+    r = client.get(f"/api/connectors/microsoft/oauth/callback?state={state}")
+    assert r.status_code == 400
+    # reuse -> 400
+    r = client.get(f"/api/connectors/microsoft/oauth/callback?code=x&state={state}")
+    assert r.status_code == 400
+
+
+def test_microsoft_oauth_callback_without_client_creds(client, monkeypatch):
+    """Microsoft callback with a valid state but wiped vault fails cleanly, not 500."""
+    import urllib.parse
+    import web.connectors.oauth_microsoft as om
+
+    monkeypatch.setattr(
+        om, "authorization_url",
+        lambda *a, **k: (f"https://login.microsoftonline.com/x?state={k.get('state', '')}",
+                         k.get("state", "")))
+    client.post("/api/connectors/microsoft_outlook/grant", json={})
+    client.post("/api/connectors/microsoft_outlook/credentials",
+                json={"fields": {"client_id": "c", "client_secret": "s"}})
+    r = client.get("/api/connectors/microsoft_outlook/oauth/start")
+    state = urllib.parse.parse_qs(
+        urllib.parse.urlparse(r.json()["url"]).query)["state"][0]
+    # wipe the vault between start and callback
+    client.post("/api/connectors/microsoft_outlook/revoke")
+    client.post("/api/connectors/microsoft_outlook/grant", json={})
+    r = client.get(f"/api/connectors/microsoft/oauth/callback?code=x&state={state}")
+    assert r.status_code == 400
+
+
+def test_microsoft_oauth_happy_path(client, monkeypatch):
+    """Full Microsoft OAuth flow stores the refresh token and clears needs_oauth."""
+    import urllib.parse
+    import web.connectors.oauth_microsoft as om
+    import web.server as srv
+
+    monkeypatch.setattr(
+        om, "authorization_url",
+        lambda *a, **k: (f"https://login.microsoftonline.com/x?state={k.get('state', '')}",
+                         k.get("state", "")))
+    monkeypatch.setattr(
+        om, "exchange_code",
+        lambda cid, sec, uri, code: {
+            "client_id": cid, "client_secret": sec, "refresh_token": "rt-123"})
+    # never hit the real Graph API during the callback health check
+    monkeypatch.setattr(srv, "_run_health", lambda cid: (True, "ok"))
+
+    client.post("/api/connectors/microsoft_outlook/grant", json={})
+    client.post("/api/connectors/microsoft_outlook/credentials",
+                json={"fields": {"client_id": "c", "client_secret": "s"}})
+    r = client.get("/api/connectors/microsoft_outlook/oauth/start")
+    assert r.status_code == 200
+    assert "login.microsoftonline.com" in r.json()["url"]
+    state = urllib.parse.parse_qs(
+        urllib.parse.urlparse(r.json()["url"]).query)["state"][0]
+    r = client.get(f"/api/connectors/microsoft/oauth/callback?code=authcode&state={state}")
+    assert r.status_code == 200
+    assert "Microsoft connected" in r.text
+
+    # refresh token persisted, needs_oauth cleared
+    detail = client.get("/api/connectors/microsoft_outlook").json()
+    assert detail["needs_oauth"] is False
+    assert detail["state"] == "connected"
+
+
+def test_microsoft_manifest_registered():
+    """Microsoft connector exists with the right auth wiring."""
+    from web.connectors.manifests import get_manifest
+    from web.connectors.adapters import get_adapter
+
+    m = get_manifest("microsoft_outlook")
+    assert m is not None
+    assert m.auth_kind == "microsoft_oauth"
+    assert m.cred_group == "microsoft"
+    assert get_adapter("microsoft_outlook") is not None

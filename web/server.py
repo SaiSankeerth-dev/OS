@@ -560,6 +560,16 @@ from web.connectors import (  # noqa: E402
 )
 from web.connectors import mcp as mcp_bridge  # noqa: E402
 from web.connectors import oauth_google  # noqa: E402
+from web.connectors import oauth_microsoft  # noqa: E402
+
+_OAUTH_MODULES = {
+    "google_oauth": oauth_google,
+    "microsoft_oauth": oauth_microsoft,
+}
+_OAUTH_GROUPS = {
+    "google_oauth": "google",
+    "microsoft_oauth": "microsoft",
+}
 from web.connectors.base import AdapterError  # noqa: E402
 
 
@@ -600,8 +610,9 @@ def _refresh_state(cid: str) -> dict:
     if st["state"] not in ("granted", "connected", "setup_error"):
         return st
     creds = dash.load_credentials(m.cred_group)
-    if m.auth_kind == "google_oauth" and not creds.get("refresh_token"):
-        dash.set_state(cid, "granted", "Press “Connect with Google” to sign in.")
+    if m.auth_kind in ("google_oauth", "microsoft_oauth") and not creds.get("refresh_token"):
+        provider = "Microsoft" if m.auth_kind == "microsoft_oauth" else "Google"
+        dash.set_state(cid, "granted", f"Press “Sign in with {provider}” to sign in.")
         return dash.grant_status(cid, m.cred_group)
     if not st["has_credentials"]:
         return st
@@ -619,7 +630,7 @@ def _connector_dict(c: dict) -> dict:
     dash = get_dash()
     st = dash.grant_status(c["id"], c["cred_group"])
     needs_oauth = False
-    if c["auth_kind"] == "google_oauth":
+    if c["auth_kind"] in ("google_oauth", "microsoft_oauth"):
         creds = dash.load_credentials(c["cred_group"])
         needs_oauth = not creds.get("refresh_token")
     return {**c, "state": st["state"],
@@ -698,17 +709,20 @@ async def test_connector(cid: str) -> dict:
 @app.get("/api/connectors/{cid}/oauth/start")
 async def oauth_start(cid: str, request: Request) -> dict:
     m = _manifest_or_404(cid)
-    if m.auth_kind != "google_oauth":
+    mod = _OAUTH_MODULES.get(m.auth_kind)
+    if mod is None:
         raise HTTPException(400, "this connector has no OAuth flow")
+    provider = "Microsoft" if m.auth_kind == "microsoft_oauth" else "Google"
     creds = _creds_for(cid)
     if not creds.get("client_id") or not creds.get("client_secret"):
-        raise HTTPException(400, "save your Google OAuth Client ID and Secret first")
-    redirect_uri = str(request.base_url).rstrip("/") + "/api/connectors/google/oauth/callback"
+        raise HTTPException(400, f"save your {provider} OAuth Client ID and Secret first")
+    group = _OAUTH_GROUPS[m.auth_kind]
+    redirect_uri = str(request.base_url).rstrip("/") + f"/api/connectors/{group}/oauth/callback"
     # Random single-use state prevents CSRF on the callback (valid 10 min).
     state = secrets.token_urlsafe(16)
     _OAUTH_STATES[state] = {"cid": cid, "created": time.time()}
     try:
-        url, _ = oauth_google.authorization_url(
+        url, _ = mod.authorization_url(
             creds["client_id"], creds["client_secret"], redirect_uri, state=state)
     except RuntimeError as e:
         _OAUTH_STATES.pop(state, None)
@@ -716,11 +730,11 @@ async def oauth_start(cid: str, request: Request) -> dict:
     return {"url": url}
 
 
-@app.get("/api/connectors/google/oauth/callback", response_class=HTMLResponse)
-async def oauth_callback(request: Request) -> HTMLResponse:
+def _oauth_callback_common(request: Request, group: str, provider: str) -> HTMLResponse:
+    mod = _OAUTH_MODULES["microsoft_oauth" if group == "microsoft" else "google_oauth"]
     params = dict(request.query_params)
     if "error" in params:
-        raise HTTPException(400, f"Google said no: {params.get('error')}")
+        raise HTTPException(400, f"{provider} said no: {params.get('error')}")
     state = params.get("state", "")
     rec = _OAUTH_STATES.pop(state, None)
     if rec is None or time.time() - rec["created"] > 600:
@@ -730,32 +744,43 @@ async def oauth_callback(request: Request) -> HTMLResponse:
     cid = rec["cid"]
     if not code:
         raise HTTPException(400, "missing code")
-    m = get_manifest(cid) or get_manifest("google_calendar")
     dash = get_dash()
-    existing = dash.load_credentials("google")
+    existing = dash.load_credentials(group)
     client_id = existing.get("client_id")
     client_secret = existing.get("client_secret")
     if not client_id or not client_secret:
         raise HTTPException(
-            400, "Your Google OAuth client was removed — save it again, then reconnect.")
-    redirect_uri = str(request.base_url).rstrip("/") + "/api/connectors/google/oauth/callback"
+            400, f"Your {provider} OAuth client was removed — save it again, then reconnect.")
+    redirect_uri = str(request.base_url).rstrip("/") + f"/api/connectors/{group}/oauth/callback"
     try:
-        tokens = oauth_google.exchange_code(
-            client_id, client_secret,
-            redirect_uri, str(request.url))
+        if group == "microsoft":
+            tokens = mod.exchange_code(client_id, client_secret, redirect_uri, code)
+        else:
+            tokens = mod.exchange_code(
+                client_id, client_secret, redirect_uri, str(request.url))
     except Exception as e:
         raise HTTPException(400, f"Token exchange failed: {e}")
     existing.update(tokens)
-    dash.save_credentials("google", "Google", existing)
-    # health-check every granted google connector so they flip to connected
+    dash.save_credentials(group, provider, existing)
+    # health-check every granted connector in this group so they flip to connected
     from web.connectors.manifests import MANIFESTS
 
     for gm in MANIFESTS:
-        if gm.cred_group == "google":
-            st = dash.grant_status(gm.id, "google")
+        if gm.cred_group == group:
+            st = dash.grant_status(gm.id, group)
             if st["state"] in ("granted", "setup_error") and st["has_credentials"]:
                 _refresh_state(gm.id)
-    return HTMLResponse(oauth_google.SUCCESS_HTML)
+    return HTMLResponse(mod.SUCCESS_HTML)
+
+
+@app.get("/api/connectors/google/oauth/callback", response_class=HTMLResponse)
+async def oauth_callback(request: Request) -> HTMLResponse:
+    return _oauth_callback_common(request, "google", "Google")
+
+
+@app.get("/api/connectors/microsoft/oauth/callback", response_class=HTMLResponse)
+async def oauth_callback_microsoft(request: Request) -> HTMLResponse:
+    return _oauth_callback_common(request, "microsoft", "Microsoft")
 
 
 @app.get("/api/connectors/{cid}/settings")

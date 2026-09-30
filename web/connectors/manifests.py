@@ -392,6 +392,40 @@ MANIFESTS: list[ConnectorManifest] = [
                        [P("image_url", "Image URL", True), P("caption", "Caption")]),
         ],
     ),
+    ConnectorManifest(
+        id="microsoft_outlook",
+        name="Microsoft Outlook",
+        tagline="Outlook mail and calendar through Microsoft Graph.",
+        color="#0078D4",
+        icon="📧",
+        auth_kind="microsoft_oauth",
+        cred_group="microsoft",
+        cred_fields=[
+            CredField("client_id", "Microsoft OAuth Client ID", "From Azure Portal → App registrations", secret=False),
+            CredField("client_secret", "Microsoft OAuth Client Secret", "From the same app registration", secret=True),
+        ],
+        scopes=["Read your Outlook mail", "Send mail (asks you first)", "Read and create calendar events (asks you first)"],
+        setup_steps=[
+            "Go to Azure Portal → Microsoft Entra ID → App registrations → New registration (free).",
+            "Add redirect URI (Web): http://127.0.0.1:3000/api/connectors/microsoft/oauth/callback",
+            "API permissions → add Microsoft Graph: Mail.Read, Mail.Send, Calendars.ReadWrite, User.Read, offline_access.",
+            "Certificates & secrets → New client secret; paste the Application (client) ID and secret below, save.",
+            "Press “Sign in with Microsoft” and approve — done, no token copy-paste.",
+        ],
+        note="Free with any Microsoft account. One sign-in covers Outlook mail and calendar together.",
+        docs_url="https://learn.microsoft.com/en-us/graph/",
+        actions=[
+            ActionSpec("list_emails", "List emails", "Recent Outlook inbox messages.", False,
+                       [P("query", "Search query"), P("max_results", "Max results (default 5)")]),
+            ActionSpec("send_email", "Send email", "Send an Outlook email.", True,
+                       [P("to", "To", True), P("subject", "Subject", True), P("body", "Body", True)]),
+            ActionSpec("list_events", "List events", "Events for a day (default: today).", False,
+                       [P("date", "Day (today, tomorrow, 2026-09-28)")]),
+            ActionSpec("create_event", "Create event", "Create a calendar event.", True,
+                       [P("title", "Title", True), P("start", "Start (2026-09-28 16:00)", True),
+                        P("end", "End (2026-09-28 17:00)"), P("description", "Description")]),
+        ],
+    ),
 ]
 
 

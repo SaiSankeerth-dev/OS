@@ -619,6 +619,90 @@ class InstagramAdapter(Adapter):
         return {"ok": True, "id": published.get("id")}
 
 
+class MicrosoftOutlookAdapter(Adapter):
+    _API = "https://graph.microsoft.com/v1.0"
+
+    def _token(self, creds) -> str:
+        self._require(creds, "client_id", "client_secret", "refresh_token")
+        from .oauth_microsoft import refresh_access_token
+        try:
+            return refresh_access_token(
+                creds["client_id"], creds["client_secret"], creds["refresh_token"])
+        except RuntimeError as e:
+            raise AdapterError(str(e)) from e
+
+    def _h(self, creds, timeout: float | None = None):
+        return {"Authorization": f"Bearer {self._token(creds)}",
+                "Content-Type": "application/json"}
+
+    def health_check(self, creds):
+        me = _ok(_req("GET", f"{self._API}/me", headers=self._h(creds),
+                      timeout=_HEALTH_TIMEOUT), "Microsoft profile")
+        name = me.get("displayName") or me.get("userPrincipalName", "")
+        return True, f"Microsoft Graph is reachable ({name})"
+
+    def run_action(self, action, params, creds):
+        h = self._h(creds)
+        if action == "list_emails":
+            q = params.get("query", "")
+            n = max(1, min(int(params.get("max_results") or 5), 20))
+            url = f"{self._API}/me/messages"
+            gql: dict = {"$top": n, "$orderby": "receivedDateTime desc",
+                         "$select": "id,subject,from,receivedDateTime"}
+            if q:
+                gql["$search"] = f'"{q}"'
+            msgs = _ok(_req("GET", url, headers=h, params=gql), "Listing mail")
+            return {"ok": True, "emails": [
+                {"id": m.get("id"), "subject": m.get("subject", ""),
+                 "from": ((m.get("from") or {}).get("emailAddress") or {}).get("address", ""),
+                 "date": m.get("receivedDateTime", "")}
+                for m in msgs.get("value", [])]}
+        if action == "send_email":
+            body = {"message": {
+                "subject": params["subject"],
+                "body": {"contentType": "Text", "content": params["body"]},
+                "toRecipients": [{"emailAddress": {"address": params["to"]}}]}}
+            sent = _ok(_req("POST", f"{self._API}/me/sendMail", headers=h,
+                            json=body), "Sending mail")
+            return {"ok": True, "to": params["to"]}
+        if action == "list_events":
+            from datetime import datetime, timedelta
+            day = (params.get("date") or "today").lower()
+            base = datetime.now()
+            if day == "tomorrow":
+                base += timedelta(days=1)
+            elif day not in ("today",):
+                try:
+                    base = datetime.fromisoformat(day)
+                except ValueError:
+                    pass
+            start = base.replace(hour=0, minute=0, second=0).isoformat()
+            end = base.replace(hour=23, minute=59, second=59).isoformat()
+            evs = _ok(_req(
+                "GET", f"{self._API}/me/calendarview",
+                headers=h,
+                params={"startDateTime": start, "endDateTime": end,
+                        "$orderby": "start/dateTime", "$top": 25}),
+                "Listing events")
+            return {"ok": True, "events": [
+                {"id": e.get("id"), "title": e.get("subject", "(no title)"),
+                 "start": ((e.get("start") or {}).get("dateTime")),
+                 "end": ((e.get("end") or {}).get("dateTime"))}
+                for e in evs.get("value", [])]}
+        if action == "create_event":
+            body = {"subject": params["title"],
+                    "start": {"dateTime": params["start"], "timeZone": "Asia/Kolkata"},
+                    "end": {"dateTime": params.get("end") or params["start"],
+                            "timeZone": "Asia/Kolkata"},
+                    "body": {"contentType": "Text",
+                             "content": params.get("description", "")}}
+            e = _ok(_req("POST", f"{self._API}/me/events", headers=h,
+                         json=body), "Creating event")
+            return {"ok": True, "id": e.get("id"), "title": e.get("subject"),
+                    "start": params["start"], "link": e.get("webLink")}
+        raise AdapterError(f"Unknown action {action}")
+
+
 ADAPTERS: dict[str, Adapter] = {}
 
 
@@ -645,6 +729,7 @@ _register(WhatsAppAdapter(), "whatsapp")
 _register(LinkedInAdapter(), "linkedin")
 _register(XAdapter(), "x")
 _register(InstagramAdapter(), "instagram")
+_register(MicrosoftOutlookAdapter(), "microsoft_outlook")
 
 
 def get_adapter(connector_id: str) -> Adapter | None:

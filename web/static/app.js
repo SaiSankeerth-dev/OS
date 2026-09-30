@@ -908,11 +908,17 @@ async function openConnectorDetail(id) {
     <label>${esc(f.label || f.key)}<input type="${f.secret ? "password" : "text"}" data-cred="${esc(f.key)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off"></label>`).join("");
   const defaults = (c.defaults || []).map((f) => `
     <label>${esc(f.label || f.key)}<input type="text" data-def="${esc(f.key)}" value="${esc(f.value || "")}" placeholder="${esc(f.placeholder || "")}"></label>`).join("");
-  const isGoogle = c.auth_kind === "google_oauth";
-  const authHTML = isGoogle
-    ? `${c.needs_oauth ? `<div class="btn-row"><button class="btn-primary" id="cd-google">🔗 Connect with Google</button></div>
-       <p class="muted small" style="margin-top:8px">OAuth signs you in at Google — OS only stores the tokens, encrypted on this machine.</p>`
-      : `<div class="callout ok">Signed in with Google ✓</div>`}
+  const isOAuth = c.auth_kind === "google_oauth" || c.auth_kind === "microsoft_oauth";
+  const provider = c.auth_kind === "microsoft_oauth" ? "Microsoft" : "Google";
+  const gLogo = `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>`;
+  const msLogo = `<svg width="18" height="18" viewBox="0 0 23 23"><path fill="#f35325" d="M1 1h10.5v10.5H1z"/><path fill="#81bc06" d="M12.5 1H23v10.5H12.5z"/><path fill="#05a6f0" d="M1 12.5h10.5V23H1z"/><path fill="#ffba08" d="M12.5 12.5H23V23H12.5z"/></svg>`;
+  const logo = c.auth_kind === "microsoft_oauth" ? msLogo : gLogo;
+  const authHTML = isOAuth
+    ? `${c.needs_oauth
+      ? `<div class="btn-row"><button class="btn-oauth" id="cd-oauth">${logo}<span>Sign in with ${provider}</span></button></div>
+         <p class="muted small" style="margin-top:8px">OAuth signs you in at ${provider} — OS only stores the tokens, encrypted on this machine.</p>`
+      : `<div class="callout ok">Signed in with ${provider} ✓</div>
+         <div class="btn-row" style="margin-top:8px"><button class="btn-ghost" id="cd-oauth-again">Switch ${provider} account</button></div>`}
        ${credFields ? `<h4 style="margin:14px 0 6px">OAuth app credentials</h4><div class="cred-form">${credFields}
        <div class="btn-row"><button class="btn-primary" id="cd-save-creds">Save credentials</button></div></div>` : ""}`
     : `<div class="cred-form">${credFields || '<p class="muted">No credentials needed for this connector.</p>'}
@@ -977,13 +983,15 @@ async function openConnectorDetail(id) {
   };
   d.querySelector("#cd-revoke")?.addEventListener("click", doRevoke);
   d.querySelector("#cd-revoke-big")?.addEventListener("click", doRevoke);
-  d.querySelector("#cd-google")?.addEventListener("click", async () => {
+  const doOAuth = async () => {
     try {
       const r = await api(`/api/connectors/${id}/oauth/start`);
-      if (r.url) startOAuth(id, r.url);
-      else toast(r.detail || "OAuth not ready — save your Client ID and Secret first.");
+      if (r.url) startOAuth(id, r.url, provider);
+      else toast(r.detail || `OAuth not ready — save your ${provider} Client ID and Secret first.`);
     } catch (e) { toast("OAuth failed to start: " + e.message); }
-  });
+  };
+  d.querySelector("#cd-oauth")?.addEventListener("click", doOAuth);
+  d.querySelector("#cd-oauth-again")?.addEventListener("click", doOAuth);
   d.querySelector("#cd-save-creds")?.addEventListener("click", async () => {
     const vals = {};
     d.querySelectorAll("[data-cred]").forEach((i) => { vals[i.dataset.cred] = i.value; });
@@ -1014,13 +1022,13 @@ async function openConnectorDetail(id) {
   }));
 }
 
-function startOAuth(id, url) {
+function startOAuth(id, url, provider) {
   const w = window.open(url, "oauth", "width=520,height=640");
   const onMsg = (e) => {
     if (e.data && (e.data.oauth_done || e.data.type === "oauth-done")) {
       window.removeEventListener("message", onMsg);
       w && w.close();
-      toast("Google connected ✓");
+      toast(`${provider || "Google"} connected ✓`);
       openConnectorDetail(id); loadConnectors($("#conn-search").value);
     }
   };

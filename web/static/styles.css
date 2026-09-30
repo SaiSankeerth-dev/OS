@@ -129,6 +129,14 @@ img { user-select: none; }
 .btn-primary { width: 100%; border: 0; border-radius: 14px; padding: 13px; font-size: 14px; font-weight: 700; color: #fff;
   background: var(--grad); margin-top: 12px; box-shadow: 0 6px 18px rgba(124, 92, 246, .35); transition: transform .12s, box-shadow .12s; }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(124, 92, 246, .45); }
+/* Branded OAuth sign-in buttons (Google / Microsoft guidelines: white, logo, dark text) */
+.btn-oauth { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #1f1f1f;
+  border: 1px solid #dadce0; border-radius: 14px; padding: 12px 22px; font-size: 14px; font-weight: 600;
+  font-family: "Roboto", system-ui, sans-serif; cursor: pointer; margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(60, 64, 67, .12); transition: box-shadow .12s, transform .12s; }
+.btn-oauth:hover { box-shadow: 0 4px 14px rgba(60, 64, 67, .22); transform: translateY(-1px); }
+.btn-oauth:active { background: #f6fafe; }
+[data-theme="dark"] .btn-oauth { background: #fff; }
 .btn-auto { width: auto !important; margin-top: 0 !important; padding: 11px 22px !important; }
 .btn-ghost { width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 12px;
   font-size: 13.5px; font-weight: 600; margin-top: 8px; color: var(--ink); }
