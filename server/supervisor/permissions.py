@@ -35,6 +35,10 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "memory_recall": ToolPolicy.ALLOW,
     "memory_forget": ToolPolicy.ALLOW,
     "calc": ToolPolicy.ALLOW,
+    # Real internet, read-only: search and page reads have no external
+    # effect, so they run straight through like the other read tools.
+    "web_search": ToolPolicy.ALLOW,
+    "web_read": ToolPolicy.ALLOW,
 }
 
 

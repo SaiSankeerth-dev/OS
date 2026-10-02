@@ -22,6 +22,8 @@ TOOL_SKILLS: dict[str, tuple[str, tuple[str, ...]]] = {
     "memory_recall": ("memory", ("memory:read",)),
     "memory_forget": ("memory", ("memory:write",)),
     "calc": ("calc", ("calc:eval",)),
+    "web_search": ("websearch", ("web:search",)),
+    "web_read": ("webread", ("web:read",)),
 }
 
 

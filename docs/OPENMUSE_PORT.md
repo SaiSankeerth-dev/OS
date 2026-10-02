@@ -99,4 +99,23 @@ Verification (2026-10-02):
 - 14 live HTTP route checks: all passed (mail-rules CRUD/seed/scan, retry create/fail/schedule/sweep, 4 PWA static assets).
 - Headless Chromium UI check: mail card renders, Gmail status shows, seed/scan buttons work, zero page errors.
 - No regressions in `test_om_phases2_6.py` + `test_om_batch3.py` (the 5 `test_om_batch2.py` OCR failures in this fresh VM are the missing tesseract binary — code unchanged since they passed 2026-09-30; install with `sudo apt install tesseract-ocr`).
-""""""
+
+## Real internet for the assistant (2026-10-02)
+
+The chat could not touch the real internet: no search tool, no page reader,
+and the supervisor blocked anything unregistered. Now:
+
+- **`web_search` tool** (`server/tools/websearch_tool.py`): free DuckDuckGo search, no API key. Primary: DDG html results; fallback: DDG Instant Answer API (used automatically when DDG rate-limits the html endpoint). Read-only, 1–8 results, 20s timeout.
+- **`web_read` tool** (`server/tools/webread_tool.py`): fetch any http(s) URL, return title + up to 8000 chars of text. Read-only; page content is data, never instructions.
+- **Skills**: `skills/websearch_skill/` and `skills/webread_skill/` (SKILL.md contracts, `status: active`), auto-loaded by the SkillLoader.
+- **Intent routing** (Laya, no LLM needed): "search the web for X" / "google X" / "look up X" → `web_search`; "read/open/fetch <url>" → `web_read`.
+- **Supervisor**: both tools registered in scope (`web:search`, `web:read`) with `ALLOW` policy — read-only, no external effect, no approval needed.
+
+Verified end-to-end through `ConversationManager` with NO language model:
+"search the web for Python programming language" → live DDG results;
+"read https://example.com" → live page text. Tool commands work even while
+Ollama is down; open chat still needs `ollama pull qwen3:8b` on sai's machine
+(this VM has ~676MB RAM free — a model cannot run here).
+
+- `tests/test_web_internet.py`: 14 passed (live search, live read, bad URLs, skill registration, 7 intent patterns, no false positives on datetime/memory, supervisor allow).
+"""""""""

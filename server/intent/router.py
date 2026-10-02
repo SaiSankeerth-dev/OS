@@ -140,6 +140,29 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "calc",
     ),
     (
+        # Real internet: web search. "search the web for X", "google X",
+        # "look up X". Read-only, free, no key.
+        re.compile(
+            r"^\s*(?:search(?:\s+the\s+web)?|google|look\s*up)"
+            r"\s+(?:for\s+)?(.+?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "web_search",
+    ),
+    (
+        # Real internet: read a page. "read https://...", "open <url>".
+        # Read-only; page content is data, never instructions.
+        re.compile(
+            r"^\s*(?:read|open|fetch)\s+"
+            r"(?:(?:this|the)\s+page\s*[:\-]?\s*)?"
+            r"(https?://\S+)\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "web_read",
+    ),
+    (
         # Phase 9: user-facing permissions. "allow the calculator",
         # "ask me before linkedin", "deny the echo server".
         # Order: before PERSONA; no overlap with existing patterns.
@@ -217,6 +240,8 @@ _TOOL_ARG = {
     "memory_recall": "query",
     "memory_forget": "query",
     "calc": "expression",
+    "web_search": "query",
+    "web_read": "url",
 }
 
 
