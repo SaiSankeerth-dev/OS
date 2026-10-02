@@ -277,9 +277,6 @@ async function sendMessage(text) {
 
 $("#send-btn").addEventListener("click", () => sendMessage($("#chat-input").value));
 $("#chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(e.target.value); });
-$$("#chips button").forEach((b) => b.addEventListener("click", () => { if (b.dataset.chip) sendMessage(b.dataset.chip); }));
-$$("#action-cards .acard").forEach((b) => b.addEventListener("click", () => sendMessage(b.dataset.prompt)));
-$$(".rel-action").forEach((b) => b.addEventListener("click", () => sendMessage(b.dataset.rel)));
 $$(".quick-actions button").forEach((b) => b.addEventListener("click", () => {
   const qa = b.dataset.qa;
   if (qa === "newtask") { switchView("tasks"); $("#task-add").hidden = false; $("#task-input").focus(); }
