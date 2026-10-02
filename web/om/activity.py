@@ -11,9 +11,15 @@ caller's job (the chat agent, a cron, etc.); the service records outcomes.
 Ideas and goals are the lightweight planning surfaces OpenMuse ships:
 ideas are captured with evidence and can be accepted (→ goal), edited, or
 dismissed; goals track milestones.
+
+Retry engine: a run can carry a retry policy (max retries + base backoff).
+When it fails, the next retry is scheduled with exponential backoff and a
+background sweeper thread automatically moves due runs back to running.
 """
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any
 
 from .store import OmStore, jdumps, jloads, now
@@ -46,19 +52,41 @@ class ActivityService:
         self.store = store or OmStore()
 
     # -- runs ------------------------------------------------------------
-    def create_run(self, title: str, steps: list[str] | None = None) -> dict:
+    def create_run(self, title: str, steps: list[str] | None = None,
+                   retry_policy: dict | None = None) -> dict:
         plan = [{"name": s, "status": "pending"} for s in (steps or [])]
+        policy = self._clean_policy(retry_policy)
+        receipt: dict[str, Any] = {"current_step": 0}
+        if policy:
+            receipt["retry"] = {"max": policy["max_retries"],
+                                "backoff": policy["backoff_s"],
+                                "count": 0, "next_at": None}
         run = self.store.insert("runs", {
             "title": title.strip() or "Untitled run",
             "plan": jdumps(plan),
             "status": "planned",
-            "receipt": jdumps({"current_step": 0}),
+            "receipt": jdumps(receipt),
             "created_at": now(),
             "updated_at": now(),
         })
         self._event(run["id"], "created",
                     {"message": f"Run created with {len(plan)} step(s)."})
+        if policy:
+            self._event(run["id"], "note", {
+                "message": f"Retry policy: up to {policy['max_retries']} "
+                           f"retries, {policy['backoff_s']}s base backoff."})
         return self._public(run)
+
+    @staticmethod
+    def _clean_policy(p: dict | None) -> dict | None:
+        if not isinstance(p, dict):
+            return None
+        try:
+            mx = max(0, int(p.get("max_retries", 0)))
+            bo = max(0, int(p.get("backoff_s", 60)))
+        except (TypeError, ValueError):
+            return None
+        return {"max_retries": mx, "backoff_s": bo} if mx > 0 else None
 
     def get_run(self, rid: str) -> dict:
         run = self.store.get("runs", rid)
@@ -85,10 +113,59 @@ class ActivityService:
                                 {"status": to, "updated_at": now()})
         self._event(rid, "status", {"message": f"{frm} → {to}"})
         if to == "failed":
-            self._event(rid, "note", {
-                "message": "Run failed. Fix the cause, then retry "
-                           "(failed → running)."})
+            self._schedule_retry(rid)
+            run = self.store.get("runs", rid)  # re-read: retry may be scheduled
         return self._public(run)
+
+    def _schedule_retry(self, rid: str) -> None:
+        """Schedule the next automatic retry (exponential backoff)."""
+        run = self.store.get("runs", rid)
+        receipt = jloads((run or {}).get("receipt"), {}) or {}
+        retry = receipt.get("retry")
+        if not isinstance(retry, dict):
+            self._event(rid, "note", {"message":
+                "Run failed. Fix the cause, then retry (failed → running)."})
+            return
+        if retry.get("next_at"):
+            return  # a retry is already scheduled
+        count, mx = retry.get("count", 0), retry.get("max", 0)
+        if count >= mx:
+            self._event(rid, "note", {"message":
+                "Retry budget exhausted — retry manually if needed."})
+            return
+        delay = retry.get("backoff", 60) * (2 ** count)
+        retry["next_at"] = now() + delay
+        self.store.update("runs", rid, {"receipt": jdumps(receipt)})
+        self._event(rid, "retry_scheduled",
+                    {"message": f"Retry {count + 1}/{mx} scheduled in {delay}s."})
+
+    def sweep_retries(self) -> list[str]:
+        """Move due failed runs back to running. Returns retried run ids."""
+        retried = []
+        for run in self.store.list("runs", "status = ?", ("failed",),
+                                   order="updated_at DESC", limit=200):
+            receipt = jloads(run.get("receipt"), {}) or {}
+            retry = receipt.get("retry")
+            if not isinstance(retry, dict):
+                continue
+            nxt = retry.get("next_at")
+            if nxt is None or nxt > now():
+                continue
+            if retry.get("count", 0) >= retry.get("max", 0):
+                continue
+            rid = run["id"]
+            retry["count"] = retry.get("count", 0) + 1
+            retry["next_at"] = None
+            self.store.update("runs", rid, {
+                "status": "running",
+                "receipt": jdumps(receipt),
+                "updated_at": now(),
+            })
+            self._event(rid, "status", {"message": "failed → running"})
+            self._event(rid, "note", {"message":
+                f"Automatic retry {retry['count']}/{retry['max']} started."})
+            retried.append(rid)
+        return retried
 
     def step(self, rid: str, index: int, status: str,
              note: str = "") -> dict:
@@ -257,3 +334,37 @@ class ActivityService:
             "goal_milestones", "goal_id = ?", (goal["id"],),
             order="created_at ASC", limit=50)
         return goal
+
+
+# ---------------------------------------------------------------------------
+# Retry sweeper — background daemon thread that fires due automatic retries.
+# ---------------------------------------------------------------------------
+_sweeper_thread: threading.Thread | None = None
+_sweeper_lock = threading.Lock()
+
+
+def start_retry_sweeper(store: OmStore | None = None,
+                        interval_s: int = 30) -> threading.Thread | None:
+    """Start the daemon thread that fires due automatic retries.
+
+    Idempotent: returns the running thread if already started.
+    """
+    global _sweeper_thread
+    with _sweeper_lock:
+        if _sweeper_thread is not None and _sweeper_thread.is_alive():
+            return _sweeper_thread
+
+        def _loop() -> None:
+            svc = ActivityService(store)
+            while True:
+                try:
+                    svc.sweep_retries()
+                except Exception:
+                    pass
+                time.sleep(interval_s)
+
+        _sweeper_thread = threading.Thread(target=_loop,
+                                           name="om-retry-sweeper",
+                                           daemon=True)
+        _sweeper_thread.start()
+        return _sweeper_thread

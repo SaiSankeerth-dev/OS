@@ -4,11 +4,12 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
-from .activity import ActivityError, ActivityService
+from .activity import ActivityError, ActivityService, start_retry_sweeper
 from .browser import BrowserError, BrowserService
 from .computer import ComputerError, get_computer
 from .documents import DocumentError, DocumentService
 from .finance import FinanceError, FinanceService
+from .mailrules import MailRulesError, MailRulesService
 from .notify import NotifyError, NotifyService
 from .store import OmStore
 from .threads import ThreadError, ThreadService
@@ -267,7 +268,16 @@ async def activity_create_run(request: Request):
     body = await _body(request)
     try:
         return _activity().create_run(body.get("title", ""),
-                                      body.get("steps", []))
+                                      body.get("steps", []),
+                                      body.get("retry_policy"))
+    except Exception as e:
+        raise _err(e)
+
+
+@router.post("/activity/runs/retry-sweep")
+def activity_retry_sweep():
+    try:
+        return {"retried": _activity().sweep_retries()}
     except Exception as e:
         raise _err(e)
 
@@ -378,6 +388,63 @@ def ideas_accept(iid: str):
 def ideas_delete(iid: str):
     try:
         _activity().delete_idea(iid)
+        return {"ok": True}
+    except Exception as e:
+        raise _err(e)
+
+
+# ---------------------------------------------------------------- mail rules
+def _mailrules() -> MailRulesService:
+    return MailRulesService(_store_get())
+
+
+@router.get("/activity/mail-rules/gmail-status")
+def mailrules_gmail_status():
+    try:
+        return _mailrules().gmail_status()
+    except Exception as e:
+        raise _err(e)
+
+
+@router.get("/activity/mail-rules")
+def mailrules_list():
+    try:
+        return _mailrules().list_rules()
+    except Exception as e:
+        raise _err(e)
+
+
+@router.post("/activity/mail-rules", status_code=201)
+async def mailrules_create(request: Request):
+    body = await _body(request)
+    try:
+        return _mailrules().add_rule(body.get("name", ""), body.get("query", ""),
+                                     body.get("keywords", []),
+                                     body.get("kind", "general"))
+    except Exception as e:
+        raise _err(e)
+
+
+@router.post("/activity/mail-rules/seed", status_code=201)
+def mailrules_seed():
+    try:
+        return _mailrules().seed_defaults()
+    except Exception as e:
+        raise _err(e)
+
+
+@router.post("/activity/mail-rules/scan")
+def mailrules_scan():
+    try:
+        return _mailrules().scan()
+    except Exception as e:
+        raise _err(e)
+
+
+@router.delete("/activity/mail-rules/{rid}")
+def mailrules_delete(rid: str):
+    try:
+        _mailrules().delete_rule(rid)
         return {"ok": True}
     except Exception as e:
         raise _err(e)

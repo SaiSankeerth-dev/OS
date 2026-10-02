@@ -1371,6 +1371,7 @@ async function loadActivity() {
         <span class="pill ${ACT_COLORS[r.status] || ""}">${esc(r.status)}</span>
         <strong class="grow">${esc(r.title)}</strong>
         <span class="muted small">${r.plan.filter((s) => s.status === "done").length}/${r.plan.length} steps</span>
+        ${r.receipt && r.receipt.retry ? `<span class="muted small" title="Automatic retry policy">🔁 ${r.receipt.retry.count}/${r.receipt.retry.max}${r.receipt.retry.next_at ? ` · next in ${Math.max(0, Math.round(r.receipt.retry.next_at - Date.now() / 1000))}s` : ""}</span>` : ""}
       </div>
       <div class="stack" style="margin:8px 0">${r.plan.map((s, i) => `
         <div class="row gap"><span>${s.status === "done" ? "✅" : s.status === "failed" ? "❌" : s.status === "running" ? "▶️" : "⬜"}</span>
@@ -1407,7 +1408,11 @@ $("#act-new").addEventListener("click", async () => {
   const title = prompt("Run title:");
   if (!title) return;
   const steps = (prompt("Steps (comma separated):") || "").split(",").map((s) => s.trim()).filter(Boolean);
-  try { await api("/api/om/activity/runs", { method: "POST", body: JSON.stringify({ title, steps }) }); loadActivity(); }
+  const rp = prompt("Auto-retry? Format: retries x base-seconds, e.g. 3x60 (Enter to skip):") || "";
+  let retry_policy = null;
+  const m = rp.match(/(\d+)\s*x\s*(\d+)/i);
+  if (m) retry_policy = { max_retries: +m[1], backoff_s: +m[2] };
+  try { await api("/api/om/activity/runs", { method: "POST", body: JSON.stringify({ title, steps, retry_policy }) }); loadActivity(); }
   catch (e) { toast(e.message); }
 });
 async function loadIdeas() {
@@ -1430,7 +1435,52 @@ async function loadIdeas() {
       await api(`/api/om/ideas/${b.dataset.delidea}`, { method: "DELETE" }); loadActivity();
     }));
   } catch (e) { $("#idea-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+  loadMailRules();
 }
+/* ---------------- mail rules ---------------- */
+async function loadMailRules() {
+  try {
+    const st = await api("/api/om/activity/mail-rules/gmail-status");
+    $("#mail-status").textContent = st.connected ? `✅ ${st.detail}` : `⚠️ ${st.detail}`;
+  } catch (e) { $("#mail-status").textContent = "could not check"; }
+  try {
+    const rules = await api("/api/om/activity/mail-rules");
+    $("#mail-rules").innerHTML = rules.length ? rules.map((r) => `
+      <div class="row gap"><span class="pill">🔎</span>
+        <div class="grow"><b>${esc(r.name)}</b> <span class="muted small">${esc(r.kind)} · query: ${esc(r.query || "—")}</span><br>
+        <span class="muted small">keywords: ${r.keywords.map(esc).join(", ")}</span></div>
+        <button class="btn-ghost btn-auto" data-mrdel="${r.id}">✕</button>
+      </div>`).join("") : `<p class="muted">No rules yet. Add starter rules or create your own.</p>`;
+    $$("#mail-rules [data-mrdel]").forEach((b) => b.addEventListener("click", async () => {
+      await api(`/api/om/activity/mail-rules/${b.dataset.mrdel}`, { method: "DELETE" });
+      loadMailRules();
+    }));
+  } catch (e) { $("#mail-rules").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+$("#mail-seed").addEventListener("click", async () => {
+  try { await api("/api/om/activity/mail-rules/seed", { method: "POST" }); toast("Starter rules added."); loadMailRules(); }
+  catch (e) { toast(e.message); }
+});
+$("#mrule-add").addEventListener("click", async () => {
+  const name = $("#mrule-name").value.trim();
+  const query = $("#mrule-query").value.trim();
+  const keywords = $("#mrule-kw").value.split(",").map((s) => s.trim()).filter(Boolean);
+  if (!name || !keywords.length) { toast("Name + at least one keyword needed."); return; }
+  try {
+    await api("/api/om/activity/mail-rules", { method: "POST", body: JSON.stringify({ name, query, keywords }) });
+    $("#mrule-name").value = $("#mrule-query").value = $("#mrule-kw").value = "";
+    loadMailRules();
+  } catch (e) { toast(e.message); }
+});
+$("#mail-scan").addEventListener("click", async () => {
+  try {
+    toast("Scanning Gmail…");
+    const r = await api("/api/om/activity/mail-rules/scan", { method: "POST" });
+    const n = r.created.filter((c) => c.idea_id).length;
+    toast(`Scanned ${r.scanned} emails — ${n} new idea draft${n === 1 ? "" : "s"}.`);
+    loadActivity();
+  } catch (e) { toast("Scan failed: " + e.message); }
+});
 $("#idea-add").addEventListener("click", async () => {
   const title = $("#idea-title").value.trim();
   if (!title) return;
@@ -1717,3 +1767,10 @@ setInterval(refreshPerms, 20000);
 setInterval(refreshNotifBadge, 30000);
 refreshNotifBadge();
 switchView("chat");
+
+/* ---------------- PWA: service worker ---------------- */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+  });
+}

@@ -6,6 +6,12 @@
 <title>OS — Your Personal AI Assistant</title>
 <link rel="stylesheet" href="/static/styles.css">
 <link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#7c6cf0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <!-- system fonts only — no external requests -->
 </head>
 <body>
@@ -381,6 +387,21 @@
             <button class="btn-ghost btn-auto" id="idea-add">Add</button>
           </div>
           <div id="idea-list" class="stack"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📧 Mail → Ideas <span class="muted small" id="mail-status">checking…</span></div>
+          <p class="muted small">Keyword rules scan your Gmail and draft ideas (with the email as evidence) for you to accept, edit, or dismiss. Nothing is sent anywhere.</p>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="mail-scan">Scan Gmail now</button>
+            <button class="btn-ghost btn-auto" id="mail-seed">Add starter rules</button>
+          </div>
+          <div id="mail-rules" class="stack" style="margin-top:8px"></div>
+          <div class="row gap" style="margin-top:8px">
+            <input id="mrule-name" class="grow" placeholder="Rule name" />
+            <input id="mrule-query" class="grow" placeholder="Gmail query (e.g. newer_than:7d)" />
+            <input id="mrule-kw" class="grow" placeholder="Keywords, comma separated" />
+            <button class="btn-ghost btn-auto" id="mrule-add">Add rule</button>
+          </div>
         </div>
         <div class="card">
           <div class="card-title">🎯 Goals</div>

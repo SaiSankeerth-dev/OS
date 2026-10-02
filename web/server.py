@@ -971,5 +971,13 @@ async def upload(file: UploadFile) -> dict:
 def run(port: int = 3000, host: str = "127.0.0.1") -> None:
     import uvicorn
 
+    # Background retry sweeper for activity runs (daemon thread, local only).
+    try:
+        from web.om.activity import start_retry_sweeper
+        from web.om.store import OmStore
+        start_retry_sweeper(OmStore(), interval_s=30)
+    except Exception:
+        pass
+
     print(f"\n  ◉ OS Dashboard → http://localhost:{port}\n")
     uvicorn.run(app, host=host, port=port, log_level="warning")
