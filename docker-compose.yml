@@ -1,0 +1,36 @@
+services:
+  os-dashboard:
+    build: .
+    image: os-dashboard:latest
+    container_name: os-dashboard
+    # Dashboard binds 0.0.0.0 inside the container; published on localhost only.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # All persistent state lives here: dashboard DB (with the encrypted
+      # credential vault), the local vault key, memory and logs.
+      - os-data:/app/data
+    # To pin the vault encryption key instead of the generated machine-local
+    # one, add an environment block like:
+    #   environment:
+    #     OS_DASHBOARD_KEY: "your-secret-key"
+    # Keep the value secret and backed up — losing it locks you out of
+    # stored credentials.
+    #
+    # Full-chat needs Ollama. Inside Docker, "localhost" is the container, not
+    # your machine — so to use Ollama installed on your computer:
+    #   1) Install Ollama: https://ollama.com  →  run: ollama pull qwen3:8b
+    #   2) Add to the environment block: OLLAMA_BASE_URL: http://host.docker.internal:11434
+    #   3) docker compose up --build
+    # Without it the dashboard still works (connectors, tasks, drafts) — chat
+    # just explains that the language model isn't reachable instead of failing.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/api/me', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  os-data:

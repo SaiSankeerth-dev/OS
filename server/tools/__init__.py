@@ -1,0 +1,1 @@
+"""OS tools: deterministic, structured-result helpers for the router."""

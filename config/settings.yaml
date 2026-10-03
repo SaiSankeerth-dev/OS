@@ -1,0 +1,154 @@
+# OS configuration. Local overrides go in `local.yaml` (gitignored).
+
+llm:
+  provider: ollama
+  base_url: http://localhost:11434
+  model: qwen3:8b
+  # Nano temperature keeps spoken replies coherent; tune later.
+  temperature: 0.6
+  # Max tokens per conversational reply. Keep short for voice.
+  max_tokens: 256
+  # Stop generation early if model emits these (we strip them in a stream too).
+  stop: []
+  request_timeout_sec: 120
+
+conversation:
+  # Three-layer context window (Section 31).
+  max_recent_messages: 12
+  max_relevant_memories: 4
+  max_task_context_chars: 2000
+
+personality:
+  # Section 19. Style traits converge into the system prompt.
+  name: JARVIS
+  traits:
+    - calm
+    - precise
+    - unfailingly polite
+    - addresses the user as "sir"
+    - dry, understated wit
+    - unflappable
+    - concise
+    - context-aware
+    - confident
+    - helpful
+    - not robotic
+    - does not repeat itself
+    - does not over-explain simple things
+    - can ask follow-up questions naturally
+  # Section 21. Phrases forbidden to keep the assistant from sounding robotic.
+  # These are prefatory/filler phrases the model should NOT preface answers with.
+  # We do NOT block legitimate English ("it is", "today is") — only filler.
+  forbidden_phrases:
+    - "Based on the available conversation context"
+    - "Certainly."
+    - "Understood."
+    - "Your request has been received."
+    - "Processing..."
+    - "Task completed successfully."
+
+logging:
+  level: INFO
+  file: logs/os.log
+  # Per-Section-37 latency capture for the debug dashboard.
+  perf_file: logs/perf.jsonl
+
+tools:
+  enabled:
+    - get_current_datetime
+    - get_system_info
+
+voice:
+  # Audio I/O (sounddevice). `null` = system default device; a string matches
+  # by device-name substring, an int selects by device index.
+  input_device: null
+  output_device: null
+  sample_rate_in: 16000
+  sample_rate_out: 24000
+  channels: 1
+  chunk_ms: 64
+  # VAD: "silero" preferred, "energy" fallback is automatic if Silero is missing.
+  vad_backend: silero
+  vad_threshold: 0.5
+  # AEC: "nlms" or "passthrough".
+  aec: nlms
+  aec_filter_len: 256
+  # Auto barge-in: consecutive speech chunks while SPEAKING before interrupt.
+  barge_in_chunks: 4
+  # STT (faster-whisper)
+  stt_model: small
+  stt_device: cpu
+  stt_compute_type: int8
+  stt_language: null
+  # TTS
+  tts_engine: pocket-tts
+
+mcp:
+  # Phase 8: MCP tool bus. Local stdio subprocesses only - no remote
+  # transports. Disabled by default; each server allowlists exactly the
+  # tools OS may call. mode: "allow" or "approval" (default).
+  enabled: false
+  servers:
+    # Example (kept disabled by default):
+    # - name: echo
+    #   command: ["python", "server/mcpbus/servers/echo_server.py"]
+    #   allowed_tools: ["echo", "add"]
+    #   mode: allow
+
+approvals:
+  # Phase 10: approval engine. A pending approval auto-expires after
+  # timeout_sec (logged EXPIRED, nothing executes). max_pending caps the
+  # queue; the newest request is refused when the queue is full.
+  timeout_sec: 1800
+  max_pending: 10
+
+browser:
+  # Primary: agent-browser CLI (Vercel). Fallback: Playwright.
+  prefer_playwright: false
+  # Session timeout in seconds before auto-close.
+  session_timeout_sec: 300
+
+research:
+  # Research routing: "auto", "quick" (DDGS only), or "deep" (GPT Researcher).
+  default_mode: auto
+  # GPT Researcher LLM config (format: provider:model_name).
+  # Uses OS's default Ollama model if not set.
+  fast_llm: null
+  smart_llm: null
+  strategic_llm: null
+  # Web search retriever: "duckduckgo" (free) or "tavily", "google", etc.
+  retriever: duckduckgo
+  # Max sources for deep research.
+  max_sources: 10
+
+scheduler:
+  # Background scheduler for proactive jobs.
+  enabled: true
+  # SQLite job store path (relative to OS root).
+  job_store_path: data/scheduler_jobs.db
+  # Per-job overrides. Omit a job to use defaults.
+  jobs:
+    morning_plan:
+      enabled: true
+      cron: "0 8 * * *"
+    email_scan:
+      enabled: true
+      cron: "*/15 * * * *"
+    deadline_check:
+      enabled: true
+      cron: "0 * * * *"
+    approval_nag:
+      enabled: true
+      cron: "*/10 * * * *"
+    watcher_eval:
+      enabled: true
+      cron: "*/30 * * * *"
+
+gstack:
+  # Coding/QA/design skill workflows via gstack.
+  enabled: false
+  # Path to gstack installation directory.
+  install_dir: null
+  # Default workspace for gstack skills.
+  workspace_dir: null
+
