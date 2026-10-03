@@ -17,3 +17,5 @@ config/secrets.yaml
 .idea/
 .vscode/
 data/
+node_modules/
+frontend/node_modules/

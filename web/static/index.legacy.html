@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS — Your Personal AI Assistant</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#7c6cf0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<!-- system fonts only — no external requests -->
+</head>
+<body>
+
+<!-- ============ BOOT SPLASH ============ -->
+<div id="boot">
+  <img class="boot-logo" src="/static/logo.png" alt="OS">
+  <div class="boot-name">OS</div>
+  <div class="boot-sub">YOUR PERSONAL AI ASSISTANT</div>
+  <div class="boot-tag">Think&nbsp;&nbsp;•&nbsp;&nbsp;Plan&nbsp;&nbsp;•&nbsp;&nbsp;Build&nbsp;&nbsp;•&nbsp;&nbsp;Automate</div>
+  <div class="boot-bar"><div class="boot-fill"></div></div>
+</div>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img class="logo-img" src="/static/logo.png" alt="OS logo">
+      <div class="logo-name">OS</div>
+      <div class="logo-sub">YOUR PERSONAL AI ASSISTANT</div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-view="home"><span class="nav-ico">🏠</span>Home</button>
+      <button class="nav-item" data-view="chat"><span class="nav-ico">💬</span>Chat</button>
+      <button class="nav-item" data-view="commitments"><span class="nav-ico">🎯</span>Commitments<span class="badge" id="badge-commitments"></span></button>
+      <button class="nav-item" data-view="tasks"><span class="nav-ico">☑</span>Tasks<span class="badge" id="badge-tasks"></span></button>
+      <button class="nav-item" data-view="plan"><span class="nav-ico">📅</span>Plan</button>
+      <button class="nav-item" data-view="agents"><span class="nav-ico">🤖</span>Agents<span class="badge" id="badge-agents"></span></button>
+      <button class="nav-item" data-view="approvals"><span class="nav-ico">🛡️</span>Approvals<span class="badge" id="badge-approvals"></span></button>
+      <button class="nav-item" data-view="projects"><span class="nav-ico">📁</span>Projects</button>
+      <button class="nav-item" data-view="people"><span class="nav-ico">👥</span>People</button>
+      <button class="nav-item" data-view="memory"><span class="nav-ico">🧠</span>Memory</button>
+      <button class="nav-item" data-view="browser"><span class="nav-ico">🌐</span>Browser</button>
+      <button class="nav-item" data-view="computer"><span class="nav-ico">💻</span>Computer</button>
+      <button class="nav-item" data-view="activity"><span class="nav-ico">🏃</span>Activity</button>
+      <button class="nav-item" data-view="files"><span class="nav-ico">🗂</span>Files</button>
+      <button class="nav-item" data-view="notifications"><span class="nav-ico">🔔</span>Inbox<span class="badge" id="badge-notif"></span></button>
+    </nav>
+
+    <div class="quick-label">QUICK ACTIONS</div>
+    <div class="quick-actions">
+      <button data-qa="newtask">＋ New Task</button>
+      <button data-qa="ask">✦ Ask OS</button>
+      <button data-qa="draft">📝 Draft Content</button>
+      <button data-qa="code">⟨/⟩ Analyze Code</button>
+      <button data-qa="plan">📅 Plan My Day</button>
+    </div>
+
+    <div class="user-card">
+      <div class="avatar">S</div>
+      <div class="user-meta">
+        <div class="user-name" id="user-name">sai</div>
+        <div class="user-mode" id="user-mode">Builder Mode ▾</div>
+        <div class="user-online"><span class="dot"></span>Online</div>
+      </div>
+      <button class="gear" title="Settings">⚙</button>
+    </div>
+  </aside>
+  <button class="nav-scrim" id="nav-scrim" aria-hidden="true" tabindex="-1"></button>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menu-btn" title="Menu">☰</button>
+      <div class="greet">
+        <img class="greet-logo" src="/static/logo.png" alt="">
+        <div>
+          <div class="greet-title" id="greet-title">Good morning, sai ☀️</div>
+          <div class="greet-sub">Ready to think, plan, build and grow with you.</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="searchbox" id="open-palette">🔍 <span>Search anything…</span> <kbd>Ctrl K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" title="Toggle theme">☀️</button>
+        <button class="icon-btn" id="grid-btn" title="Connectors">▦</button>
+        <button class="icon-btn avatar-sm" title="Settings">◐</button>
+      </div>
+    </header>
+
+    <div class="views">
+      <!-- ===== HOME VIEW (PRIMARY SCREEN) ===== -->
+      <section class="view active" id="view-home">
+        <div class="dash-view">
+          <div class="dash-hero-card">
+            <div class="dash-hero-left">
+              <span class="badge" style="background:#7c5cf6;color:#fff;">CONTROL PLANE</span>
+              <h2 id="home-greeting">Good evening, Sai</h2>
+              <p class="muted">What matters right now across your commitments, tasks, and agents.</p>
+            </div>
+            <div class="dash-hero-right">
+              <button class="btn-primary" id="btn-home-replan">⚡ Replan Day</button>
+              <button class="btn-secondary" id="btn-home-sync">🔄 Ingest Sources</button>
+            </div>
+          </div>
+
+          <div class="dash-grid-2">
+            <!-- 1. NOW & NEXT -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">🎯</span>
+                <div><b>Next Recommended Action</b><div class="muted">Highest operational priority</div></div>
+              </div>
+              <div id="home-next-action" class="card-highlight">
+                <p class="muted">Loading next action...</p>
+              </div>
+            </div>
+
+            <!-- 2. TODAY'S SCHEDULED WORK -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">📅</span>
+                <div><b>Today's Scheduled Work</b><div class="muted">Allocated execution windows</div></div>
+                <button class="btn-sm" id="btn-view-plan-all" style="margin-left:auto;">View Full Plan →</button>
+              </div>
+              <div id="home-plan-list" class="item-list">
+                <p class="muted">No tasks planned yet today.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-grid-3">
+            <!-- 3. WAITING ITEMS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">⏳</span>
+                <div><b>Waiting For</b><div class="muted">Dependencies on people & events</div></div>
+              </div>
+              <div id="home-waiting-list" class="item-list">
+                <p class="muted">Nothing currently waiting.</p>
+              </div>
+            </div>
+
+            <!-- 4. BLOCKED ITEMS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">🚫</span>
+                <div><b>Blocked Items</b><div class="muted">Requires resolution</div></div>
+              </div>
+              <div id="home-blocked-list" class="item-list">
+                <p class="muted">No blocked items.</p>
+              </div>
+            </div>
+
+            <!-- 5. UPCOMING DEADLINES -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">⚠️</span>
+                <div><b>Upcoming Deadlines</b><div class="muted">Immutable external targets</div></div>
+              </div>
+              <div id="home-deadlines-list" class="item-list">
+                <p class="muted">No urgent deadlines.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-grid-2">
+            <!-- 6. ACTIVE SPECIALIZED AGENTS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">🤖</span>
+                <div><b>Specialized Workers</b><div class="muted">OpenCode, Browser, Research</div></div>
+                <button class="btn-sm" id="btn-dispatch-modal" style="margin-left:auto;">+ Dispatch</button>
+              </div>
+              <div id="home-agents-list" class="item-list">
+                <p class="muted">No active agent runs.</p>
+              </div>
+            </div>
+
+            <!-- 7. PENDING APPROVALS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon">🛡️</span>
+                <div><b>Governance & Approvals</b><div class="muted">Bound arguments hash verification</div></div>
+              </div>
+              <div id="home-approvals-list" class="item-list">
+                <p class="muted">No approvals waiting.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 8. OPERATIONAL ACTIVITY -->
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-icon">🏃</span>
+              <div><b>Operational Activity Log</b><div class="muted">Provenance of events, plans, and verifications</div></div>
+            </div>
+            <div id="home-activity-list" class="activity-timeline">
+              <p class="muted">Loading activity...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== COMMITMENTS VIEW ===== -->
+      <section class="view" id="view-commitments">
+        <div class="dash-view">
+          <div class="dash-hero-card">
+            <div>
+              <h2>Commitments</h2>
+              <p class="muted">Things you have agreed, promised, or are expected to accomplish.</p>
+            </div>
+            <button class="btn-primary" id="btn-new-commitment">+ New Commitment</button>
+          </div>
+          <div class="panel">
+            <div id="commitments-list" class="item-list">Loading commitments...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PLAN VIEW ===== -->
+      <section class="view" id="view-plan">
+        <div class="dash-view">
+          <div class="dash-hero-card">
+            <div>
+              <h2>Execution Plan</h2>
+              <p class="muted">Allocated work slots protecting your deadlines without silent shifts.</p>
+            </div>
+            <button class="btn-primary" id="btn-plan-generate">⚡ Recalculate Plan</button>
+          </div>
+          <div class="panel">
+            <div id="plan-full-list" class="item-list">Loading plan...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== AGENTS VIEW ===== -->
+      <section class="view" id="view-agents">
+        <div class="dash-view">
+          <div class="dash-hero-card">
+            <div>
+              <h2>Specialized Agents Control Center</h2>
+              <p class="muted">OpenCode (Coding/Terminal), Browser Use (Web), Researcher (Synthesis).</p>
+            </div>
+            <button class="btn-primary" id="btn-agents-launch">+ Launch Worker</button>
+          </div>
+          <div class="dash-grid-3">
+            <div class="panel">
+              <div class="panel-head"><b>⟨/⟩ OpenCode Worker</b></div>
+              <p class="muted" style="font-size:13px;">Isolated sandbox repository modifications, terminal operations, and test executions.</p>
+              <div class="user-online" style="margin-top:10px;"><span class="dot"></span>Ready</div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><b>🌐 Browser Worker</b></div>
+              <p class="muted" style="font-size:13px;">Persistent Playwright browser automation, receipt auditing, and form interaction.</p>
+              <div class="user-online" style="margin-top:10px;"><span class="dot"></span>Ready</div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><b>🔍 Research Agent</b></div>
+              <p class="muted" style="font-size:13px;">Multi-source web search, fact extraction, and structured citation provenance.</p>
+              <div class="user-online" style="margin-top:10px;"><span class="dot"></span>Ready</div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:16px;">
+            <div class="panel-head"><b>Recent Worker Runs</b></div>
+            <div id="agents-full-list" class="item-list">Loading agent runs...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== APPROVALS VIEW ===== -->
+      <section class="view" id="view-approvals">
+        <div class="dash-view">
+          <div class="dash-hero-card">
+            <div>
+              <h2>Approvals Center</h2>
+              <p class="muted">Every external write requires explicit permission and cryptographic argument binding.</p>
+            </div>
+          </div>
+          <div class="panel">
+            <div id="approvals-full-list" class="item-list">Loading approvals...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PEOPLE VIEW ===== -->
+      <section class="view" id="view-people">
+        <div class="dash-view">
+          <div class="dash-hero-card">
+            <div>
+              <h2>People & Relationships</h2>
+              <p class="muted">People connected to your commitments, meetings, and communications.</p>
+            </div>
+            <button class="btn-primary" id="btn-new-person">+ Add Person</button>
+          </div>
+          <div class="panel">
+            <div id="people-full-list" class="item-list">Loading people...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CHAT VIEW ===== -->
+      <section class="view" id="view-chat">
+        <div class="chat-layout">
+          <div class="chat-main">
+            <div class="hero" id="hero">
+              <img class="hero-logo" src="/static/logo.png" alt="">
+              <h1>Turn your ideas into reality with OS</h1>
+              <p>Plan, create, research and automate — all in one place.</p>
+              <button class="btn-primary hero-cta" id="hero-new">Start a new chat <span>→</span></button>
+            </div>
+
+            <div class="messages" id="messages"></div>
+
+            <div class="composer">
+              <div class="composer-box">
+                <button class="icon-btn" id="attach-btn" title="Attach a file">📎</button>
+                <input type="file" id="file-input" hidden>
+                <input type="file" id="upload-input" hidden>
+                <input id="chat-input" type="text" placeholder="Message OS…" autocomplete="off">
+                <button class="icon-btn" id="mic-btn" title="Voice input">🎙</button>
+                <button class="send-btn" id="send-btn" title="Send">➤</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== RIGHT RAIL ===== -->
+          <aside class="rail">
+            <div class="card approval-card" id="approval-card" hidden>
+              <div class="card-head">
+                <div class="warn-ico">⏳</div>
+                <div><b class="warn-title">Approval Required</b><div class="muted">Review and approve to post</div></div>
+                <button class="icon-btn" id="approval-close">✕</button>
+              </div>
+              <div class="approval-title-row">
+                <span class="li-ico">in</span><b>LinkedIn Post</b>
+                <span class="ver-badge" id="approval-ver">v1.0</span>
+              </div>
+              <div class="kv"><span>🎯 Platform</span><b>LinkedIn</b></div>
+              <div class="kv"><span>👁 Persona</span><b>Builder</b></div>
+              <div class="kv"><span>🌐 Visibility</span><b>Public</b></div>
+              <div class="kv"><span>🏷 Topics</span><b>Build in public, AI</b></div>
+              <div class="kv"><span>🖼 Media</span><b>3 images</b></div>
+              <div class="kv"><span>🔔 Hashtags</span><b>5 hashtags</b></div>
+              <div class="kv"><span>🔔 Account</span><b class="not-conn" id="li-account">● Not connected</b><button class="link-btn" id="li-connect">Connect</button></div>
+              <button class="btn-primary" id="btn-approve">➤ Approve &amp; Post</button>
+              <button class="btn-ghost" id="btn-edit">✎ Edit Draft</button>
+              <button class="btn-danger-ghost" id="btn-discard">🗑 Discard</button>
+            </div>
+
+            <!-- connector write-action approvals -->
+            <div class="card" id="action-approval-card" hidden>
+              <div class="card-head">
+                <div class="warn-ico">🛡</div>
+                <div><b class="warn-title">Action approval</b><div class="muted">OS will run this on the connected service</div></div>
+                <button class="icon-btn" id="action-approval-close">✕</button>
+              </div>
+              <div id="action-approval-body"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ===== TASKS ===== -->
+      <section class="view" id="view-tasks">
+        <div class="page-head">
+          <div><h2>Tasks</h2><p class="page-sub">Stay organized and get things done.</p></div>
+          <button class="btn-primary btn-auto" id="task-new-btn">＋ New Task</button>
+        </div>
+        <div class="tab-row" id="task-tabs">
+          <button class="tab active" data-tab="all">All</button>
+          <button class="tab" data-tab="today">Today</button>
+          <button class="tab" data-tab="upcoming">Upcoming</button>
+          <button class="tab" data-tab="completed">Completed</button>
+        </div>
+        <div class="task-add" id="task-add" hidden>
+          <input id="task-input" placeholder="Add a task…">
+          <button class="btn-primary btn-auto" id="task-add-btn">Add</button>
+        </div>
+        <div id="task-list" class="list"></div>
+      </section>
+
+      <!-- ===== CALENDAR ===== -->
+      <section class="view" id="view-calendar">
+        <div class="page-head">
+          <div><h2>Calendar</h2><p class="page-sub">Plan your day, stay productive.</p></div>
+          <button class="btn-primary btn-auto" id="cal-add">＋ Add Event</button>
+        </div>
+        <div class="cal-bar">
+          <div class="month-nav">
+            <button class="icon-btn" id="cal-prev">‹</button>
+            <b id="cal-month">—</b>
+            <button class="icon-btn" id="cal-next">›</button>
+          </div>
+          <div class="tab-row" id="cal-tabs">
+            <button class="tab" data-tab="day">Day</button>
+            <button class="tab active" data-tab="week">Week</button>
+            <button class="tab" data-tab="month">Month</button>
+          </div>
+        </div>
+        <div id="calendar-body"></div>
+      </section>
+
+      <!-- ===== PROJECTS ===== -->
+      <section class="view" id="view-projects">
+        <div class="page-head">
+          <div><h2>Projects</h2><p class="page-sub">Organize your work and ideas.</p></div>
+          <button class="btn-primary btn-auto" id="proj-new">＋ New Project</button>
+        </div>
+        <div id="project-grid" class="proj-grid"></div>
+      </section>
+
+      <!-- ===== MEMORY ===== -->
+      <section class="view" id="view-memory">
+        <div class="page-head"><div><h2>Memory</h2><p class="page-sub">OS remembers what matters to you.</p></div></div>
+        <div class="tab-row" id="memory-tabs">
+          <button class="tab active" data-tab="all">All</button>
+          <button class="tab" data-tab="personal">Personal</button>
+          <button class="tab" data-tab="work">Work</button>
+          <button class="tab" data-tab="preference">Preferences</button>
+        </div>
+        <div id="memory-list" class="list"></div>
+      </section>
+
+      <!-- ===== SKILLS ===== -->
+      <section class="view" id="view-skills">
+        <div class="page-head"><div><h2>Skills</h2><p class="page-sub">Tools and capabilities OS can use.</p></div></div>
+        <div class="tab-row" id="skill-tabs">
+          <button class="tab active" data-tab="all">All</button>
+          <button class="tab" data-tab="development">Development</button>
+          <button class="tab" data-tab="content">Content</button>
+          <button class="tab" data-tab="research">Research</button>
+          <button class="tab" data-tab="automation">Automation</button>
+        </div>
+        <div id="skill-grid" class="skill-grid"></div>
+      </section>
+
+      <!-- ===== WATCHERS ===== -->
+      <section class="view" id="view-watchers">
+        <div class="page-head"><div><h2>Watchers</h2><p class="page-sub">Get suggestions, never acts without you.</p></div></div>
+        <div id="watcher-list" class="list"></div>
+      </section>
+
+      <!-- ===== FILES ===== -->
+      <section class="view" id="view-files">
+        <div class="page-head">
+          <div><h2>Files</h2><p class="page-sub">Keep your important files and conversations.</p></div>
+          <button class="btn-primary btn-auto" id="files-upload">＋ Upload</button>
+        </div>
+        <div class="tab-row" id="file-tabs">
+          <button class="tab active" data-tab="all">All Files</button>
+          <button class="tab" data-tab="docs">Documents</button>
+          <button class="tab" data-tab="images">Images</button>
+          <button class="tab" data-tab="other">Other</button>
+        </div>
+        <p class="muted" id="files-root"></p>
+        <div id="file-list" class="file-grid"></div>
+      </section>
+
+      <!-- ===== ANALYTICS ===== -->
+      <section class="view" id="view-analytics">
+        <div class="page-head">
+          <div><h2>Analytics</h2><p class="page-sub">Track your productivity and usage.</p></div>
+          <span class="pill">All time ▾</span>
+        </div>
+        <div id="analytics-tiles" class="tile-grid"></div>
+        <div class="charts">
+          <div class="card chart-card">
+            <div class="card-title">Activity Overview</div>
+            <div id="chart-bars"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-title">Tasks by Status</div>
+            <div id="chart-donut"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== COMPUTER ===== -->
+      <section class="view" id="view-computer">
+        <div class="page-head">
+          <div><h2>Computer</h2><p class="page-sub">A sandboxed Linux computer: run commands, keep receipts, edit workspace files.</p></div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="comp-start">▶ Start</button>
+            <button class="btn-ghost btn-auto" id="comp-stop">⏹ Stop</button>
+          </div>
+        </div>
+        <div class="card"><div class="card-title">Status</div><div id="comp-status" class="muted">…</div></div>
+        <div class="card">
+          <div class="card-title">Run a command</div>
+          <div class="row gap">
+            <input id="comp-cmd" class="grow" placeholder="e.g. python3 --version" autocomplete="off" />
+            <input id="comp-cwd" style="width:10rem" value="/workspace" title="Working directory" />
+            <button class="btn-primary btn-auto" id="comp-run">Run</button>
+          </div>
+          <p class="muted small">Commands time out after 30s. Output is capped at 128KB. Paths stay inside the workspace — use <code>$WORKSPACE</code> or relative paths in commands.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Command receipts</div>
+          <div id="comp-receipts" class="stack"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Workspace files</div>
+          <div class="row gap">
+            <input id="comp-path" class="grow" value="/workspace" />
+            <button class="btn-ghost btn-auto" id="comp-ls">List</button>
+            <button class="btn-ghost btn-auto" id="comp-mkdir">＋ Folder</button>
+          </div>
+          <div id="comp-files" class="stack"></div>
+          <div id="comp-editor" hidden>
+            <div class="row gap"><strong id="comp-edit-path" class="grow"></strong>
+              <button class="btn-primary btn-auto" id="comp-save">Save</button></div>
+            <textarea id="comp-text" rows="12" class="code"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== BROWSER ===== -->
+      <section class="view" id="view-browser">
+        <div class="page-head">
+          <div><h2>Browser</h2><p class="page-sub">Persistent browser sessions. Open pages, read them, take screenshots.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">New session</div>
+          <div class="row gap">
+            <input id="br-url" class="grow" placeholder="https://example.com" autocomplete="off" />
+            <button class="btn-primary btn-auto" id="br-open">Open</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Sessions</div>
+          <div id="br-list" class="stack"></div>
+        </div>
+        <div class="card" id="br-read-card" hidden>
+          <div class="card-title" id="br-read-title">Page</div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="br-shot">📸 Screenshot</button>
+            <button class="btn-ghost btn-auto" id="br-console">⌨ Console</button>
+            <button class="btn-ghost btn-auto" id="br-pdf">🖨 PDF</button>
+            <button class="btn-ghost btn-auto" id="br-close">Close session</button>
+          </div>
+          <div id="br-shot-wrap" class="center"></div>
+          <div id="br-console-wrap" hidden><div class="card-title">Console</div><pre id="br-console-text" class="code wrap"></pre></div>
+          <pre id="br-text" class="code wrap"></pre>
+        </div>
+      </section>
+
+      <!-- ===== ACTIVITY ===== -->
+      <section class="view" id="view-activity">
+        <div class="page-head">
+          <div><h2>Activity</h2><p class="page-sub">Durable runs with pause / resume / cancel / retry, plus ideas and goals.</p></div>
+          <button class="btn-primary btn-auto" id="act-new">＋ New run</button>
+        </div>
+        <div id="act-runs" class="stack"></div>
+        <div class="card">
+          <div class="card-title">💡 Ideas</div>
+          <div class="row gap">
+            <input id="idea-title" class="grow" placeholder="New idea…" />
+            <button class="btn-ghost btn-auto" id="idea-add">Add</button>
+          </div>
+          <div id="idea-list" class="stack"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📧 Mail → Ideas <span class="muted small" id="mail-status">checking…</span></div>
+          <p class="muted small">Keyword rules scan your Gmail and draft ideas (with the email as evidence) for you to accept, edit, or dismiss. Nothing is sent anywhere.</p>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="mail-scan">Scan Gmail now</button>
+            <button class="btn-ghost btn-auto" id="mail-seed">Add starter rules</button>
+          </div>
+          <div id="mail-rules" class="stack" style="margin-top:8px"></div>
+          <div class="row gap" style="margin-top:8px">
+            <input id="mrule-name" class="grow" placeholder="Rule name" />
+            <input id="mrule-query" class="grow" placeholder="Gmail query (e.g. newer_than:7d)" />
+            <input id="mrule-kw" class="grow" placeholder="Keywords, comma separated" />
+            <button class="btn-ghost btn-auto" id="mrule-add">Add rule</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🎯 Goals</div>
+          <div class="row gap">
+            <input id="goal-title" class="grow" placeholder="New goal…" />
+            <button class="btn-ghost btn-auto" id="goal-add">Add</button>
+          </div>
+          <div id="goal-list" class="stack"></div>
+        </div>
+      </section>
+
+      <!-- ===== FINANCE ===== -->
+      <section class="view" id="view-finance">
+        <div class="page-head">
+          <div><h2>Finance</h2><p class="page-sub">Upload a bank/statement CSV and get a spending summary. All local.</p></div>
+          <label class="btn-primary btn-auto" style="cursor:pointer">＋ Upload CSV
+            <input type="file" id="fin-file" accept=".csv" hidden />
+          </label>
+        </div>
+        <div id="fin-reports" class="stack"></div>
+      </section>
+
+      <!-- ===== DOCUMENTS ===== -->
+      <section class="view" id="view-documents">
+        <div class="page-head">
+          <div><h2>Documents</h2><p class="page-sub">PDF library — view, inspect form fields, fill, export.</p></div>
+          <label class="btn-primary btn-auto" style="cursor:pointer">＋ Upload PDF
+            <input type="file" id="doc-file" accept=".pdf" hidden />
+          </label>
+        </div>
+        <div id="doc-list" class="stack"></div>
+        <div class="card" id="doc-detail" hidden>
+          <div class="card-title" id="doc-detail-title">Document</div>
+          <div id="doc-fields" class="stack"></div>
+          <div class="row gap">
+            <button class="btn-primary btn-auto" id="doc-fill">Fill &amp; save copy</button>
+            <button class="btn-ghost btn-auto" id="doc-download">⬇ Download</button>
+            <button class="btn-ghost btn-auto" id="doc-text">📝 Page text</button>
+            <button class="btn-ghost btn-auto" id="doc-del">Delete</button>
+          </div>
+          <pre id="doc-textout" class="code wrap" hidden></pre>
+        </div>
+      </section>
+
+      <!-- ===== THREADS ===== -->
+      <section class="view" id="view-threads">
+        <div class="page-head">
+          <div><h2>Threads</h2><p class="page-sub">Local conversations — rename, archive, restore, replay.</p></div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="thr-arch-toggle">Archived</button>
+            <button class="btn-primary btn-auto" id="thr-new">＋ New thread</button>
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <div id="thr-list" class="stack" style="width:16rem"></div>
+          <div class="card grow" id="thr-detail" hidden>
+            <div class="row gap"><strong id="thr-title" class="grow"></strong>
+              <button class="btn-ghost btn-auto" id="thr-rename">Rename</button>
+              <button class="btn-ghost btn-auto" id="thr-replay">↻ Replay</button>
+              <button class="btn-ghost btn-auto" id="thr-archive">Archive</button>
+              <button class="btn-ghost btn-auto" id="thr-del">Delete</button>
+            </div>
+            <div id="thr-msgs" class="stack"></div>
+            <div class="row gap">
+              <input id="thr-input" class="grow" placeholder="Write a message…" />
+              <button class="btn-primary btn-auto" id="thr-send">Send</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== NOTIFICATIONS ===== -->
+      <section class="view" id="view-notifications">
+        <div class="page-head">
+          <div><h2>Inbox</h2><p class="page-sub">Notifications from watchers, runs, and reminders.</p></div>
+          <div class="row gap">
+            <button class="btn-ghost btn-auto" id="notif-readall">Mark all read</button>
+            <button class="btn-ghost btn-auto" id="notif-clear">Clear read</button>
+          </div>
+        </div>
+        <div id="notif-list" class="stack"></div>
+        <div class="card">
+          <div class="card-title">📲 Telegram push <span class="muted small" id="tg-status">checking…</span></div>
+          <p class="muted small">Free phone notifications via your Telegram bot. Connect Telegram in the Connectors tab first (bot token + your chat ID), then send a test.</p>
+          <div class="row gap">
+            <input id="tg-title" class="grow" placeholder="Test title" value="OS test ping" />
+            <button class="btn-ghost btn-auto" id="tg-send">Send test</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal-backdrop" id="settings-modal" hidden>
+  <div class="modal settings-modal">
+    <div class="sm-layout">
+      <nav class="sm-nav">
+        <h3>Settings</h3>
+        <button class="sm-nav-item" data-dtab="general"><span>⚙️</span>General</button>
+        <button class="sm-nav-item active" data-dtab="connectors"><span>▦</span>Connectors</button>
+        <button class="sm-nav-item" data-dtab="privacy"><span>🔒</span>Data &amp; privacy</button>
+        <div class="sm-nav-foot">
+          <div class="sm-ver" id="sm-ver">OS Dashboard</div>
+        </div>
+      </nav>
+      <div class="sm-content">
+        <button class="sm-close" id="settings-close" title="Close">✕</button>
+
+        <section class="dtab" id="dtab-general">
+          <h2>General</h2>
+          <div class="set-row"><div><b>Theme</b><p>Light, dark, or follow your system.</p></div>
+            <div class="seg" id="theme-seg">
+              <button data-theme-opt="light">Light</button>
+              <button data-theme-opt="dark">Dark</button>
+              <button data-theme-opt="system">System</button>
+            </div></div>
+          <div class="set-row" id="perm-row" hidden><div><b>Permission requests</b><p>Connectors waiting for your approval. <span id="perm-count"></span></p></div>
+            <button class="btn-ghost btn-auto" id="perm-banner">Review</button></div>
+          <div class="set-row"><div><b>Language model</b><p id="set-model">Local Ollama</p></div>
+            <span class="pill" id="set-model-pill">checking…</span></div>
+          <div class="set-row"><div><b>MCP bridge</b><p>Connected connectors are exposed as MCP tools at <code>/mcp</code>.</p></div>
+            <span class="pill pill-ok" id="set-mcp">on</span></div>
+        </section>
+
+        <section class="dtab active" id="dtab-connectors">
+          <div id="conn-list-view">
+            <h2>Connectors</h2>
+            <p class="muted sm-sub">OS asks your permission before touching any service. Nothing runs until you allow it — and every write asks again.</p>
+            <div class="conn-search"><span>🔍</span><input id="conn-search" placeholder="Search connectors" autocomplete="off"></div>
+            <h4 class="conn-group">Connected</h4>
+            <div class="conn-group-box" id="conn-connected"></div>
+            <h4 class="conn-group">Available</h4>
+            <div class="conn-group-box" id="conn-available"></div>
+          </div>
+          <div id="conn-detail-view" hidden>
+            <button class="btn-ghost back-btn" id="conn-back">‹ Back</button>
+            <div id="conn-detail"></div>
+          </div>
+        </section>
+
+        <section class="dtab" id="dtab-privacy">
+          <h2>Data &amp; privacy</h2>
+          <div class="set-row"><div><b>Local-first</b><p>Everything runs on this machine. Credentials are encrypted before they're stored.</p></div>
+            <span class="pill pill-ok">on</span></div>
+          <div class="set-row"><div><b>Revoke everything</b><p>Remove all connector grants and delete every stored credential.</p></div>
+            <button class="btn-danger-ghost btn-auto" id="revoke-all">Revoke all</button></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="perm-modal" hidden>
+  <div class="modal">
+    <h3 id="perm-title">Connect Gmail?</h3>
+    <p class="muted" id="perm-sub">OS is asking your permission. It will only use what you allow, and you can revoke anytime.</p>
+    <div id="perm-scopes" class="scope-list"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="perm-deny">Deny</button>
+      <button class="btn-primary" id="perm-allow">Allow</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cred-modal" hidden>
+  <div class="modal">
+    <h3 id="cred-title">Add credentials</h3>
+    <p class="muted">Stored only on this machine. Never sent anywhere except the service itself.</p>
+    <div id="cred-fields"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cred-cancel">Cancel</button>
+      <button class="btn-primary" id="cred-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="edit-modal" hidden>
+  <div class="modal wide">
+    <h3>Edit draft</h3>
+    <p class="muted">Saving creates a new version that goes through approval again.</p>
+    <textarea id="edit-text" rows="10"></textarea>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="edit-cancel">Cancel</button>
+      <button class="btn-primary" id="edit-save">Save as new version</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="onboard-modal" hidden>
+  <div class="modal wide">
+    <div style="text-align:center;margin-bottom:6px"><img src="/static/logo.png" alt="OS" style="width:64px;height:64px"></div>
+    <h3 style="text-align:center">Connect Google to unlock OS</h3>
+    <p class="muted" style="text-align:center">One sign-in connects Calendar, Gmail, Drive, Sheets and YouTube — free with any Google account.</p>
+    <div id="ob-step-setup">
+      <h4 style="margin:14px 0 6px">Step 1 — create a free OAuth app <span class="muted small">(one time, ~2 min)</span></h4>
+      <ol class="setup-steps">
+        <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console → Credentials</a> and create a project (free).</li>
+        <li>“Create Credentials → OAuth client ID → <b>Desktop app</b>”.</li>
+        <li>Paste the Client ID and Client Secret below.</li>
+      </ol>
+      <div class="cred-form">
+        <label>Google OAuth Client ID<input type="text" id="ob-client-id" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off"></label>
+        <label>Google OAuth Client Secret<input type="password" id="ob-client-secret" placeholder="Paste secret" autocomplete="off"></label>
+        <div class="btn-row"><button class="btn-primary" id="ob-save">Save &amp; continue →</button></div>
+      </div>
+    </div>
+    <div id="ob-step-signin" hidden>
+      <h4 style="margin:14px 0 6px">Step 2 — sign in with Google</h4>
+      <p class="muted small">You'll sign in at google.com — OS only stores the tokens, encrypted on this machine.</p>
+      <div class="btn-row" style="justify-content:center;margin:16px 0"><button class="btn-primary" id="ob-google" style="font-size:16px;padding:12px 28px">🔗 Sign in with Google</button></div>
+    </div>
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn-ghost" id="ob-skip">Skip for now</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="palette" hidden>
+  <div class="modal palette-modal">
+    <div class="palette-input-row"><span>🔍</span><input id="palette-input" placeholder="Search anything…" autocomplete="off"><kbd>Ctrl K</kbd></div>
+    <div id="palette-results"></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
