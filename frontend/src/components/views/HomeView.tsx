@@ -145,62 +145,69 @@ export const HomeView: React.FC = () => {
               </div>
             </div>
           </GlassCard>
-        ) : homeData?.now?.task ? (
-          <GlassCard glow="emerald" className="p-6 border-emerald-500/30">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="emerald" size="sm">
-                    Immediate Focus
-                  </Badge>
-                  {homeData.now.task.deadline && (
-                    <span className="text-xs font-mono text-os-muted">
-                      Deadline: {homeData.now.task.deadline}
-                    </span>
-                  )}
-                </div>
-                <h3 className="text-xl font-bold text-os-primary">
-                  {homeData.now.task.title}
-                </h3>
-                <p className="text-xs text-os-secondary">
-                  Estimated duration: {homeData.now.task.estimated_duration_minutes || 60} mins ·
-                  Highest priority in today's active plan.
-                </p>
-              </div>
+        ) : (() => {
+          const nowTask = (homeData?.now as any)?.task || (homeData?.now?.title ? homeData.now : null);
+          if (nowTask) {
+            return (
+              <GlassCard glow="emerald" className="p-6 border-emerald-500/30">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="emerald" size="sm">
+                        Immediate Focus
+                      </Badge>
+                      {nowTask.deadline && (
+                        <span className="text-xs font-mono text-os-muted">
+                          Deadline: {new Date(nowTask.deadline).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold text-os-primary">
+                      {nowTask.title}
+                    </h3>
+                    <p className="text-xs text-os-secondary">
+                      Estimated duration: {nowTask.estimated_duration_minutes || (nowTask as any).estimated_minutes || 60} mins ·{' '}
+                      {(nowTask as any).reason || "Highest priority in today's active plan."}
+                    </p>
+                  </div>
 
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setCurrentView('tasks')}
-                leftIcon={<Play className="w-4 h-4" />}
-              >
-                Start Execution
-              </Button>
-            </div>
-          </GlassCard>
-        ) : (
-          <GlassCard className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-base font-semibold text-os-primary">
-                  Clear Deck — No critical blockers
-                </h3>
-                <p className="text-xs text-os-secondary mt-1">
-                  You are up to date on pending decisions. Would you like OS to organize your
-                  schedule or inspect open commitments?
-                </p>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => setCurrentView('tasks')}
+                    leftIcon={<Play className="w-4 h-4" />}
+                  >
+                    Start Execution
+                  </Button>
+                </div>
+              </GlassCard>
+            );
+          }
+
+          return (
+            <GlassCard className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-os-primary">
+                    Clear Deck — No critical blockers
+                  </h3>
+                  <p className="text-xs text-os-secondary mt-1">
+                    You are up to date on pending decisions. Would you like OS to organize your
+                    schedule or inspect open commitments?
+                  </p>
+                </div>
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={() => setCurrentView('plan')}
+                  rightIcon={<ChevronRight className="w-4 h-4" />}
+                >
+                  Inspect Schedule
+                </Button>
               </div>
-              <Button
-                variant="glass"
-                size="sm"
-                onClick={() => setCurrentView('plan')}
-                rightIcon={<ChevronRight className="w-4 h-4" />}
-              >
-                Inspect Schedule
-              </Button>
-            </div>
-          </GlassCard>
-        )}
+            </GlassCard>
+          );
+        })()}
       </section>
 
       {/* 2. THREE-COLUMN OPERATIONAL GRID */}
@@ -222,45 +229,58 @@ export const HomeView: React.FC = () => {
           </div>
 
           <GlassCard className="p-4 space-y-2.5">
-            {planItems.length === 0 ? (
-              <div className="py-8 text-center text-xs text-os-muted">
-                No active plan for today yet.
-                <div className="mt-2">
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    onClick={() => setCurrentView('plan')}
-                    leftIcon={<Sparkles className="w-3.5 h-3.5 text-emerald-400" />}
-                  >
-                    Generate Daily Plan
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              planItems.slice(0, 5).map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  className="flex items-center justify-between p-2.5 rounded-glass-sm bg-white/5 hover:bg-white/10 border border-transparent hover:border-os-border transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-os-secondary w-16">
-                      {item.start_time || '09:00'}
-                    </span>
-                    <div className="h-2 w-2 rounded-full bg-emerald-400/80"></div>
-                    <div>
-                      <div className="text-xs font-semibold text-os-primary">{item.title}</div>
-                      {item.why_now && (
-                        <div className="text-[10px] text-os-muted">{item.why_now}</div>
-                      )}
+            {(() => {
+              const activeItems = planItems.length > 0 ? planItems : ((homeData?.today_plan as any[]) || []);
+              if (activeItems.length === 0) {
+                return (
+                  <div className="py-8 text-center text-xs text-os-muted">
+                    No active plan for today yet.
+                    <div className="mt-2">
+                      <Button
+                        variant="glass"
+                        size="sm"
+                        onClick={() => setCurrentView('plan')}
+                        leftIcon={<Sparkles className="w-3.5 h-3.5 text-emerald-400" />}
+                      >
+                        Generate Daily Plan
+                      </Button>
                     </div>
                   </div>
+                );
+              }
 
-                  <span className="text-[10px] font-mono text-os-muted">
-                    {item.duration_minutes || 60}m
-                  </span>
-                </div>
-              ))
-            )}
+              return activeItems.slice(0, 5).map((item, idx) => {
+                const startTime = item.start_time || (item.scheduled_start ? new Date(item.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (item as any).start ? new Date((item as any).start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00');
+                const duration = item.duration_minutes || (item as any).estimated_minutes || (item as any).why_now?.duration_minutes || 60;
+                const whyNowText = typeof item.why_now === 'string'
+                  ? item.why_now
+                  : (item.why_now as any)?.rationale || '';
+
+                return (
+                  <div
+                    key={item.id || idx}
+                    className="flex items-center justify-between p-2.5 rounded-glass-sm bg-white/5 hover:bg-white/10 border border-transparent hover:border-os-border transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs text-os-secondary w-16">
+                        {startTime}
+                      </span>
+                      <div className="h-2 w-2 rounded-full bg-emerald-400/80"></div>
+                      <div>
+                        <div className="text-xs font-semibold text-os-primary">{item.title}</div>
+                        {whyNowText && (
+                          <div className="text-[10px] text-os-muted line-clamp-1">{whyNowText}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] font-mono text-os-muted">
+                      {duration}m
+                    </span>
+                  </div>
+                );
+              });
+            })()}
           </GlassCard>
         </section>
 
@@ -337,10 +357,10 @@ export const HomeView: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                  <span className="text-os-primary">{act.description}</span>
+                  <span className="text-os-primary">{act.summary || act.description || (act as any).event_type || 'Activity verified'}</span>
                 </div>
                 <span className="font-mono text-[10px] text-os-muted">
-                  {act.timestamp ? new Date(act.timestamp).toLocaleTimeString() : 'Just now'}
+                  {act.timestamp || (act as any).created_at ? new Date(act.timestamp || (act as any).created_at).toLocaleTimeString() : 'Just now'}
                 </span>
               </div>
             ))

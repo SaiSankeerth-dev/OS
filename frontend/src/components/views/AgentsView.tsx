@@ -192,42 +192,50 @@ export const AgentsView: React.FC = () => {
               No recent worker tasks recorded. Use "Dispatch Task" or direct OS in chat.
             </div>
           ) : (
-            runs.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center justify-between p-3 rounded-glass-sm bg-white/5 hover:bg-white/10 transition-colors text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <Badge variant="cyan" size="sm">
-                    {r.agent_type.toUpperCase()}
-                  </Badge>
-                  <span className="font-medium text-os-primary">{r.instruction}</span>
-                </div>
+            runs.map((r) => {
+              const instructionText =
+                r.instruction ||
+                (r as any).input_reference?.instruction ||
+                (r as any).workflow_type ||
+                'Worker execution';
+              const st = (r.status || '').toLowerCase();
+              const badgeVariant =
+                st === 'completed' || st === 'succeeded'
+                  ? 'emerald'
+                  : st === 'running'
+                  ? 'amber'
+                  : st === 'failed'
+                  ? 'danger'
+                  : 'neutral';
 
-                <div className="flex items-center gap-3 font-mono text-[11px]">
-                  <Badge
-                    variant={
-                      r.status === 'completed'
-                        ? 'emerald'
-                        : r.status === 'running'
-                        ? 'amber'
-                        : 'neutral'
-                    }
-                    size="sm"
-                  >
-                    {r.status}
-                  </Badge>
-                  {r.created_at && (
-                    <span className="text-os-muted">
-                      {new Date(r.created_at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  )}
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between p-3 rounded-glass-sm bg-white/5 hover:bg-white/10 transition-colors text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <Badge variant="cyan" size="sm">
+                      {r.agent_type.toUpperCase()}
+                    </Badge>
+                    <span className="font-medium text-os-primary">{instructionText}</span>
+                  </div>
+
+                  <div className="flex items-center gap-3 font-mono text-[11px]">
+                    <Badge variant={badgeVariant} size="sm">
+                      {r.status}
+                    </Badge>
+                    {r.created_at && (
+                      <span className="text-os-muted">
+                        {new Date(r.created_at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </GlassCard>
       </section>

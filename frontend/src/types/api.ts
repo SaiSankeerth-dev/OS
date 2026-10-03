@@ -25,14 +25,18 @@ export interface Commitment {
 export interface PlanItem {
   id: string;
   plan_id?: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  duration_minutes: number;
-  item_type: 'task' | 'meeting' | 'break' | 'event' | 'buffer';
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
-  why_now?: string;
-  task_id?: string;
+  title?: string;
+  start_time?: string;
+  end_time?: string;
+  scheduled_start?: string;
+  scheduled_end?: string;
+  duration_minutes?: number;
+  item_type?: 'task' | 'meeting' | 'break' | 'event' | 'buffer' | string;
+  status?: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'PLANNED' | string;
+  why_now?: any;
+  task_id?: string | null;
+  commitment_id?: string | null;
+  priority_rank?: number;
 }
 
 export interface DailyPlan {
@@ -41,16 +45,18 @@ export interface DailyPlan {
   plan_date: string;
   summary?: string;
   status?: string;
+  reason?: string;
+  planner_version?: string;
 }
 
 export interface Approval {
   approval_id: string;
-  action_id: string;
-  tool_name: string;
-  risk_level: 'low' | 'medium' | 'high' | 'LOW' | 'MEDIUM' | 'HIGH';
-  arguments: Record<string, any>;
-  arguments_hash: string;
-  requested_at: string;
+  action_id?: string;
+  tool_name?: string;
+  risk_level?: 'low' | 'medium' | 'high' | 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  arguments?: Record<string, any>;
+  arguments_hash?: string;
+  requested_at?: string;
   status?: string;
 }
 
@@ -69,19 +75,26 @@ export interface AgentRun {
   id: string;
   user_id?: string;
   agent_type: 'coding' | 'browser' | 'research' | string;
-  instruction: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  instruction?: string;
+  workflow_type?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'SUCCEEDED' | 'FAILED' | string;
+  input_reference?: Record<string, any>;
+  output_reference?: Record<string, any>;
   result?: any;
   created_at?: string;
 }
 
 export interface ActivityItem {
   id: string;
-  action_type: string;
-  description: string;
-  status: string;
-  timestamp: string;
+  action_type?: string;
+  event_type?: string;
+  summary?: string;
+  description?: string;
+  status?: string;
+  timestamp?: string;
+  created_at?: string;
   evidence_receipt?: Record<string, any>;
+  metadata?: Record<string, any>;
   verified?: boolean;
 }
 
@@ -89,8 +102,8 @@ export interface Connector {
   id: string;
   name: string;
   icon: string;
-  category: string;
-  state: 'available' | 'granted' | 'connected' | 'setup_error' | 'denied';
+  category?: string;
+  state: 'available' | 'granted' | 'connected' | 'setup_error' | 'denied' | string;
   scopes: string[];
   scopes_granted: string[];
   has_credentials: boolean;
@@ -101,11 +114,10 @@ export interface Connector {
 }
 
 export interface HomeViewData {
-  now?: {
-    task?: Task;
-    plan_item?: PlanItem;
-    message?: string;
-  };
+  greeting?: string;
+  now?: any;
+  today_plan?: PlanItem[] | any[];
+  upcoming_deadlines?: any[];
   next?: Array<PlanItem | Task>;
   waiting?: Array<{ id: string; title: string; reason: string }>;
   blocked?: Array<{ id: string; title: string; blocker: string }>;

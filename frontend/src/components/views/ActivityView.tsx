@@ -38,11 +38,14 @@ export const ActivityView: React.FC = () => {
     fetchActivity();
   }, []);
 
-  const filtered = activities.filter(
-    (a) =>
-      a.description.toLowerCase().includes(filterQuery.toLowerCase()) ||
-      a.action_type.toLowerCase().includes(filterQuery.toLowerCase())
-  );
+  const filtered = activities.filter((a) => {
+    const desc = a.summary || a.description || (a as any).event_type || '';
+    const type = a.action_type || (a as any).event_type || '';
+    return (
+      desc.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      type.toLowerCase().includes(filterQuery.toLowerCase())
+    );
+  });
 
   return (
     <div className="max-w-5xl mx-auto w-full px-4 md:px-8 py-6 space-y-6 animate-in fade-in duration-200">
@@ -89,7 +92,13 @@ export const ActivityView: React.FC = () => {
         ) : (
           filtered.map((item) => {
             const isExpanded = expandedId === item.id;
-            const hasEvidence = !!item.evidence_receipt;
+            const evidenceObj = item.evidence_receipt || (item as any).metadata;
+            const hasEvidence = !!evidenceObj && Object.keys(evidenceObj).length > 0;
+            const summaryText = item.summary || item.description || (item as any).event_type || 'Activity logged';
+            const typeText = (item as any).event_type || item.action_type || 'Event';
+            const timeText = item.timestamp || (item as any).created_at
+              ? new Date(item.timestamp || (item as any).created_at).toLocaleTimeString()
+              : 'Recorded';
 
             return (
               <GlassCard key={item.id} className="p-4 transition-all">
@@ -105,22 +114,20 @@ export const ActivityView: React.FC = () => {
                     </div>
                     <div>
                       <div className="text-xs font-semibold text-os-primary">
-                        {item.description}
+                        {summaryText}
                       </div>
                       <div className="text-[10px] font-mono text-os-muted">
-                        Type: {item.action_type}
+                        Type: {typeText}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3 font-mono text-[11px]">
                     <span className="text-os-muted">
-                      {item.timestamp
-                        ? new Date(item.timestamp).toLocaleTimeString()
-                        : 'Recorded'}
+                      {timeText}
                     </span>
                     <Badge variant="emerald" size="sm">
-                      {item.status || 'VERIFIED'}
+                      {item.status || ((item as any).metadata?.status) || 'VERIFIED'}
                     </Badge>
                     {hasEvidence && (
                       <button className="text-os-muted hover:text-os-primary">
@@ -135,14 +142,14 @@ export const ActivityView: React.FC = () => {
                 </div>
 
                 {/* Evidence Receipt Drawer */}
-                {isExpanded && item.evidence_receipt && (
+                {isExpanded && evidenceObj && (
                   <div className="mt-3 pt-3 border-t border-os-border/50 text-xs font-mono">
                     <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] mb-1.5">
                       <Database className="w-3.5 h-3.5" />
                       <span>World Model Evidence Receipt</span>
                     </div>
                     <pre className="p-2.5 rounded bg-black/40 border border-white/5 overflow-x-auto text-[11px] text-os-secondary max-h-40">
-                      {JSON.stringify(item.evidence_receipt, null, 2)}
+                      {JSON.stringify(evidenceObj, null, 2)}
                     </pre>
                   </div>
                 )}

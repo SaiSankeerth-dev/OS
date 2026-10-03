@@ -55,12 +55,13 @@ export const MemoryView: React.FC = () => {
     }
   };
 
-  const filtered = memories.filter(
-    (m) =>
-      m.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.value.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.type.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = memories.filter((m) => {
+    const k = (m.key || '').toLowerCase();
+    const v = (typeof m.value === 'string' ? m.value : JSON.stringify(m.value || '')).toLowerCase();
+    const t = (m.type || '').toLowerCase();
+    const q = searchQuery.toLowerCase();
+    return k.includes(q) || v.includes(q) || t.includes(q);
+  });
 
   return (
     <div className="max-w-5xl mx-auto w-full px-4 md:px-8 py-6 space-y-6 animate-in fade-in duration-200">

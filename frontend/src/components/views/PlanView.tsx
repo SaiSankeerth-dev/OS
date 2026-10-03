@@ -135,8 +135,15 @@ export const PlanView: React.FC = () => {
         ) : (
           <div className="relative pl-6 md:pl-8 border-l border-os-border/60 space-y-4">
             {items.map((item, idx) => {
-              const isMeeting = item.item_type === 'meeting' || item.item_type === 'event';
-              const isBuffer = item.item_type === 'buffer';
+              const itemType = (item.item_type || (item as any).type || item.status || 'TASK').toLowerCase();
+              const isMeeting = itemType === 'meeting' || itemType === 'event';
+              const isBuffer = itemType === 'buffer';
+              const startTime = item.start_time || (item.scheduled_start ? new Date(item.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00');
+              const endTime = item.end_time || (item.scheduled_end ? new Date(item.scheduled_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:00');
+              const duration = item.duration_minutes || (item as any).why_now?.duration_minutes || 60;
+              const whyNowText = typeof item.why_now === 'string'
+                ? item.why_now
+                : (item.why_now as any)?.rationale || '';
 
               return (
                 <div key={item.id || idx} className="relative group">
@@ -160,30 +167,30 @@ export const PlanView: React.FC = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-os-border/40">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-semibold text-emerald-400">
-                          {item.start_time} - {item.end_time}
+                          {startTime} - {endTime}
                         </span>
                         <Badge
                           variant={isMeeting ? 'cyan' : isBuffer ? 'amber' : 'emerald'}
                           size="sm"
                         >
-                          {item.item_type.toUpperCase()}
+                          {itemType.toUpperCase()}
                         </Badge>
                       </div>
 
                       <span className="text-[11px] font-mono text-os-muted">
-                        {item.duration_minutes} min slot
+                        {duration} min slot
                       </span>
                     </div>
 
                     <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <h4 className="text-sm font-semibold text-os-primary">{item.title}</h4>
-                        {item.why_now && (
+                        <h4 className="text-sm font-semibold text-os-primary">{item.title || (item as any).summary || 'Scheduled Item'}</h4>
+                        {whyNowText && (
                           <p className="text-xs text-os-secondary mt-1 flex items-center gap-1.5">
                             <span className="font-mono text-[10px] uppercase text-os-muted">
                               Rationale:
                             </span>
-                            <span>{item.why_now}</span>
+                            <span>{whyNowText}</span>
                           </p>
                         )}
                       </div>

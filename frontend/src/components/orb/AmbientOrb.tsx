@@ -128,65 +128,77 @@ export const AmbientOrb: React.FC<AmbientOrbProps> = ({
 
     // Animation Loop
     let clock = new THREE.Clock();
+    let isDisposed = false;
 
     const animate = () => {
+      if (isDisposed) return;
       animFrameIdRef.current = requestAnimationFrame(animate);
-      const elapsedTime = clock.getElapsedTime();
+      
+      try {
+        const elapsedTime = clock.getElapsedTime();
 
-      // State-specific motion dynamics
-      let speed = 0.5;
-      let waveAmp = 0.05;
+        // State-specific motion dynamics
+        let speed = 0.5;
+        let waveAmp = 0.05;
 
-      if (state === 'LISTENING') {
-        speed = 1.8;
-        waveAmp = 0.16;
-      } else if (state === 'THINKING') {
-        speed = 2.4;
-        waveAmp = 0.12;
-      } else if (state === 'SPEAKING') {
-        speed = 1.4;
-        waveAmp = 0.18;
-      } else if (state === 'WORKING') {
-        speed = 1.0;
-        waveAmp = 0.08;
+        if (state === 'LISTENING') {
+          speed = 1.8;
+          waveAmp = 0.16;
+        } else if (state === 'THINKING') {
+          speed = 2.4;
+          waveAmp = 0.12;
+        } else if (state === 'SPEAKING') {
+          speed = 1.4;
+          waveAmp = 0.18;
+        } else if (state === 'WORKING') {
+          speed = 1.0;
+          waveAmp = 0.08;
+        }
+
+        particles.rotation.y = elapsedTime * 0.3 * speed;
+        particles.rotation.x = elapsedTime * 0.2 * speed;
+
+        if (state === 'WORKING') {
+          satelliteGroup.rotation.z = -elapsedTime * 1.2;
+        }
+
+        // Vertex wave displacement
+        const posAttr = geometry.attributes.position as THREE.BufferAttribute;
+        const arr = posAttr.array as Float32Array;
+
+        for (let i = 0; i < particleCount; i++) {
+          const ox = originalPositions[i * 3];
+          const oy = originalPositions[i * 3 + 1];
+          const oz = originalPositions[i * 3 + 2];
+
+          const wave = Math.sin(elapsedTime * 3.0 * speed + ox * 4.0 + oy * 4.0) * waveAmp;
+          arr[i * 3] = ox * (1 + wave);
+          arr[i * 3 + 1] = oy * (1 + wave);
+          arr[i * 3 + 2] = oz * (1 + wave);
+        }
+        posAttr.needsUpdate = true;
+
+        renderer.render(scene, camera);
+      } catch {
+        // Safe context loss recovery
       }
-
-      particles.rotation.y = elapsedTime * 0.3 * speed;
-      particles.rotation.x = elapsedTime * 0.2 * speed;
-
-      if (state === 'WORKING') {
-        satelliteGroup.rotation.z = -elapsedTime * 1.2;
-      }
-
-      // Vertex wave displacement
-      const posAttr = geometry.attributes.position as THREE.BufferAttribute;
-      const arr = posAttr.array as Float32Array;
-
-      for (let i = 0; i < particleCount; i++) {
-        const ox = originalPositions[i * 3];
-        const oy = originalPositions[i * 3 + 1];
-        const oz = originalPositions[i * 3 + 2];
-
-        const wave = Math.sin(elapsedTime * 3.0 * speed + ox * 4.0 + oy * 4.0) * waveAmp;
-        arr[i * 3] = ox * (1 + wave);
-        arr[i * 3 + 1] = oy * (1 + wave);
-        arr[i * 3 + 2] = oz * (1 + wave);
-      }
-      posAttr.needsUpdate = true;
-
-      renderer.render(scene, camera);
     };
 
     animate();
 
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(animFrameIdRef.current);
-      if (rendererRef.current && container.contains(rendererRef.current.domElement)) {
-        container.removeChild(rendererRef.current.domElement);
+      try {
+        if (rendererRef.current && container.contains(rendererRef.current.domElement)) {
+          container.removeChild(rendererRef.current.domElement);
+        }
+        geometry.dispose();
+        material.dispose();
+        renderer.dispose();
+      } catch {
+        // Safe disposal
       }
-      geometry.dispose();
-      material.dispose();
-      renderer.dispose();
     };
   }, [state, size]);
 
