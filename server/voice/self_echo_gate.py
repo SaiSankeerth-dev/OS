@@ -8,6 +8,7 @@ removed and replaced with proper acoustic echo cancellation.
 """
 from __future__ import annotations
 
+import logging
 import time
 from pipecat.frames.frames import (
     Frame,
@@ -20,6 +21,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 
+log = logging.getLogger("os.voice.self_echo_gate")
 
 ECHO_TAIL_SECONDS = 0.25  # room decay after bot stops — tune per speaker/room
 
@@ -30,15 +32,28 @@ class SelfEchoGate(FrameProcessor):
     plus a short tail after it stops, so OS never transcribes its own voice.
 
     Frame flow:
-      - BotStartedSpeakingFrame  → gate on, suppress everything downstream
+      - BotStartedSpeakingFrame  → gate on, suppress downstream unless barge-in
       - BotStoppedSpeakingFrame  → gate off after ECHO_TAIL_SECONDS
-      - All other frames pass through unchanged
+      - UserStartedSpeakingFrame → if allow_barge_in, break gate and forward frame
+      - All other frames pass through unchanged when gate is down
     """
 
-    def __init__(self) -> None:
+    def __init__(self, allow_barge_in: bool = True) -> None:
         super().__init__()
+        self.allow_barge_in = allow_barge_in
         self._bot_speaking = False
         self._gate_until = 0.0
+        self.barge_in_count = 0
+
+    @property
+    def is_gated(self) -> bool:
+        return self._bot_speaking or time.monotonic() < self._gate_until
+
+    def interrupt(self) -> None:
+        """Manually trigger barge-in / cancel gate."""
+        self._bot_speaking = False
+        self._gate_until = 0.0
+        self.barge_in_count += 1
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         # Bot state frames travel on the output side but pass through
@@ -50,10 +65,16 @@ class SelfEchoGate(FrameProcessor):
             self._bot_speaking = False
             self._gate_until = time.monotonic() + ECHO_TAIL_SECONDS
 
-        # If the gate is up (bot speaking or echo tail), drop input frames.
-        gated = self._bot_speaking or time.monotonic() < self._gate_until
+        # Check for user barge-in while gated
+        if self.allow_barge_in and self.is_gated:
+            if isinstance(frame, UserStartedSpeakingFrame):
+                log.info("SelfEchoGate: User barge-in detected. Breaking echo gate.")
+                self.interrupt()
+                await self.push_frame(frame, direction)
+                return
 
-        if gated and isinstance(
+        # If the gate is up (bot speaking or echo tail), drop input frames.
+        if self.is_gated and isinstance(
             frame,
             (
                 AudioRawFrame,

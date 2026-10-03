@@ -439,12 +439,19 @@ class DatabaseEngine:
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Connection, None, None]:
         conn = self._get_connection()
+        is_nested = getattr(conn, "in_transaction", False)
+        if not is_nested:
+            try:
+                conn.execute("BEGIN IMMEDIATE;")
+            except sqlite3.OperationalError:
+                is_nested = True
         try:
-            conn.execute("BEGIN IMMEDIATE;")
             yield conn
-            conn.commit()
+            if not is_nested:
+                conn.commit()
         except Exception:
-            conn.rollback()
+            if not is_nested:
+                conn.rollback()
             raise
 
 

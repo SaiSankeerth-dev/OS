@@ -45,6 +45,8 @@ MANIFESTS: list[ConnectorManifest] = [
                         P("end", "End (2026-09-28 17:00)"), P("description", "Description")]),
             ActionSpec("delete_event", "Delete event", "Delete an event by its ID.", True,
                        [P("event_id", "Event ID", True)]),
+            ActionSpec("update_event", "Update event", "Update or reschedule an event.", True,
+                       [P("event_id", "Event ID", True), P("title", "Title"), P("start", "Start"), P("end", "End")]),
         ],
     ),
     ConnectorManifest(
@@ -68,6 +70,9 @@ MANIFESTS: list[ConnectorManifest] = [
                        [P("query", "Search query", True), P("max_results", "Max results")]),
             ActionSpec("send_email", "Send email", "Send an email. Always needs your approval.", True,
                        [P("to", "To", True), P("subject", "Subject", True), P("body", "Body", True)]),
+            ActionSpec("reply_email", "Reply to email", "Reply to an email thread.", True,
+                       [P("to", "To", True), P("subject", "Subject", True), P("body", "Body", True),
+                        P("thread_id", "Thread ID"), P("message_id", "Message ID")]),
         ],
     ),
     ConnectorManifest(

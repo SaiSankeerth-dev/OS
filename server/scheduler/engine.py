@@ -16,7 +16,7 @@ Default jobs (can be enabled/disabled via config):
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
 log = logging.getLogger("os.scheduler")
@@ -67,58 +67,301 @@ DEFAULT_JOBS: list[dict[str, Any]] = [
 
 
 # ---------------------------------------------------------------------------
-# Job handler stubs (will be wired to real services)
+# ---------------------------------------------------------------------------
+# Real Job Handlers
 # ---------------------------------------------------------------------------
 
-async def _morning_plan() -> dict[str, Any]:
-    """Morning plan job: synthesize today's priorities."""
-    log.info("[Scheduler] Running morning_plan")
-    # TODO: Wire to real calendar, gmail, commitment, deadline services
+async def _morning_plan(user_id: str = "default_user") -> dict[str, Any]:
+    """Morning plan job: synthesize today's priorities into a daily schedule.
+
+    Reads open tasks and commitments, carves busy calendar windows, runs
+    PlannerEngine to generate today's active schedule, and logs an activity notification.
+    """
+    log.info("[Scheduler] Running morning_plan for user %s", user_id)
+    from server.planner.engine import PlannerEngine
+    from server.db.database import get_db
+    from server.db.repositories.core import ActivityRepository
+    from server.domain.entities import Activity
+    from server.domain.enums import ActorType
+
+    db = get_db()
+    planner = PlannerEngine(db=db)
+    act_repo = ActivityRepository(db=db)
+
+    plan, items = planner.create_daily_plan(user_id=user_id)
+
+    activity = Activity(
+        user_id=user_id,
+        actor_type=ActorType.OS,
+        event_type="notification.morning_plan",
+        entity_type="plan",
+        entity_id=plan.id,
+        summary=f"Morning briefing: {len(items)} tasks scheduled for today ({plan.plan_date})",
+        metadata={
+            "plan_id": plan.id,
+            "plan_date": plan.plan_date,
+            "scheduled_count": len(items),
+            "task_ids": [it.task_id for it in items],
+        },
+    )
+    act_repo.log(activity)
+
     return {
         "job": "morning_plan",
         "status": "completed",
+        "plan_id": plan.id,
+        "plan_date": plan.plan_date,
+        "scheduled_count": len(items),
+        "task_ids": [it.task_id for it in items],
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "actions": ["calendar_read", "gmail_scan", "commitment_check", "deadline_scan"],
     }
 
 
-async def _email_scan() -> dict[str, Any]:
-    """Email scan job: check for new emails and extract commitments."""
-    log.info("[Scheduler] Running email_scan")
+async def _email_scan(user_id: str = "default_user") -> dict[str, Any]:
+    """Email scan job: check for incoming email source events and extract commitments."""
+    log.info("[Scheduler] Running email_scan for user %s", user_id)
+    from server.db.database import get_db
+    from server.db.repositories.core import SourceEventRepository, ActivityRepository
+    from server.domain.entities import Activity
+    from server.domain.enums import ActorType
+    from server.ingestion.pipeline import IngestionPipeline
+
+    db = get_db()
+    event_repo = SourceEventRepository(db=db)
+    act_repo = ActivityRepository(db=db)
+    pipeline = IngestionPipeline(event_repo=event_repo)
+
+    unprocessed = event_repo.get_unprocessed(user_id=user_id, limit=20)
+    email_events = [
+        ev for ev in unprocessed
+        if "email" in ev.event_type.lower() or "gmail" in ev.source_id.lower()
+    ]
+
+    processed_count = 0
+    extracted_commitments = []
+
+    for ev in email_events:
+        res = pipeline.process_event(ev)
+        processed_count += 1
+        if res.commitment:
+            extracted_commitments.append({
+                "commitment_id": res.commitment.id,
+                "title": res.commitment.title,
+                "deadline": res.commitment.deadline.isoformat() if res.commitment.deadline else None,
+            })
+            act_repo.log(
+                Activity(
+                    user_id=user_id,
+                    actor_type=ActorType.OS,
+                    event_type="notification.email_commitment_extracted",
+                    entity_type="commitment",
+                    entity_id=res.commitment.id,
+                    summary=f"Commitment extracted from email: '{res.commitment.title}'",
+                    metadata={"source_event_id": ev.id, "subject": ev.payload.get("subject", "")},
+                )
+            )
+
     return {
         "job": "email_scan",
         "status": "completed",
+        "scanned_count": len(email_events),
+        "processed_count": processed_count,
+        "extracted_count": len(extracted_commitments),
+        "commitments": extracted_commitments,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
-async def _deadline_check() -> dict[str, Any]:
-    """Deadline check job: scan approaching deadlines."""
-    log.info("[Scheduler] Running deadline_check")
+async def _deadline_check(user_id: str = "default_user", horizon_hours: int = 48) -> dict[str, Any]:
+    """Deadline check job: scan approaching deadlines and detect risks."""
+    log.info("[Scheduler] Running deadline_check for user %s (horizon=%dh)", user_id, horizon_hours)
+    from server.db.database import get_db
+    from server.db.repositories.core import TaskRepository, ActivityRepository
+    from server.domain.entities import Activity
+    from server.domain.enums import ActorType
+
+    db = get_db()
+    task_repo = TaskRepository(db=db)
+    act_repo = ActivityRepository(db=db)
+
+    now = datetime.now(timezone.utc)
+    horizon = now + timedelta(hours=horizon_hours)
+
+    open_tasks = task_repo.get_open_tasks(user_id)
+    at_risk_tasks = []
+
+    for t in open_tasks:
+        if not t.deadline:
+            continue
+        dl = t.deadline if t.deadline.tzinfo else t.deadline.replace(tzinfo=timezone.utc)
+
+        if dl <= horizon:
+            is_overdue = dl < now
+            hours_until = (dl - now).total_seconds() / 3600.0
+
+            has_risk = False
+            risk_reason = ""
+            if is_overdue:
+                has_risk = True
+                risk_reason = f"Task is overdue by {int(-hours_until * 60)} minutes"
+            elif t.scheduled_end:
+                sched_end = t.scheduled_end if t.scheduled_end.tzinfo else t.scheduled_end.replace(tzinfo=timezone.utc)
+                if sched_end > dl:
+                    has_risk = True
+                    risk_reason = f"Scheduled completion ({sched_end.isoformat()}) exceeds deadline ({dl.isoformat()})"
+            else:
+                has_risk = True
+                risk_reason = f"Due in {int(hours_until)} hours but not scheduled"
+
+            if has_risk:
+                at_risk_tasks.append({
+                    "id": t.id,
+                    "title": t.title,
+                    "deadline": dl.isoformat(),
+                    "reason": risk_reason,
+                    "priority": t.priority,
+                })
+                act_repo.log(
+                    Activity(
+                        user_id=user_id,
+                        actor_type=ActorType.OS,
+                        event_type="notification.deadline_alert",
+                        entity_type="task",
+                        entity_id=t.id,
+                        summary=f"Deadline Alert: '{t.title}' - {risk_reason}",
+                        metadata={"task_id": t.id, "deadline": dl.isoformat(), "reason": risk_reason},
+                    )
+                )
+
     return {
         "job": "deadline_check",
         "status": "completed",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "at_risk_count": len(at_risk_tasks),
+        "at_risk_tasks": at_risk_tasks,
+        "timestamp": now.isoformat(),
     }
 
 
-async def _approval_nag() -> dict[str, Any]:
-    """Approval nag job: remind about pending approvals."""
-    log.info("[Scheduler] Running approval_nag")
+async def _approval_nag(user_id: str = "default_user", nag_after_seconds: int = 600) -> dict[str, Any]:
+    """Approval nag job: remind user about aging pending approvals."""
+    log.info("[Scheduler] Running approval_nag for user %s (threshold=%ds)", user_id, nag_after_seconds)
+    from server.db.database import get_db
+    from server.db.repositories.core import ActionApprovalRepository, ActivityRepository
+    from server.domain.entities import Activity
+    from server.domain.enums import ActorType
+
+    db = get_db()
+    repo = ActionApprovalRepository(db=db)
+    act_repo = ActivityRepository(db=db)
+
+    pending_pairs = repo.get_pending_approvals(user_id=user_id)
+    now = datetime.now(timezone.utc)
+    nagged = []
+
+    for approval, action in pending_pairs:
+        req_at = approval.requested_at if approval.requested_at.tzinfo else approval.requested_at.replace(tzinfo=timezone.utc)
+        age_sec = (now - req_at).total_seconds()
+
+        is_expired = False
+        if approval.expires_at:
+            exp = approval.expires_at if approval.expires_at.tzinfo else approval.expires_at.replace(tzinfo=timezone.utc)
+            if now > exp:
+                is_expired = True
+
+        if age_sec >= nag_after_seconds and not is_expired:
+            mins = int(age_sec // 60)
+            summary = f"Reminder: '{action.tool_name}' has been waiting for approval for ~{mins} minutes."
+            nagged.append({
+                "approval_id": approval.id,
+                "action_id": action.id,
+                "tool_name": action.tool_name,
+                "age_minutes": mins,
+            })
+            act_repo.log(
+                Activity(
+                    user_id=user_id,
+                    actor_type=ActorType.OS,
+                    event_type="notification.approval_nag",
+                    entity_type="approval",
+                    entity_id=approval.id,
+                    summary=summary,
+                    metadata={
+                        "approval_id": approval.id,
+                        "action_id": action.id,
+                        "tool": action.tool_name,
+                        "age_seconds": age_sec,
+                    },
+                )
+            )
+
     return {
         "job": "approval_nag",
         "status": "completed",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "pending_count": len(pending_pairs),
+        "nagged_count": len(nagged),
+        "nagged": nagged,
+        "timestamp": now.isoformat(),
     }
 
 
-async def _watcher_eval() -> dict[str, Any]:
-    """Watcher evaluation job: run watcher rules."""
-    log.info("[Scheduler] Running watcher_eval")
+async def _watcher_eval(user_id: str = "default_user") -> dict[str, Any]:
+    """Watcher evaluation job: evaluate proactive watcher checks across DB state."""
+    log.info("[Scheduler] Running watcher_eval for user %s", user_id)
+    from server.db.database import get_db
+    from server.db.repositories.core import ActionApprovalRepository, ActivityRepository
+    from server.domain.entities import Activity
+    from server.domain.enums import ActorType
+
+    db = get_db()
+    approval_repo = ActionApprovalRepository(db=db)
+    act_repo = ActivityRepository(db=db)
+
+    now = datetime.now(timezone.utc)
+    suggestions: list[dict[str, Any]] = []
+
+    # 1. Aging pending approvals
+    pending = approval_repo.get_pending_approvals(user_id=user_id)
+    aging = [
+        (app, act) for app, act in pending
+        if (now - (app.requested_at if app.requested_at.tzinfo else app.requested_at.replace(tzinfo=timezone.utc))).total_seconds() > 600
+    ]
+    if aging:
+        n = len(aging)
+        sug_text = (
+            f"{n} action{'s' if n != 1 else ''} waiting for approval: "
+            f"{', '.join(act.tool_name for _, act in aging[:3])}. Say 'approve' or 'reject' to proceed."
+        )
+        suggestions.append({"kind": "aging_approvals", "text": sug_text})
+
+    # 2. Recent failed activities
+    recent_acts = act_repo.list_recent(user_id=user_id, limit=50)
+    failed_acts = [
+        a for a in recent_acts
+        if "fail" in a.event_type.lower() or "error" in a.event_type.lower()
+    ]
+    if len(failed_acts) >= 2:
+        suggestions.append({
+            "kind": "recent_failures",
+            "text": f"{len(failed_acts)} recent system failures detected. Review activity logs.",
+        })
+
+    for s in suggestions:
+        act_repo.log(
+            Activity(
+                user_id=user_id,
+                actor_type=ActorType.OS,
+                event_type="notification.watcher_suggestion",
+                summary=s["text"],
+                metadata=s,
+            )
+        )
+
     return {
         "job": "watcher_eval",
         "status": "completed",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "suggestions_count": len(suggestions),
+        "suggestions": suggestions,
+        "timestamp": now.isoformat(),
     }
 
 
@@ -259,13 +502,13 @@ class OSScheduler:
             })
         return result
 
-    async def run_job_now(self, job_name: str) -> dict[str, Any]:
-        """Manually trigger a job immediately."""
+    async def run_job_now(self, job_name: str, **kwargs) -> dict[str, Any]:
+        """Manually trigger a job immediately with optional kwargs."""
         for cfg in self._jobs_config:
             if cfg["name"] == job_name:
                 handler = JOB_HANDLERS.get(cfg["handler"])
                 if handler:
-                    result = await handler()
+                    result = await handler(**kwargs)
                     self._history.append({
                         "job": job_name,
                         "triggered": "manual",

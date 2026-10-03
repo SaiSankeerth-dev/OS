@@ -21,14 +21,75 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from server.domain.enums import RiskLevel
+from server.execution.registry import ToolDefinition, ExecutionToolRegistry
+
 log = logging.getLogger("os.adapters.browser")
 
+
 # ---------------------------------------------------------------------------
-# Data
+# Data & Classification
 # ---------------------------------------------------------------------------
+
+class BrowserActionType(str, Enum):
+    READ = "READ"
+    WRITE = "WRITE"
+    DESTRUCTIVE = "DESTRUCTIVE"
+
+
+def classify_browser_action(
+    action: str,
+    details: Optional[dict[str, Any]] = None,
+) -> BrowserActionType:
+    """Classifies a browser action into READ, WRITE, or DESTRUCTIVE.
+
+    - READ: navigate, open, extract_text, screenshot, read, inspect, get_url.
+    - WRITE: click, fill, type, press, select, hover, scroll.
+    - DESTRUCTIVE: submit_form, checkout, delete, eval, execute_script,
+      or clicks targeting high-risk keywords (delete, pay, purchase).
+    """
+    action_lower = action.lower().strip()
+    details = details or {}
+
+    # Explicit read-only actions
+    if action_lower in ("navigate", "open", "extract_text", "screenshot", "read", "inspect", "get_url", "snapshot"):
+        return BrowserActionType.READ
+
+    # Explicit destructive actions
+    if action_lower in ("submit_form", "checkout", "delete", "eval", "execute_script"):
+        return BrowserActionType.DESTRUCTIVE
+
+    # Interactions: click, fill, type, press
+    if action_lower in ("click", "fill", "type", "press", "select", "hover", "scroll"):
+        target_text = str(
+            details.get("ref", "")
+            or details.get("selector", "")
+            or details.get("text", "")
+            or details.get("value", "")
+        ).lower()
+        destructive_keywords = ("delete", "remove", "pay", "purchase", "buy", "checkout", "confirm_payment", "transfer")
+        if any(kw in target_text for kw in destructive_keywords):
+            return BrowserActionType.DESTRUCTIVE
+        return BrowserActionType.WRITE
+
+    # Conservative default
+    return BrowserActionType.WRITE
+
+
+def browser_action_to_risk(action_type: BrowserActionType) -> RiskLevel:
+    """Maps BrowserActionType to OS RiskLevel."""
+    if action_type == BrowserActionType.READ:
+        return RiskLevel.LOW
+    elif action_type == BrowserActionType.WRITE:
+        return RiskLevel.MEDIUM
+    elif action_type == BrowserActionType.DESTRUCTIVE:
+        return RiskLevel.HIGH
+    return RiskLevel.HIGH
+
 
 @dataclass
 class BrowserReceipt:
@@ -39,6 +100,19 @@ class BrowserReceipt:
     details: dict[str, Any] = field(default_factory=dict)
     screenshot_path: Optional[str] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "action": self.action,
+            "url": self.url,
+            "status": self.status,
+            "status_code": self.status_code,
+            "details": self.details,
+            "screenshot_path": self.screenshot_path,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    as_dict = to_dict
 
 
 # ---------------------------------------------------------------------------
@@ -285,3 +359,73 @@ class BrowserWorker:
         elif self._pw:
             self._pw.close(session_id)
         self._sessions.pop(session_id, None)
+
+    def execute_action(
+        self,
+        session_id: str,
+        action: str,
+        arguments: dict[str, Any],
+    ) -> BrowserReceipt:
+        """Executes a browser action by name with arguments and returns BrowserReceipt."""
+        action_lower = action.lower().strip()
+        if action_lower in ("navigate", "open"):
+            url = arguments.get("url") or arguments.get("target_url") or "about:blank"
+            return self.navigate(session_id, url)
+        elif action_lower in ("screenshot", "take_screenshot"):
+            return self.screenshot(session_id, arguments.get("path"))
+        elif action_lower in ("extract_text", "snapshot", "read"):
+            text = self.extract_text(session_id)
+            url = self._sessions.get(session_id, {}).get("current_url", "about:blank")
+            return BrowserReceipt(
+                action="extract_text",
+                url=url,
+                status="SUCCEEDED",
+                status_code=200,
+                details={"text": text, "length": len(text)},
+            )
+        elif action_lower == "click":
+            ref = arguments.get("ref") or arguments.get("selector") or arguments.get("target") or ""
+            return self.click(session_id, ref)
+        elif action_lower == "fill":
+            ref = arguments.get("ref") or arguments.get("selector") or arguments.get("target") or ""
+            val = arguments.get("value") or arguments.get("text") or ""
+            return self.fill(session_id, ref, str(val))
+        elif action_lower == "submit_form":
+            form_data = arguments.get("form_data") or arguments.get("fields") or {}
+            return self.submit_form(session_id, form_data)
+        else:
+            raise ValueError(f"Unknown browser action: '{action}'")
+
+
+def create_browser_tool(
+    action: str,
+    worker: Optional[BrowserWorker] = None,
+    default_session_id: str = "default",
+) -> ToolDefinition:
+    """Creates a ToolDefinition for a browser action wired to PolicyEngine and SafeExecutor."""
+    _worker = worker or BrowserWorker()
+    action_type = classify_browser_action(action)
+    risk = browser_action_to_risk(action_type)
+
+    def _execute(args: dict[str, Any]) -> dict[str, Any]:
+        session_id = args.get("session_id", default_session_id)
+        receipt = _worker.execute_action(session_id, action, args)
+        return receipt.to_dict()
+
+    return ToolDefinition(
+        name=f"browser.{action}",
+        description=f"Browser action: {action} ({action_type.value})",
+        risk_level=risk,
+        requires_approval=(action_type == BrowserActionType.DESTRUCTIVE),
+        execute=_execute,
+    )
+
+
+def register_browser_tools(
+    registry: ExecutionToolRegistry,
+    worker: Optional[BrowserWorker] = None,
+) -> None:
+    """Registers standard browser tools with the unified execution tool registry."""
+    for action in ("navigate", "extract_text", "screenshot", "click", "fill", "submit_form"):
+        registry.register(create_browser_tool(action, worker=worker))
+

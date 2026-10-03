@@ -64,10 +64,8 @@ class NlmsAEC:
         self.mu = mu
         self.eps = eps
         self._w = np.zeros(filter_len, dtype=np.float64)
-        # Reference history across chunk boundaries.
-        self._ref_hist: collections.deque = collections.deque(
-            [0.0] * filter_len, maxlen=filter_len
-        )
+        # Continuous reference history buffer across chunk boundaries
+        self._ref_buffer = np.zeros(filter_len, dtype=np.float64)
         self._adapted_chunks = 0
 
     @property
@@ -77,9 +75,7 @@ class NlmsAEC:
     def reset(self) -> None:
         """Forget the learned room response (e.g. on device change)."""
         self._w[:] = 0.0
-        self._ref_hist = collections.deque(
-            [0.0] * self.filter_len, maxlen=self.filter_len
-        )
+        self._ref_buffer[:] = 0.0
         self._adapted_chunks = 0
 
     def process(self, mic_chunk: bytes, speaker_ref: bytes | None = None) -> bytes:
@@ -103,18 +99,29 @@ class NlmsAEC:
         w = self._w
         mu = self.mu
         eps = self.eps
-        hist = self._ref_hist
+        L = self.filter_len
 
+        # Concatenate past history buffer with new reference audio
+        extended_ref = np.concatenate((self._ref_buffer, ref))
+        # Keep last L samples for the next chunk
+        self._ref_buffer = extended_ref[-L:].copy()
+
+        # Build strided sliding window view across the reference samples
+        from numpy.lib.stride_tricks import sliding_window_view
+        windows = sliding_window_view(extended_ref, window_shape=L)
+        # Windows: windows[1 : n + 1] has n windows ending at ref[0]..ref[n-1]
+        # Reverse along columns so w[0] multiplies the most recent sample
+        X = windows[1 : n + 1, ::-1]
+
+        # Vectorized energy norm across all sample windows in single C call
+        norm_sq = np.sum(X * X, axis=1) + eps
+
+        # Highly optimized loop without allocations
         for i in range(n):
-            hist.append(ref[i])
-            x = np.fromiter(hist, dtype=np.float64, count=self.filter_len)
-            # x is oldest..newest; filter expects newest-first alignment —
-            # reverse so w[0] multiplies the most recent sample.
-            x = x[::-1]
-            y = float(np.dot(w, x))
+            xi = X[i]
+            y = float(np.dot(w, xi))
             e = mic[i] - y
-            norm = float(np.dot(x, x)) + eps
-            w += (mu * e / norm) * x
+            w += (mu * e / norm_sq[i]) * xi
             out[i] = e
 
         self._adapted_chunks += 1

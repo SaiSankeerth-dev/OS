@@ -845,6 +845,10 @@ async def approve_action(aid: str) -> dict:
     adapter = get_adapter(rec["connector_id"])
     if adapter is None:
         raise HTTPException(404, "unknown connector")
+
+    # Race condition protection: mark executing immediately before side-effect
+    dash.set_action_status(aid, "executing", "running action")
+
     try:
         result = adapter.run_action(rec["action"], rec["params"],
                                     _creds_for(rec["connector_id"]))
@@ -857,6 +861,24 @@ async def approve_action(aid: str) -> dict:
         raise HTTPException(500, "action failed")
     dash.touch_used(rec["connector_id"])
     dash.set_action_status(aid, "done", _short_result(result))
+
+    # Run PostconditionVerifier and record evidence
+    try:
+        from server.execution import PostconditionVerifier
+        from server.db.database import get_db
+        db = get_db()
+        tool_name = f"{rec['connector_id']}.{rec['action']}"
+        with db.transaction() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO actions (id, user_id, tool_name, arguments_hash, idempotency_key, created_at) "
+                "VALUES (?, 'default_user', ?, 'hash', ?, datetime('now'))",
+                (aid, tool_name, f"idem_{aid}"),
+            )
+        pv = PostconditionVerifier()
+        pv.verify_action(aid, tool_name, result, "default_user", arguments=rec["params"])
+    except Exception as e:
+        log.warning("Postcondition verification on connector action failed: %s", e)
+
     return {"ok": True, "result": result}
 
 

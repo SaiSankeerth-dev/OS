@@ -488,6 +488,8 @@ class PlanRepository:
                     ),
                 )
 
+    create_plan = save_plan
+
     def get_active_plan(self, user_id: str, plan_date: str) -> Optional[Tuple[Plan, list[PlanItem]]]:
         with self.db.connection() as conn:
             p_row = conn.execute(
@@ -692,6 +694,28 @@ class ActionApprovalRepository:
                 ),
             )
         return a
+
+    def get_action(self, action_id: str) -> Optional[Action]:
+        with self.db.connection() as conn:
+            r = conn.execute("SELECT * FROM actions WHERE id = ?", (action_id,)).fetchone()
+            if not r:
+                return None
+            return Action(
+                id=r["id"],
+                user_id=r["user_id"],
+                agent_run_id=r["agent_run_id"],
+                task_id=r["task_id"],
+                tool_name=r["tool_name"],
+                risk_level=RiskLevel(r["risk_level"]),
+                arguments=json.loads(r["arguments"] or "{}"),
+                arguments_hash=r["arguments_hash"],
+                status=ActionStatus(r["status"]),
+                idempotency_key=r["idempotency_key"],
+                result=json.loads(r["result"]) if r["result"] else None,
+                started_at=_iso_to_dt(r["started_at"]),
+                completed_at=_iso_to_dt(r["completed_at"]),
+                created_at=_iso_to_dt(r["created_at"]) or datetime.now(timezone.utc),
+            )
 
     def create_approval(self, app: Approval) -> Approval:
         now = datetime.now(timezone.utc).isoformat()

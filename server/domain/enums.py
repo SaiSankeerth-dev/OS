@@ -74,6 +74,8 @@ class ActionStatus(str, Enum):
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
     TIMED_OUT = "TIMED_OUT"
+    EXECUTING = "RUNNING"
+    COMPLETED = "SUCCEEDED"
 
 
 class ApprovalStatus(str, Enum):

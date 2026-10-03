@@ -212,10 +212,10 @@ def _cmd_gmail_send(text: str, ctx: Ctx) -> AssistantResult:
     if not m:
         return _ask("Who should I send it to? (I need an email address)")
     to = m.group(0)
-    subj = re.search(r"subject\s*[:\-]?\s*\"?([^\"\n]+)\"?", text, re.I)
-    body_m = re.search(r"body\s*[:\-]?\s*\"?(.+?)\"?$", text, re.I | re.S)
+    subj = re.search(r"subject\s*[:\-]?\s*[\"']?([^\"'\n]+?)[\"']?(?=\s+body\b|\s*$)", text, re.I)
+    body_m = re.search(r"body\s*[:\-]?\s*[\"']?(.+?)[\"']?$", text, re.I | re.S)
     if not body_m:
-        body_m = re.search(r"(?:saying|that says|with (?:the )?message)\s+(.+)$", text, re.I | re.S)
+        body_m = re.search(r"(?:saying|that says|with (?:the )?message)\s+[\"']?(.+?)[\"']?$", text, re.I | re.S)
     subject = subj.group(1).strip() if subj else ""
     body = body_m.group(1).strip() if body_m else ""
     if not subject:
@@ -244,6 +244,71 @@ def _cmd_gmail_search(text: str, ctx: Ctx) -> AssistantResult:
             f"• {e['subject']} — {e['from']}" for e in emails)
 
     return _run_read(ctx, cid, "search_emails", {"query": query}, fmt)
+
+
+def _cmd_calendar_cancel(text: str, ctx: Ctx) -> AssistantResult:
+    cid = "google_calendar"
+    if cid not in ctx.connected_ids():
+        return _need_connection(cid, "Google Calendar", "cancel that event")
+    m = re.search(r"\b(evt_[a-zA-Z0-9_-]+)\b", text, re.I)
+    if not m:
+        m = re.search(r"(?:id\s+)([a-zA-Z0-9_-]{5,})", text, re.I)
+    event_id = m.group(1) if m else None
+    if not event_id:
+        m = re.search(r"(?:cancel|delete)\s+(?:the\s+)?(?:meeting|event|call)\s+[\"']?(.+?)[\"']?$", text, re.I)
+        event_id = m.group(1).strip() if m else None
+    if not event_id or event_id.lower() in ("event", "meeting", "call"):
+        return _ask("Which event should I cancel? (Please provide the event ID or title)")
+    summary = f"🗑️ Cancel calendar event: {event_id}"
+    return _request_write(ctx, cid, "Google Calendar", "delete_event",
+                          "Cancel event",
+                          {"event_id": event_id}, summary)
+
+
+def _cmd_calendar_reschedule(text: str, ctx: Ctx) -> AssistantResult:
+    cid = "google_calendar"
+    if cid not in ctx.connected_ids():
+        return _need_connection(cid, "Google Calendar", "reschedule that")
+    m = re.search(r"\b(evt_[a-zA-Z0-9_-]+)\b", text, re.I)
+    if not m:
+        m = re.search(r"(?:id\s+)([a-zA-Z0-9_-]{5,})", text, re.I)
+    event_id = m.group(1) if m else None
+    if not event_id:
+        m = re.search(r"(?:reschedule|move)\s+(?:the\s+)?(?:meeting|event|call)?\s*[\"']?([^\"'\n]+?)[\"']?\s+to\b", text, re.I)
+        event_id = m.group(1).strip() if m else None
+    dt = parse_event_datetime(text)
+    if not event_id or event_id.lower() in ("event", "meeting", "call"):
+        return _ask("Which event should I reschedule? (Please provide the event ID or title)")
+    if dt is None:
+        return _ask(f"When should I move event '{event_id}' to? (e.g. 'tomorrow at 3pm')")
+    start, end = dt
+    summary = f"📅 Reschedule event {event_id} to {_fmt_time(start)}–{_fmt_time(end)}"
+    return _request_write(ctx, cid, "Google Calendar", "update_event",
+                          "Reschedule event",
+                          {"event_id": event_id, "start": start, "end": end}, summary)
+
+
+def _cmd_gmail_reply(text: str, ctx: Ctx) -> AssistantResult:
+    cid = "gmail"
+    if cid not in ctx.connected_ids():
+        return _need_connection(cid, "Gmail", "reply to that email")
+    m = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", text)
+    to = m.group(0) if m else None
+    m_id = re.search(r"(?:thread|message)\s+(?:id\s+)?([a-zA-Z0-9_-]{5,})", text, re.I)
+    thread_id = m_id.group(1) if m_id else None
+    body_m = re.search(r"(?:saying|that says|with (?:the )?message)\s+(.+)$", text, re.I | re.S)
+    body = body_m.group(1).strip() if body_m else ""
+    subj_m = re.search(r"subject\s*[:\-]?\s*\"?([^\"\n]+)\"?", text, re.I)
+    subject = subj_m.group(1).strip() if subj_m else "Follow-up"
+    if not to and not thread_id:
+        return _ask("Who should I reply to? (Need an email address or thread ID)")
+    if not body:
+        return _ask("What should the reply say?")
+    params = {"to": to or "reply@example.com", "subject": subject, "body": body}
+    if thread_id:
+        params["thread_id"] = thread_id
+    summary = f"↩️ Reply to {to or thread_id}\nSubject: Re: {subject}\n\n{body[:300]}"
+    return _request_write(ctx, cid, "Gmail", "reply_email", "Reply to email", params, summary)
 
 
 def _cmd_github_issue(text: str, ctx: Ctx) -> AssistantResult:
@@ -416,6 +481,9 @@ def _cmd_drive_list(text: str, ctx: Ctx) -> AssistantResult:
 
 # (pattern, handler) — order matters, most specific first
 COMMANDS = [
+    (re.compile(r"\b(reschedule|move)\b.{0,40}\b(meeting|event|appointment|call)?\b", re.I), _cmd_calendar_reschedule),
+    (re.compile(r"\b(cancel|delete)\b.{0,40}\b(meeting|event|appointment|call)\b", re.I), _cmd_calendar_cancel),
+    (re.compile(r"\b(reply)\b.{0,30}\b(to\s+email|email|mail)\b", re.I), _cmd_gmail_reply),
     (re.compile(r"\b(schedule|create|add|book|set up)\b.{0,50}\b(meeting|event|appointment|call|reminder|session)\b", re.I), _cmd_calendar_create),
     (re.compile(r"\b(what'?s|show|list|any|do i have)\b.{0,40}\b(on my calendar|my schedule|events|meetings|appointments)\b", re.I), _cmd_calendar_list),
     (re.compile(r"\bsend\b.{0,30}\bemail\b", re.I), _cmd_gmail_send),

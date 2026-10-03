@@ -31,9 +31,9 @@ class PolicyEngine:
         self,
         tool: ToolDefinition,
         arguments: dict[str, Any],
-        user_autonomy: str = "balanced",
+        user_autonomy: Optional[str] = None,
     ) -> PolicyDecision:
-        autonomy = user_autonomy or self.autonomy_level
+        autonomy = user_autonomy or self.autonomy_level or "balanced"
         tool_name = getattr(tool, "tool_name", None) or getattr(tool, "name", "unknown")
         req_approval = getattr(tool, "requires_approval", False)
 

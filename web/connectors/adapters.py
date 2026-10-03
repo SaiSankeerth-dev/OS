@@ -158,6 +158,22 @@ class GoogleCalendarAdapter(Adapter):
                                             eventId=params["event_id"]).execute(),
                 "Deleting event")
             return {"ok": True, "deleted": params["event_id"]}
+        if action == "update_event":
+            body = {}
+            if "title" in params:
+                body["summary"] = params["title"]
+            if "start" in params:
+                body["start"] = {"dateTime": params["start"]}
+            if "end" in params:
+                body["end"] = {"dateTime": params["end"]}
+            if "description" in params:
+                body["description"] = params["description"]
+            e = _google_call(
+                lambda: svc.events().patch(
+                    calendarId="primary", eventId=params["event_id"], body=body).execute(),
+                "Updating event")
+            return {"ok": True, "id": e.get("id"), "title": e.get("summary"),
+                    "start": params.get("start"), "link": e.get("htmlLink")}
         raise AdapterError(f"Unknown action {action}")
 
 
@@ -196,6 +212,22 @@ class GmailAdapter(Adapter):
                 lambda: svc.users().messages().send(
                     userId="me", body={"raw": raw}).execute(), "Sending email")
             return {"ok": True, "id": sent.get("id"), "to": params["to"]}
+        if action == "reply_email":
+            mime = MIMEText(params["body"])
+            mime["to"] = params["to"]
+            subj = params["subject"]
+            mime["subject"] = subj if subj.lower().startswith("re:") else f"Re: {subj}"
+            if "message_id" in params:
+                mime["In-Reply-To"] = params["message_id"]
+                mime["References"] = params["message_id"]
+            raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
+            send_body = {"raw": raw}
+            if "thread_id" in params:
+                send_body["threadId"] = params["thread_id"]
+            sent = _google_call(
+                lambda: svc.users().messages().send(
+                    userId="me", body=send_body).execute(), "Replying to email")
+            return {"ok": True, "id": sent.get("id"), "to": params["to"], "thread_id": sent.get("threadId")}
         raise AdapterError(f"Unknown action {action}")
 
 

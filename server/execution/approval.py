@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from server.domain.entities import Action, Activity, Approval
@@ -28,15 +28,21 @@ class ApprovalTamperedError(ValueError):
     pass
 
 
+class ApprovalExpiredError(ValueError):
+    pass
+
+
 class ApprovalEngine:
     def __init__(
         self,
         approval_repo: Optional[ActionApprovalRepository] = None,
         activity_repo: Optional[ActivityRepository] = None,
+        timeout_sec: int = 1800,
     ) -> None:
         db = get_db()
         self.repo = approval_repo or ActionApprovalRepository(db)
         self.activity_repo = activity_repo or ActivityRepository(db)
+        self.timeout_sec = timeout_sec
 
     def request_approval(
         self,
@@ -45,9 +51,12 @@ class ApprovalEngine:
         arguments: dict[str, Any],
         task_id: Optional[str] = None,
         risk_level: RiskLevel = RiskLevel.HIGH,
+        timeout_sec: Optional[int] = None,
     ) -> tuple[Action, Approval]:
         arg_hash = compute_arguments_hash(arguments)
         idempotency_key = f"{user_id}_{tool_name}_{arg_hash}_{int(datetime.now(timezone.utc).timestamp())}"
+        effective_timeout = timeout_sec if timeout_sec is not None else self.timeout_sec
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=effective_timeout)
 
         action = Action(
             user_id=user_id,
@@ -66,6 +75,7 @@ class ApprovalEngine:
             user_id=user_id,
             arguments_hash=arg_hash,
             status=ApprovalStatus.PENDING,
+            expires_at=expires_at,
         )
         self.repo.create_approval(approval)
 
@@ -101,6 +111,22 @@ class ApprovalEngine:
 
             if row["status"] != "PENDING":
                 raise ValueError(f"Approval '{approval_id}' is already {row['status']}")
+
+            # Check expiration
+            expires_at_val = row["expires_at"] if "expires_at" in row.keys() else None
+            if expires_at_val:
+                try:
+                    exp = datetime.fromisoformat(expires_at_val)
+                    if exp.tzinfo is None:
+                        exp = exp.replace(tzinfo=timezone.utc)
+                    if datetime.now(timezone.utc) > exp:
+                        self.repo.decide_approval(approval_id, ApprovalStatus.EXPIRED, user_id)
+                        raise ApprovalExpiredError(
+                            f"Approval '{approval_id}' expired at {exp.isoformat()} and cannot be approved"
+                        )
+                except (ValueError, TypeError) as e:
+                    if isinstance(e, ApprovalExpiredError):
+                        raise
 
             # Bound arguments check
             if row["arguments_hash"] != current_hash:

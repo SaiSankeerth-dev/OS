@@ -256,6 +256,31 @@ class WorldModelRepository:
                 created_at=_iso_to_dt(row["created_at"]) or datetime.now(timezone.utc),
             )
 
+    def list_evidence(self, user_id: str = "default_user", limit: int = 50) -> list[Evidence]:
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM evidence WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit),
+            )
+            return [
+                Evidence(
+                    id=row["id"],
+                    user_id=row["user_id"],
+                    source_id=row["source_id"],
+                    source_event_id=row["source_event_id"],
+                    evidence_type=row["evidence_type"],
+                    external_id=row["external_id"],
+                    title=row["title"],
+                    content=row["content"],
+                    uri=row["uri"],
+                    metadata=json.loads(row["metadata"] or "{}"),
+                    occurred_at=_iso_to_dt(row["occurred_at"]),
+                    content_hash=row["content_hash"],
+                    created_at=_iso_to_dt(row["created_at"]) or datetime.now(timezone.utc),
+                )
+                for row in cursor.fetchall()
+            ]
+
     # ---- Agent Runs ---------------------------------------------------------
     def record_agent_run(self, run: AgentRun) -> AgentRun:
         now = datetime.now(timezone.utc).isoformat()

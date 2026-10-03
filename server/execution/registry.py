@@ -20,11 +20,21 @@ class ToolDefinition:
     name: str
     description: str
     risk_level: RiskLevel
-    handler: Callable[[dict[str, Any]], Any]
+    handler: Optional[Callable[[dict[str, Any]], Any]] = None
     input_schema: dict[str, Any] = field(default_factory=dict)
     output_schema: dict[str, Any] = field(default_factory=dict)
     requires_approval: bool = False
     verifier_name: Optional[str] = None
+    # Explicit prepare -> execute -> verify boundary
+    prepare: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
+    execute: Optional[Callable[[dict[str, Any]], Any]] = None
+    verify: Optional[Callable[[dict[str, Any], Any], Any]] = None
+
+    def __post_init__(self) -> None:
+        if self.execute is not None and self.handler is None:
+            self.handler = self.execute
+        elif self.handler is not None and self.execute is None:
+            self.execute = self.handler
 
 
 class ExecutionToolRegistry:
