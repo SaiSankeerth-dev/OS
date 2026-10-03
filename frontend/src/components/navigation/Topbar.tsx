@@ -31,15 +31,20 @@ export const Topbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 w-full h-16 border-b border-os-border bg-os-bg/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between">
       {/* Left: Branding & Ambient Presence */}
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-3">
         <div
-          className="flex items-center gap-2.5 cursor-pointer group"
+          className="flex items-center gap-2.5 cursor-pointer group select-none"
           onClick={() => setCurrentView('home')}
         >
-          <AmbientOrb state={orbState} size={36} />
+          <img
+            src="/static/logo.png"
+            alt="OS Logo"
+            className="w-8 h-8 rounded-full object-contain filter drop-shadow-[0_0_12px_rgba(99,102,241,0.35)] transition-transform duration-200 group-hover:scale-105"
+          />
+          <AmbientOrb state={orbState} size={28} />
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-base tracking-tight text-os-primary group-hover:text-emerald-400 transition-colors">
+              <span className="font-extrabold text-base tracking-tight text-os-primary group-hover:text-indigo-400 transition-colors">
                 OS
               </span>
               <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-os-secondary">

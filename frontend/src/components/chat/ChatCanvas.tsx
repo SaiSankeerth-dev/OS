@@ -180,10 +180,12 @@ export const ChatCanvas: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">
-                    <Sparkles className="w-2.5 h-2.5" />
-                  </div>
-                  <span className="text-xs font-medium text-os-secondary">OS</span>
+                  <img
+                    src="/static/logo.png"
+                    alt="OS"
+                    className="w-4 h-4 rounded-full object-contain filter drop-shadow-[0_0_6px_rgba(99,102,241,0.4)]"
+                  />
+                  <span className="text-xs font-semibold text-os-secondary">OS</span>
                   <span className="text-[10px] font-mono text-os-muted">{msg.timestamp}</span>
                 </>
               )}
