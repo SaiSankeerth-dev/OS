@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../services/api';
 import {
-  ShieldAlert,
+  Volume2,
   Cpu,
   Zap,
   Terminal,
@@ -13,10 +13,12 @@ import {
   AlertTriangle,
   Play,
   RotateCcw,
-  Volume2,
   Lock,
   Share2,
   Video,
+  Shield,
+  Activity,
+  Layers,
 } from 'lucide-react';
 
 interface DotInfo {
@@ -57,6 +59,11 @@ export const HudView: React.FC = () => {
     latency: '4.2 ms',
   });
 
+  // Pipeline state
+  const [pipelineStage, setPipelineStage] = useState<'STANDBY' | 'DOT RBAC' | 'HITL GATE' | 'ENGINE' | 'TELEMETRY'>('STANDBY');
+  const [pipelinePercent, setPipelinePercent] = useState<number>(0);
+  const [reactorSpeedMultiplier, setReactorSpeedMultiplier] = useState<number>(1.0);
+
   // Computer takeover state
   const [isHumanControl, setIsHumanControl] = useState<boolean>(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
@@ -76,7 +83,7 @@ export const HudView: React.FC = () => {
     {
       id: 'init-1',
       sender: 'os',
-      text: 'OS v1.0 Control Plane Online.\n• OpenJarvis: 5 Composable Primitives active.\n• OpenMuse: Agent Computer & Sandbox Worker connected.\n• OpenDots: 4 Specialist Coworkers (@forge, @scout, @scribe, @sentinel) & Revision-Safe Spaces verified.',
+      text: 'OS v2.0 Control Plane Online.\n• OpenJarvis: 5 Composable Primitives active (Hardware-Aware Local Engine).\n• OpenMuse: Agent Computer & Sandbox Worker connected.\n• OpenDots: 4 Specialist Coworkers (@forge, @scout, @scribe, @sentinel) & Revision-Safe Spaces verified.',
     },
   ]);
   const [inputText, setInputText] = useState<string>('');
@@ -84,6 +91,13 @@ export const HudView: React.FC = () => {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const setPipeline = (stage: 'STANDBY' | 'DOT RBAC' | 'HITL GATE' | 'ENGINE' | 'TELEMETRY', rState: string, pct: number) => {
+    setPipelineStage(stage);
+    setRuntimeState(rState);
+    setPipelinePercent(pct);
+    setReactorSpeedMultiplier(stage === 'STANDBY' ? 1.0 : stage === 'HITL GATE' ? 0.4 : 2.5);
+  };
 
   // Load state from backend
   const loadState = useCallback(async () => {
@@ -147,13 +161,13 @@ export const HudView: React.FC = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
-      angle += 0.018;
+      angle += 0.016 * reactorSpeedMultiplier;
 
       // Outer rotating telemetry ring
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(angle * 0.6);
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.38)';
       ctx.lineWidth = 2;
       ctx.setLineDash([12, 8, 4, 8]);
       ctx.beginPath();
@@ -165,7 +179,7 @@ export const HudView: React.FC = () => {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(-angle * 1.1);
-      ctx.strokeStyle = 'rgba(0, 255, 157, 0.55)';
+      ctx.strokeStyle = 'rgba(0, 255, 157, 0.58)';
       ctx.lineWidth = 3;
       ctx.setLineDash([22, 14]);
       ctx.beginPath();
@@ -174,7 +188,7 @@ export const HudView: React.FC = () => {
       ctx.restore();
 
       // 3D Octahedron core
-      const radius = 36;
+      const radius = 35;
       const vertices = [
         [0, -radius, 0], [0, radius, 0],
         [-radius, 0, 0], [radius, 0, 0],
@@ -200,7 +214,7 @@ export const HudView: React.FC = () => {
       });
 
       ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.65;
       edges.forEach(([i, j]) => {
         ctx.beginPath();
         ctx.moveTo(projected[i][0], projected[i][1]);
@@ -226,15 +240,16 @@ export const HudView: React.FC = () => {
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animId);
     };
-  }, []);
+  }, [reactorSpeedMultiplier]);
 
-  const handleSendCommand = async (customQuery?: string) => {
+  const handleSendCommand = async (customQuery?: string, overrideDot?: string) => {
     const q = customQuery || inputText.trim();
     if (!q) return;
     if (!customQuery) setInputText('');
 
+    const targetDot = overrideDot || activeDot;
     setMessages((prev) => [...prev, { id: Math.random().toString(), sender: 'user', text: q }]);
-    setRuntimeState('PROCESSING');
+    setPipeline('DOT RBAC', 'PROCESSING', 35);
 
     const ql = q.toLowerCase();
     let actionType: string | undefined = undefined;
@@ -252,10 +267,11 @@ export const HudView: React.FC = () => {
     }
 
     try {
-      const res = await api.sendHudCommand(q, activeDot, actionType, actionPayload);
-      setRuntimeState(res.state || 'STANDBY');
+      setPipeline('ENGINE', 'WORKING', 65);
+      const res = await api.sendHudCommand(q, targetDot, actionType, actionPayload);
 
       if (res.status === 'blocked') {
+        setPipeline('STANDBY', 'ERROR', 0);
         setMessages((prev) => [
           ...prev,
           {
@@ -269,6 +285,7 @@ export const HudView: React.FC = () => {
       }
 
       if (res.status === 'permission_denied') {
+        setPipeline('STANDBY', 'ERROR', 0);
         setMessages((prev) => [
           ...prev,
           {
@@ -282,6 +299,7 @@ export const HudView: React.FC = () => {
       }
 
       if (res.status === 'waiting_approval' && res.approval_card) {
+        setPipeline('HITL GATE', 'WAITING_APPROVAL', 50);
         setMessages((prev) => [
           ...prev,
           {
@@ -300,6 +318,7 @@ export const HudView: React.FC = () => {
         return;
       }
 
+      setPipeline('TELEMETRY', 'COMPLETED', 100);
       const responseText = res.response || 'Executed successfully.';
       setLastSpeech(responseText.replace(/<[^>]*>?/gm, ''));
       setMessages((prev) => [
@@ -321,10 +340,14 @@ export const HudView: React.FC = () => {
 
       setTerminalLogs((prev) => [
         ...prev,
-        `$ os ask --dot ${activeDot} "${q}"\n[OK] Latency: ${res.telemetry?.latency_ms || 4.2}ms`,
+        `$ os ask --dot ${targetDot} "${q}"\n[OK] Latency: ${res.telemetry?.latency_ms || 4.2}ms`,
       ]);
+
+      setTimeout(() => {
+        setPipeline('STANDBY', 'STANDBY', 0);
+      }, 1200);
     } catch (err: any) {
-      setRuntimeState('ERROR');
+      setPipeline('STANDBY', 'ERROR', 0);
       setMessages((prev) => [
         ...prev,
         { id: Math.random().toString(), sender: 'os', text: `Error: ${err.message}` },
@@ -345,14 +368,15 @@ export const HudView: React.FC = () => {
 
       if (decision === 'deny') {
         setTerminalLogs((prev) => [...prev, `[DENIED BY OPERATOR] ${payload}`]);
-        setRuntimeState('STANDBY');
+        setPipeline('STANDBY', 'STANDBY', 0);
       } else {
         const out = res?.execution_result?.stdout?.trim() || res?.execution_result?.status || `Executed under policy '${decision}'`;
         setTerminalLogs((prev) => [
           ...prev,
           `$ ${payload}\n[AGENT COMPUTER] ${out}`,
         ]);
-        setRuntimeState('STANDBY');
+        setPipeline('TELEMETRY', 'COMPLETED', 100);
+        setTimeout(() => setPipeline('STANDBY', 'STANDBY', 0), 1200);
       }
     } catch (err: any) {
       console.error('Failed to resolve approval:', err);
@@ -411,6 +435,7 @@ export const HudView: React.FC = () => {
   };
 
   const handleOptimize = async () => {
+    setPipeline('ENGINE', 'PROCESSING', 70);
     try {
       const res = await api.optimizeHudTraces();
       setTelemetry({
@@ -418,21 +443,95 @@ export const HudView: React.FC = () => {
         energy: `${res.total_energy_joules} J`,
         latency: `${res.avg_latency_ms} ms`,
       });
+      const latestSkill = (res.learned_skills && res.learned_skills.length)
+        ? res.learned_skills[res.learned_skills.length - 1].replace(/\.$/, '')
+        : 'local-first-routing';
       setMessages((prev) => [
         ...prev,
         {
           id: Math.random().toString(),
           sender: 'os',
-          text: `[OS Learning Loop] Synthesized ${res.total_traces} local interaction traces.\nLearned: ${res.learned_skills[res.learned_skills.length - 1] || 'Routing weights tuned.'}`,
+          text: `[OS Learning Loop] Synthesized ${res.total_traces} local interaction traces.\n• Latest Skill: ${latestSkill}`,
         },
       ]);
+      setTerminalLogs((prev) => [...prev, `$ os optimize\n[OK] Tuned routing weights across ${res.total_traces} traces.`]);
+      setPipeline('TELEMETRY', 'COMPLETED', 100);
+      setTimeout(() => setPipeline('STANDBY', 'STANDBY', 0), 1200);
     } catch (err: any) {
       console.error(err);
+      setPipeline('STANDBY', 'ERROR', 0);
+    }
+  };
+
+  const handleRunPreset = async (preset: string) => {
+    if (preset === 'morning') {
+      setActiveDot('sentinel');
+      handleSendCommand('Generate my morning briefing', 'sentinel');
+    } else if (preset === 'optimize') {
+      handleOptimize();
+    } else if (preset === 'risky_shell') {
+      setActiveDot('forge');
+      handleSendCommand('deploy docker container openmuse-computer:local --port 8790', 'forge');
+    } else if (preset === 'youtube') {
+      setActiveDot('scout');
+      setPipeline('ENGINE', 'WORKING', 75);
+      try {
+        const data = await api.summarizeYouTubeVideo('https://youtube.com/watch?v=9o00NBuluVQ', 'OpenMuse & OpenJarvis Architecture');
+        const bullets = (data.key_takeaways || []).map((t: string) => `• ${t}`).join('\n');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            sender: 'os',
+            text: `[@scout // YouTube Skill Connector] Indexed ${data.title}:\n${bullets}`,
+          },
+        ]);
+        setTerminalLogs((prev) => [
+          ...prev,
+          `$ os youtube summarize "${data.video_url}"\n[OK] Indexed ${data.key_takeaways?.length || 3} takeaways into Space.`,
+        ]);
+        setPipeline('TELEMETRY', 'COMPLETED', 100);
+        setTimeout(() => setPipeline('STANDBY', 'STANDBY', 0), 1200);
+      } catch (e: any) {
+        console.error(e);
+        setPipeline('STANDBY', 'ERROR', 0);
+      }
+    } else if (preset === 'linkedin') {
+      setActiveDot('scribe');
+      setPipeline('ENGINE', 'WORKING', 75);
+      try {
+        const data = await api.draftLinkedInPost('OS v2.0 Local-First AI Operating System', [
+          'OpenJarvis 5 Composable Primitives with Intelligence-Per-Watt telemetry',
+          'OpenMuse isolated Agent Computer with 1-click Human Take Control',
+          'OpenDots scoped RBAC coworkers & revision-locked Markdown Spaces',
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            sender: 'os',
+            text: `[@scribe // LinkedIn Skill Connector] Drafted launch post (${data.character_count} chars):\n\n${data.content}`,
+          },
+        ]);
+        setTerminalLogs((prev) => [
+          ...prev,
+          `$ os linkedin draft --topic "OS v2.0"\n[OK] Draft ready (${data.character_count} chars).`,
+        ]);
+        setPipeline('TELEMETRY', 'COMPLETED', 100);
+        setTimeout(() => setPipeline('STANDBY', 'STANDBY', 0), 1200);
+      } catch (e: any) {
+        console.error(e);
+        setPipeline('STANDBY', 'ERROR', 0);
+      }
+    } else if (preset === 'destructive') {
+      setActiveDot('forge');
+      handleSendCommand('rm -rf / --no-preserve-root', 'forge');
     }
   };
 
   const speakLast = () => {
     if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(lastSpeech);
       utter.rate = 1.02;
       utter.pitch = 0.95;
@@ -447,7 +546,7 @@ export const HudView: React.FC = () => {
       <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-[#0a1324]/90 border border-cyan-500/20 backdrop-blur-md shadow-lg shadow-cyan-950/20">
         <div className="flex items-center gap-3">
           <span className="text-cyan-400 font-bold tracking-widest text-sm flex items-center gap-2">
-            <span className="text-cyan-300">◈</span> OS // CYBER-HUD v1.0
+            <span className="text-cyan-300">◈</span> OS // CYBER-HUD v2.0
           </span>
           <span className="text-[11px] text-cyan-200/50 hidden md:inline">
             OpenJarvis + OpenMuse + OpenDots Architecture
@@ -472,6 +571,37 @@ export const HudView: React.FC = () => {
             <Volume2 className="w-3.5 h-3.5" />
             <span>Voice Readout</span>
           </button>
+        </div>
+      </div>
+
+      {/* 5-Stage Task Execution Pipeline Header */}
+      <div className="px-4 py-2 rounded-lg bg-[#0a1324]/85 border border-cyan-500/20 flex flex-col gap-1.5 shadow-md">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-cyan-400/80 font-bold uppercase tracking-wider flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            Task Execution Pipeline:
+          </span>
+          <div className="flex items-center gap-2">
+            {(['STANDBY', 'DOT RBAC', 'HITL GATE', 'ENGINE', 'TELEMETRY'] as const).map((stage, idx) => (
+              <span
+                key={stage}
+                className={`text-[10px] px-2 py-0.5 rounded font-bold transition-all ${
+                  pipelineStage === stage
+                    ? 'bg-cyan-400 text-black shadow-sm shadow-cyan-400/50'
+                    : 'bg-black/40 text-cyan-500/60 border border-cyan-500/20'
+                }`}
+              >
+                {idx + 1}. {stage}
+              </span>
+            ))}
+          </div>
+        </div>
+        {/* Progress Bar */}
+        <div className="w-full h-1 bg-black/60 rounded-full overflow-hidden border border-cyan-500/20">
+          <div
+            className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-300"
+            style={{ width: `${pipelinePercent}%` }}
+          />
         </div>
       </div>
 
@@ -551,19 +681,48 @@ export const HudView: React.FC = () => {
                 <span className="text-cyan-300">{telemetry.traces} traces tuned</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-cyan-500/20">
-              <button
-                onClick={() => handleSendCommand('Generate my morning briefing')}
-                className="px-2.5 py-1.5 text-[11px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors"
-              >
-                ☀ Morning Digest
-              </button>
-              <button
-                onClick={handleOptimize}
-                className="px-2.5 py-1.5 text-[11px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors"
-              >
-                ⚡ OS Optimize
-              </button>
+
+            {/* 6 1-Click Task Demo Presets */}
+            <div className="pt-2 border-t border-cyan-500/20">
+              <div className="text-[10px] text-cyan-400/70 uppercase font-bold mb-1.5">1-Click Presets:</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => handleRunPreset('morning')}
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                >
+                  ☀ Morning Digest
+                </button>
+                <button
+                  onClick={() => handleRunPreset('optimize')}
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                >
+                  ⚡ OS Optimize
+                </button>
+                <button
+                  onClick={() => handleRunPreset('risky_shell')}
+                  className="px-2 py-1 text-[10px] rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 transition-colors text-left truncate"
+                >
+                  🛡 HITL Deploy
+                </button>
+                <button
+                  onClick={() => handleRunPreset('youtube')}
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                >
+                  📹 YouTube Summary
+                </button>
+                <button
+                  onClick={() => handleRunPreset('linkedin')}
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                >
+                  💼 LinkedIn Draft
+                </button>
+                <button
+                  onClick={() => handleRunPreset('destructive')}
+                  className="px-2 py-1 text-[10px] rounded border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 transition-colors text-left truncate"
+                >
+                  🛑 Security Block
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -584,7 +743,7 @@ export const HudView: React.FC = () => {
             <div className="flex items-center justify-between text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-cyan-500/20 pb-2 mb-2">
               <span>AG-UI Live Stream & Human-in-the-Loop Approvals</span>
               <button
-                onClick={() => handleSendCommand('deploy docker container openmuse-computer:local --port 8790')}
+                onClick={() => handleRunPreset('risky_shell')}
                 className="text-[10px] px-2 py-0.5 rounded border border-amber-500/40 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
               >
                 Test HITL Gate
@@ -650,11 +809,11 @@ export const HudView: React.FC = () => {
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendCommand()}
                 placeholder="Command OS or active Dot (e.g. 'calculate 137 * 42', 'deploy container')..."
-                className="flex-1 px-3 py-2 text-xs rounded bg-black/60 border border-cyan-500/30 text-cyan-100 placeholder-cyan-500/40 focus:outline-none focus:border-cyan-400"
+                className="flex-1 h-9 px-3 text-xs rounded bg-black/60 border border-cyan-500/30 text-cyan-100 placeholder-cyan-500/40 focus:outline-none focus:border-cyan-400"
               />
               <button
                 onClick={() => handleSendCommand()}
-                className="px-4 py-2 text-xs rounded bg-cyan-500 text-black font-bold hover:bg-cyan-400 transition-colors"
+                className="px-4 h-9 text-xs rounded bg-cyan-500 text-black font-bold hover:bg-cyan-400 transition-colors"
               >
                 EXECUTE
               </button>
@@ -702,14 +861,14 @@ export const HudView: React.FC = () => {
               type="text"
               value={pageTitle}
               onChange={(e) => setPageTitle(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400"
+              className="h-9 flex-none px-2.5 text-xs rounded bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400"
             />
             <textarea
               value={pageMarkdown}
               onChange={(e) => setPageMarkdown(e.target.value)}
-              className="flex-1 min-h-[120px] p-2 text-xs rounded bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400 resize-none font-mono"
+              className="flex-1 min-h-[115px] p-2 text-xs rounded bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400 resize-none font-mono"
             />
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2 pt-1 flex-none">
               <button
                 onClick={handleSaveSpacePage}
                 className="px-2.5 py-1.5 text-[11px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors"
@@ -721,7 +880,7 @@ export const HudView: React.FC = () => {
                   setActiveDot('scribe');
                   setPageMarkdown(
                     (prev) =>
-                      prev + '\n- [Added by @scribe Dot]: Verified local-first routing, HITL safety gates, and revision-safe documents.'
+                      prev + `\n- [Rev v${pageRevision + 1} by @scribe]: Verified local-first routing, HITL safety gates, and revision-safe documents.`
                   );
                 }}
                 className="px-2.5 py-1.5 text-[11px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors"
