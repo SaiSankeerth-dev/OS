@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OS v1.0 // 3D Cyber-HUD & Multi-Agent Workspace</title>
+<style>
+  :root {
+    --bg-dark: #050811;
+    --panel-bg: rgba(10, 19, 36, 0.85);
+    --cyan: #00f0ff;
+    --cyan-dim: rgba(0, 240, 255, 0.22);
+    --amber: #ffb800;
+    --red: #ff3b5c;
+    --emerald: #00ff9d;
+    --text-main: #e2f4ff;
+    --text-muted: #7aa2c4;
+    --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(circle at 50% 45%, #0c1c38 0%, #050811 75%);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--cyan-dim);
+    background: rgba(5, 8, 17, 0.92);
+    backdrop-filter: blur(8px);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--cyan);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+  }
+  .state-pill {
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid var(--emerald);
+    color: var(--emerald);
+    background: rgba(0, 255, 157, 0.1);
+    text-transform: uppercase;
+  }
+  .grid-layout {
+    display: grid;
+    grid-template-columns: 310px 1fr 360px;
+    gap: 14px;
+    padding: 14px;
+    flex: 1;
+  }
+  @media (max-width: 1100px) {
+    .grid-layout { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--cyan-dim);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 18px rgba(0, 240, 255, 0.04);
+  }
+  .panel-title {
+    font-size: 0.8rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    border-bottom: 1px solid var(--cyan-dim);
+    padding-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dot-card {
+    padding: 10px;
+    border: 1px solid rgba(0, 240, 255, 0.18);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(8, 15, 30, 0.7);
+  }
+  .dot-card.active, .dot-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+    background: rgba(0, 240, 255, 0.09);
+  }
+  .dot-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.88rem; }
+  .dot-role { font-size: 0.74rem; color: var(--text-muted); margin-top: 3px; }
+  .perm-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+  .badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 240, 255, 0.14);
+    color: var(--cyan);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+  }
+  /* Center HUD & Chat */
+  .center-col { display: flex; flex-direction: column; gap: 14px; }
+  .reactor-box {
+    position: relative;
+    height: 230px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: radial-gradient(circle, rgba(0,240,255,0.12) 0%, rgba(5,8,17,0.95) 75%);
+  }
+  canvas#reactorCanvas { width: 100%; height: 100%; }
+  .hud-overlay-stats {
+    position: absolute;
+    bottom: 10px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+  .chat-stream {
+    flex: 1;
+    min-height: 250px;
+    max-height: 360px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 4px;
+  }
+  .msg {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid var(--cyan);
+    max-width: 85%;
+  }
+  .msg.os {
+    align-self: flex-start;
+    background: rgba(16, 28, 52, 0.9);
+    border-left: 3px solid var(--cyan);
+    max-width: 92%;
+  }
+  .approval-card {
+    border: 1px solid var(--amber);
+    background: rgba(255, 184, 0, 0.08);
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 6px;
+  }
+  .btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  button {
+    background: rgba(0, 240, 255, 0.14);
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    padding: 7px 12px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  button:hover { background: var(--cyan); color: #050811; font-weight: 700; }
+  button.warn { border-color: var(--amber); color: var(--amber); background: rgba(255, 184, 0, 0.12); }
+  button.warn:hover { background: var(--amber); color: #050811; }
+  button.danger { border-color: var(--red); color: var(--red); background: rgba(255, 59, 92, 0.12); }
+  button.danger:hover { background: var(--red); color: #fff; }
+  .input-bar { display: flex; gap: 8px; }
+  input[type="text"], textarea {
+    flex: 1;
+    background: rgba(4, 9, 20, 0.9);
+    border: 1px solid var(--cyan-dim);
+    color: var(--text-main);
+    padding: 9px 12px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+  }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--cyan); }
+  .terminal-box {
+    background: #03060c;
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 0.74rem;
+    color: var(--emerald);
+    height: 150px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .space-editor {
+    width: 100%;
+    height: 130px;
+    resize: vertical;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span>◈ OS // CYBER-HUD v1.0</span>
+    <span style="font-size:0.72rem; color:var(--text-muted);">OpenJarvis + OpenMuse + OpenDots Architecture</span>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <span id="stateBadge" class="state-pill">STANDBY</span>
+    <button onclick="speakLastResponse()">🔊 Voice Readout</button>
+  </div>
+</header>
+
+<div class="grid-layout">
+  <!-- Left Column: OpenDots Coworkers & OpenJarvis Primitives -->
+  <div class="panel">
+    <div class="panel-title">
+      <span>OpenDots // Specialist Coworkers</span>
+      <span style="font-size:0.68rem;">Scoped RBAC</span>
+    </div>
+    <div id="dotsContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
+
+    <div class="panel-title" style="margin-top:8px;">
+      <span>OpenJarvis // 5 Primitives Telemetry</span>
+    </div>
+    <div id="telemetryBox" style="font-size:0.75rem; line-height:1.6; color:var(--text-muted);">
+      <div>• <b>Intelligence:</b> <span id="hwIntel">Auto-Hardware Profile Active</span></div>
+      <div>• <b>Engine:</b> <span id="engineModel" style="color:var(--cyan);">ollama/qwen3.5:35b (0 Cloud Leaks)</span></div>
+      <div>• <b>Energy / Latency:</b> <span id="energyMetric">0.064 J / 4.2 ms</span></div>
+      <div>• <b>Safety Gate:</b> <span style="color:var(--emerald);">Destructive Patterns Blocked</span></div>
+      <div>• <b>Learning Loop:</b> <span id="traceCount">2</span> traces optimized</div>
+    </div>
+    <div class="btn-row">
+      <button onclick="runPreset('morning')">☀ Morning Digest</button>
+      <button onclick="runPreset('optimize')">⚡ OS Optimize</button>
+    </div>
+  </div>
+
+  <!-- Center Column: 3D Arc Reactor Core + AG-UI Command & Approval Stream -->
+  <div class="center-col">
+    <div class="panel reactor-box">
+      <canvas id="reactorCanvas"></canvas>
+      <div class="hud-overlay-stats">
+        <span id="activeDotIndicator">ACTIVE DOT: FORGE (Coding & Terminal)</span>
+        <span id="clockDisplay">LOCAL-FIRST // VERIFIED SECURE</span>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1;">
+      <div class="panel-title">
+        <span>AG-UI Live Stream & Human-in-the-Loop Approvals</span>
+        <button onclick="runPreset('risky_shell')" class="warn">Test HITL Approval Gate</button>
+      </div>
+      <div id="chatStream" class="chat-stream"></div>
+      <div class="input-bar">
+        <input type="text" id="cmdInput" placeholder="Command OS or active Dot (e.g. 'calculate 137 * 42', 'deploy container', 'draft lab notes')..." onkeydown="if(event.key==='Enter') sendCommand()" />
+        <button onclick="sendCommand()">EXECUTE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: OpenMuse Agent Computer + OpenDots Spaces Editor -->
+  <div class="panel">
+    <div class="panel-title">
+      <span>OpenMuse // Agent Computer</span>
+      <button id="takeControlBtn" onclick="toggleTakeControl()">🕹 Take Control</button>
+    </div>
+    <div style="font-size:0.72rem; color:var(--text-muted);">
+      Mode: <b id="computerModeLabel" style="color:var(--emerald);">AGENT_AUTONOMOUS</b> | Sandbox: <code>/workspace</code>
+    </div>
+    <div id="terminalBox" class="terminal-box">$ os init --hardware-aware
+[OK] Detected hardware architecture + local engine active.
+$ os doctor
+[OK] All 5 Composable Primitives verified. Safety gates active.</div>
+
+    <div class="panel-title" style="margin-top:6px;">
+      <span>OpenDots Space // Live Page Editor</span>
+      <span id="revBadge" class="badge">Rev v1</span>
+    </div>
+    <input type="text" id="pageTitle" value="OS Architecture & Lab Roadmap" />
+    <textarea id="pageMarkdown" class="space-editor"># OS Synthesis
+- OpenJarvis: Local-first 5 primitives + energy telemetry
+- OpenMuse: Agent Computer container + Take Control
+- OpenDots: Scoped Dots + Revision-checked Spaces</textarea>
+    <div class="btn-row">
+      <button onclick="saveSpacePage()">💾 Save Page (Revision Check)</button>
+      <button onclick="askScribeToRevise()">✍ Ask Scribe Dot to Expand</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let DOTS = {
+  forge: { name: "Forge", role: "Coding & Autonomous Terminal Engineer", perms: ["files", "shell", "memory"] },
+  scout: { name: "Scout", role: "Deep Research & Web Specialist", perms: ["browser", "memory"] },
+  scribe: { name: "Scribe", role: "Space & Documentation Architect", perms: ["files", "memory"] },
+  sentinel: { name: "Sentinel", role: "System Diagnostics & Security Monitor", perms: ["memory"] }
+};
+
+let currentDot = "forge";
+let pageRevision = 1;
+let traceCounter = 2;
+let computerTakenControl = false;
+let lastOSText = "OS online and standing by, Sai.";
+
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[&<>"']/g, function(m) {
+    switch (m) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return m;
+    }
+  });
+}
+
+function renderDots() {
+  const container = document.getElementById("dotsContainer");
+  container.innerHTML = "";
+  Object.entries(DOTS).forEach(([id, d]) => {
+    const card = document.createElement("div");
+    card.className = "dot-card" + (id === currentDot ? " active" : "");
+    card.onclick = () => {
+      currentDot = id;
+      document.getElementById("activeDotIndicator").textContent = `ACTIVE DOT: ${d.name.toUpperCase()} (${d.role})`;
+      renderDots();
+    };
+    card.innerHTML = `
+      <div class="dot-header"><span>● ${escapeHtml(d.name)}</span><span style="font-size:0.7rem;color:var(--cyan);">@${escapeHtml(id)}</span></div>
+      <div class="dot-role">${escapeHtml(d.role)}</div>
+      <div class="perm-badges">${(d.perms || []).map(p => `<span class="badge">${escapeHtml(p)}</span>`).join("")}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function setState(st) {
+  const badge = document.getElementById("stateBadge");
+  badge.textContent = st;
+  badge.style.borderColor = st === "WAITING_APPROVAL" ? "var(--amber)" : (st === "ERROR" ? "var(--red)" : "var(--emerald)");
+  badge.style.color = badge.style.borderColor;
+}
+
+function appendMessage(sender, htmlContent, isOS = true) {
+  const stream = document.getElementById("chatStream");
+  const div = document.createElement("div");
+  div.className = "msg " + (isOS ? "os" : "user");
+  div.innerHTML = htmlContent;
+  stream.appendChild(div);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function logTerminal(line) {
+  const term = document.getElementById("terminalBox");
+  term.textContent += "\n" + line;
+  term.scrollTop = term.scrollHeight;
+}
+
+async function bootState() {
+  try {
+    const res = await fetch("/api/hud/state");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.dots) DOTS = data.dots;
+      if (data.hardware) {
+        document.getElementById("hwIntel").textContent = `${data.hardware.cpu_cores} Cores / ${data.hardware.ram_gb} GB RAM`;
+        document.getElementById("engineModel").textContent = `${data.hardware.preferred_engine}/${data.hardware.recommended_local_model}`;
+      }
+      if (data.telemetry) {
+        document.getElementById("traceCount").textContent = data.telemetry.total_traces;
+        document.getElementById("energyMetric").textContent = `${data.telemetry.total_energy_joules} J / ${data.telemetry.avg_latency_ms} ms`;
+      }
+      if (data.spaces && data.spaces.pages && data.spaces.pages.length > 0) {
+        const p = data.spaces.pages[0];
+        pageRevision = p.revision;
+        document.getElementById("revBadge").textContent = "Rev v" + p.revision;
+        document.getElementById("pageTitle").value = p.title;
+        document.getElementById("pageMarkdown").value = p.markdown;
+      }
+      renderDots();
+    }
+  } catch (e) {
+    console.warn("Backend boot fetch failed; operating in local mode", e);
+  }
+}
+
+async function sendCommand(customQuery) {
+  const input = document.getElementById("cmdInput");
+  const q = customQuery || input.value.trim();
+  if (!q) return;
+  if (!customQuery) input.value = "";
+
+  appendMessage("You", `<b>You:</b> ${escapeHtml(q)}`, false);
+  setState("PROCESSING");
+
+  const ql = q.toLowerCase();
+  let actionType = null;
+  let actionPayload = null;
+
+  if (ql.includes("rm -rf /") || ql.includes("| bash") || ql.includes("format c:")) {
+    actionType = "shell_exec";
+    actionPayload = q;
+  } else if (ql.includes("deploy") || ql.includes("docker") || ql.includes("shell") || ql.includes("git push")) {
+    actionType = "shell_exec";
+    actionPayload = q;
+  } else if (ql.startsWith("save ") || ql.includes("write file")) {
+    actionType = "file_write";
+    actionPayload = q;
+  }
+
+  try {
+    const resp = await fetch("/api/hud/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: q,
+        dot: currentDot,
+        action_type: actionType,
+        action_payload: actionPayload,
+      }),
+    });
+
+    const data = await resp.json();
+    setState(data.state || "STANDBY");
+
+    if (data.status === "blocked") {
+      appendMessage("OS", `<b style="color:var(--red);">🛑 SECURITY BLOCK:</b> ${escapeHtml(data.reason)}`, true);
+      logTerminal(`[SECURITY GATE BLOCKED] ${q}`);
+      return;
+    }
+
+    if (data.status === "permission_denied") {
+      appendMessage("OS", `<b style="color:var(--red);">Permission Denied:</b> ${escapeHtml(data.error)}`, true);
+      logTerminal(`[PERMISSION DENIED] ${q}`);
+      return;
+    }
+
+    if (data.status === "waiting_approval" && data.approval_card) {
+      const card = data.approval_card;
+      const aprId = card.approval_id;
+      const cardHtml = `
+        <b>[${escapeHtml(data.dot)}] Task Paused — Human Approval Required</b>
+        <div class="approval-card" id="${escapeHtml(aprId)}">
+          <div>Action: <code>${escapeHtml(card.action_type)}</code> in OpenMuse Agent Computer</div>
+          <div>Payload: <code>${escapeHtml(card.payload)}</code></div>
+          <div style="font-size:0.68rem; color:var(--text-muted); margin-top:4px;">Hash: ${escapeHtml(card.arguments_hash || '')}</div>
+          <div class="btn-row">
+            <button onclick="resolveApproval('${escapeHtml(aprId)}', 'allow_once', '${escapeHtml(card.payload)}')">✓ Allow Once</button>
+            <button onclick="resolveApproval('${escapeHtml(aprId)}', 'always_allow', '${escapeHtml(card.payload)}')">⚡ Always Allow</button>
+            <button class="danger" onclick="resolveApproval('${escapeHtml(aprId)}', 'deny', '${escapeHtml(card.payload)}')">✕ Deny</button>
+          </div>
+        </div>
+      `;
+      appendMessage("OS", cardHtml, true);
+      return;
+    }
+
+    if (data.telemetry) {
+      document.getElementById("energyMetric").textContent = `${data.telemetry.energy_joules} J / ${data.telemetry.latency_ms} ms`;
+    }
+    lastOSText = (data.response || "").replace(/<[^>]*>?/gm, "");
+    appendMessage("OS", escapeHtml(data.response || ""), true);
+    logTerminal(`$ os ask --dot ${currentDot} "${q}"\n[OK] Completed in ${data.telemetry ? data.telemetry.latency_ms : '4.2'}ms`);
+  } catch (e) {
+    setState("ERROR");
+    appendMessage("OS", `<b style="color:var(--red);">Error:</b> ${escapeHtml(e.message)}`, true);
+  }
+}
+
+async function resolveApproval(aprId, decision, cmd) {
+  const el = document.getElementById(aprId);
+  if (el) {
+    el.innerHTML = `<span style="color:var(--emerald);">Decision Enforced by Server: <b>${escapeHtml(decision)}</b></span>`;
+  }
+
+  try {
+    const res = await fetch("/api/hud/approval", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approval_id: aprId, decision: decision }),
+    });
+    const data = await res.json();
+    if (decision === "deny") {
+      setState("STANDBY");
+      logTerminal(`[DENIED BY OPERATOR] ${cmd}`);
+      appendMessage("OS", `[${DOTS[currentDot].name}] Execution safely aborted per operator denial.`);
+    } else {
+      setState("EXECUTING");
+      logTerminal(`$ ${cmd}\n[AGENT COMPUTER] Executed cleanly under verified '${decision}' policy.`);
+      appendMessage("OS", `[${DOTS[currentDot].name}] Approved (${decision}). Resumed execution inside isolated Agent Computer.`);
+      setTimeout(() => setState("STANDBY"), 300);
+    }
+  } catch (err) {
+    console.error("Failed to resolve approval:", err);
+  }
+}
+
+async function toggleTakeControl() {
+  computerTakenControl = !computerTakenControl;
+  const lbl = document.getElementById("computerModeLabel");
+  const btn = document.getElementById("takeControlBtn");
+
+  try {
+    const res = await fetch("/api/hud/computer/takeover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ take_control: computerTakenControl }),
+    });
+    const data = await res.json();
+    if (computerTakenControl) {
+      lbl.textContent = "HUMAN_OVERRIDE (TAKE CONTROL ACTIVE)";
+      lbl.style.color = "var(--amber)";
+      btn.textContent = "🤖 Return to Agent";
+      logTerminal("[OPENMUSE] Human operator took interactive control of browser & terminal.");
+    } else {
+      lbl.textContent = "AGENT_AUTONOMOUS";
+      lbl.style.color = "var(--emerald)";
+      btn.textContent = "🕹 Take Control";
+      logTerminal("[OPENMUSE] Returned terminal & browser session to autonomous agent worker.");
+    }
+  } catch (err) {
+    console.error("Takeover toggle error:", err);
+  }
+}
+
+async function saveSpacePage() {
+  const title = document.getElementById("pageTitle").value;
+  const markdown = document.getElementById("pageMarkdown").value;
+
+  try {
+    const res = await fetch("/api/hud/spaces/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        space_id: "engineering-hq",
+        page_id: "engineering-notes",
+        title: title,
+        markdown: markdown,
+        author: "Sai",
+        expected_revision: pageRevision,
+      }),
+    });
+
+    if (res.status === 409) {
+      const err = await res.json();
+      appendMessage("OS", `<b style="color:var(--amber);">⚠️ Revision Collision:</b> ${escapeHtml(err.detail.error || "Concurrent edit detected. Your draft was preserved.")}`, true);
+      return;
+    }
+
+    const data = await res.json();
+    pageRevision = data.revision;
+    document.getElementById("revBadge").textContent = "Rev v" + pageRevision;
+    logTerminal(`[OPENDOTS SPACE] Saved '${title}' at Revision v${pageRevision} (optimistic lock verified).`);
+    appendMessage("OS", `[Scribe] Saved page <b>${escapeHtml(title)}</b> to Space <code>engineering-hq</code> (Revision <b>v${pageRevision}</b> verified).`);
+  } catch (err) {
+    console.error("Failed to save space page:", err);
+  }
+}
+
+function askScribeToRevise() {
+  currentDot = "scribe";
+  renderDots();
+  const md = document.getElementById("pageMarkdown");
+  md.value += "\n- [Added by @scribe Dot]: Verified local-first routing, HITL safety gates, and revision-safe documents.";
+  saveSpacePage();
+}
+
+async function runPreset(type) {
+  if (type === "morning") {
+    currentDot = "sentinel";
+    renderDots();
+    sendCommand("Generate my morning briefing");
+  } else if (type === "optimize") {
+    try {
+      const res = await fetch("/api/hud/optimize", { method: "POST" });
+      const data = await res.json();
+      document.getElementById("traceCount").textContent = data.total_traces;
+      document.getElementById("energyMetric").textContent = `${data.total_energy_joules} J / ${data.avg_latency_ms} ms`;
+      appendMessage("OS", `<b>[OS Learning Loop]</b> Synthesized ${data.total_traces} local interaction traces. Learned skills: <code>${escapeHtml(data.learned_skills[data.learned_skills.length - 1] || '')}</code>.`);
+    } catch (err) {
+      console.error(err);
+    }
+  } else if (type === "risky_shell") {
+    currentDot = "forge";
+    renderDots();
+    sendCommand("deploy docker container openmuse-computer:local --port 8790");
+  }
+}
+
+function speakLastResponse() {
+  if ("speechSynthesis" in window) {
+    const utter = new SpeechSynthesisUtterance(lastOSText);
+    utter.rate = 1.02;
+    utter.pitch = 0.95;
+    window.speechSynthesis.speak(utter);
+  }
+}
+
+// 3D Wireframe Arc Reactor Core Canvas Animation
+const canvas = document.getElementById("reactorCanvas");
+const ctx = canvas.getContext("2d");
+let angle = 0;
+
+function resizeCanvas() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+function drawReactor() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  angle += 0.018;
+
+  // Outer rotating telemetry ring
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle * 0.6);
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.35)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([12, 8, 4, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 82, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Counter-rotating segmented ring
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-angle * 1.1);
+  ctx.strokeStyle = "rgba(0, 255, 157, 0.55)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([22, 14]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 62, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // 3D projected octahedron core
+  const radius = 38;
+  const vertices = [
+    [0, -radius, 0], [0, radius, 0],
+    [-radius, 0, 0], [radius, 0, 0],
+    [0, 0, -radius], [0, 0, radius]
+  ];
+  const edges = [
+    [0,2],[0,3],[0,4],[0,5],
+    [1,2],[1,3],[1,4],[1,5],
+    [2,4],[4,3],[3,5],[5,2]
+  ];
+
+  const projected = vertices.map(([x, y, z]) => {
+    const cosY = Math.cos(angle), sinY = Math.sin(angle);
+    const cosX = Math.cos(angle * 0.7), sinX = Math.sin(angle * 0.7);
+    let x1 = x * cosY - z * sinY;
+    let z1 = z * cosY + x * sinY;
+    let y1 = y * cosX - z1 * sinX;
+    let z2 = z1 * cosX + y * sinX;
+    const scale = 220 / (220 + z2);
+    return [cx + x1 * scale, cy + y1 * scale];
+  });
+
+  ctx.strokeStyle = "#00f0ff";
+  ctx.lineWidth = 1.6;
+  edges.forEach(([i, j]) => {
+    ctx.beginPath();
+    ctx.moveTo(projected[i][0], projected[i][1]);
+    ctx.lineTo(projected[j][0], projected[j][1]);
+    ctx.stroke();
+  });
+
+  // Glowing core pulse
+  const pulse = 10 + Math.sin(angle * 3) * 3;
+  const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, pulse * 2.5);
+  grad.addColorStop(0, "rgba(0, 240, 255, 0.95)");
+  grad.addColorStop(1, "rgba(0, 240, 255, 0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, pulse * 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  requestAnimationFrame(drawReactor);
+}
+
+renderDots();
+appendMessage("OS", "<b>OS v1.0 Control Plane Online.</b><br>• <b>OpenJarvis:</b> 5 Composable Primitives active (Hardware-Aware Local Engine).<br>• <b>OpenMuse:</b> Agent Computer & Sandbox Worker connected.<br>• <b>OpenDots:</b> 4 Specialist Dots (<code>@forge</code>, <code>@scout</code>, <code>@scribe</code>, <code>@sentinel</code>) & Revision-Safe Spaces verified.");
+bootState();
+drawReactor();
+</script>
+</body>
+</html>

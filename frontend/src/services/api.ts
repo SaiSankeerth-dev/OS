@@ -191,4 +191,89 @@ export const api = {
   async getAnalytics(): Promise<AnalyticsData> {
     return request<AnalyticsData>('/api/analytics');
   },
+
+  // Cyber-HUD & 5 Primitives
+  async getHudState(): Promise<any> {
+    return request<any>('/api/hud/state');
+  },
+
+  async sendHudCommand(query: string, dot?: string, actionType?: string, actionPayload?: string): Promise<any> {
+    return request<any>('/api/hud/command', {
+      method: 'POST',
+      body: JSON.stringify({
+        query,
+        dot,
+        action_type: actionType,
+        action_payload: actionPayload,
+      }),
+    });
+  },
+
+  async resolveHudApproval(approvalId: string, decision: string): Promise<any> {
+    return request<any>('/api/hud/approval', {
+      method: 'POST',
+      body: JSON.stringify({
+        approval_id: approvalId,
+        decision,
+      }),
+    });
+  },
+
+  async toggleHudTakeover(takeControl: boolean): Promise<any> {
+    return request<any>('/api/hud/computer/takeover', {
+      method: 'POST',
+      body: JSON.stringify({
+        take_control: takeControl,
+      }),
+    });
+  },
+
+  async saveHudSpacePage(spaceId: string, pageId: string, title: string, markdown: string, author = 'Sai', expectedRevision?: number): Promise<any> {
+    return request<any>('/api/hud/spaces/save', {
+      method: 'POST',
+      body: JSON.stringify({
+        space_id: spaceId,
+        page_id: pageId,
+        title,
+        markdown,
+        author,
+        expected_revision: expectedRevision,
+      }),
+    });
+  },
+
+  async optimizeHudTraces(): Promise<any> {
+    return request<any>('/api/hud/optimize', {
+      method: 'POST',
+    });
+  },
+
+  async draftLinkedInPost(topic: string, highlights: string[] = []): Promise<any> {
+    return request<any>('/api/hud/social/linkedin/draft', {
+      method: 'POST',
+      body: JSON.stringify({ topic, highlights }),
+    });
+  },
+
+  async publishLinkedInPost(postText: string, token?: string): Promise<any> {
+    return request<any>('/api/hud/social/linkedin/publish', {
+      method: 'POST',
+      body: JSON.stringify({ post_text: postText, token }),
+    });
+  },
+
+  async summarizeYouTubeVideo(videoUrl: string, title = ''): Promise<any> {
+    return request<any>('/api/hud/social/youtube/summarize', {
+      method: 'POST',
+      body: JSON.stringify({ video_url: videoUrl, title }),
+    });
+  },
+
+  async speakHudVoice(text: string): Promise<any> {
+    return request<any>('/api/hud/voice/speak', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
 };
+

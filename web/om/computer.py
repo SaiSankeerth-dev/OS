@@ -135,7 +135,15 @@ class ComputerService:
 
     # -- mode / lifecycle ------------------------------------------------
     def docker_available(self) -> bool:
-        return shutil.which("docker") is not None
+        if os.environ.get("OS_COMPUTER_MODE") == "local":
+            return False
+        if shutil.which("docker") is None:
+            return False
+        try:
+            proc = subprocess.run(["docker", "info"], capture_output=True, timeout=2)
+            return proc.returncode == 0
+        except Exception:
+            return False
 
     def mode(self) -> str:
         return "docker" if self.docker_available() else "local"
@@ -324,13 +332,28 @@ class ComputerService:
             ], timeout=COMMAND_TIMEOUT + 10)
         lcwd = self._workspace_path_local(cwd)
         lcwd.mkdir(parents=True, exist_ok=True)
-        shell = "/bin/bash" if Path("/bin/bash").exists() else "/bin/sh"
+        shell = None
+        if os.name == "nt":
+            for candidate in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files (x86)\Git\bin\bash.exe",
+                shutil.which("sh"),
+            ]:
+                if candidate and Path(candidate).exists():
+                    shell = str(candidate)
+                    break
+        if not shell:
+            shell = "/bin/bash" if Path("/bin/bash").exists() else (shutil.which("bash") or shutil.which("sh") or "/bin/sh")
         env = _scrub_env()
         env["WORKSPACE"] = str(lcwd)  # $WORKSPACE always points at the real dir
         try:
+            cmd_args = (
+                [shell, "--noprofile", "--norc", "-c", command]
+                if "bash" in str(shell).lower()
+                else [shell, "-c", command]
+            )
             proc = subprocess.run(
-                [shell, "--noprofile", "--norc", "-c", command] if "bash" in shell
-                else [shell, "-c", command],
+                cmd_args,
                 cwd=str(lcwd), capture_output=True, text=True,
                 timeout=COMMAND_TIMEOUT, env=env,
             )

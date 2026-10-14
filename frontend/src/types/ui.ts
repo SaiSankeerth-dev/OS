@@ -7,7 +7,9 @@ export type NavView =
   | 'agents'
   | 'activity'
   | 'connectors'
-  | 'memory';
+  | 'memory'
+  | 'hud';
+
 
 export type OrbState = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'WORKING';
 

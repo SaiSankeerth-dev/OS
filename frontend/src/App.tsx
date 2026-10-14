@@ -13,6 +13,7 @@ import { AgentsView } from './components/views/AgentsView';
 import { ActivityView } from './components/views/ActivityView';
 import { ConnectorsView } from './components/views/ConnectorsView';
 import { MemoryView } from './components/views/MemoryView';
+import { HudView } from './components/views/HudView';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
 
 const MainShell: React.FC = () => {
@@ -22,6 +23,8 @@ const MainShell: React.FC = () => {
     switch (currentView) {
       case 'home':
         return <HomeView />;
+      case 'hud':
+        return <HudView />;
       case 'chat':
         return <ChatCanvas />;
       case 'plan':

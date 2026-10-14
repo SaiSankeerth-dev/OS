@@ -167,6 +167,15 @@ try:
 except Exception as _v1_err:
     log.warning("v1 routes unavailable: %s", _v1_err)
 
+# OS Cyber-HUD, 5 Primitives Telemetry, Specialist Dots & Take-Control
+try:
+    from web.hud_routes import router as _hud_router
+
+    app.include_router(_hud_router)
+except Exception as _hud_err:
+    log.warning("hud routes unavailable: %s", _hud_err)
+
+
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -497,6 +506,19 @@ async def files() -> dict:
                 except OSError:
                     size = 0
                 items.append({"path": rel, "type": "file", "size": size})
+
+    if not _WORKSPACE.exists():
+        try:
+            _WORKSPACE.mkdir(parents=True, exist_ok=True)
+            (_WORKSPACE / "welcome.md").write_text("# OS Workspace\nWelcome to your workspace.\n", encoding="utf-8")
+        except Exception:
+            pass
+    elif _WORKSPACE.is_dir():
+        try:
+            if not any(_WORKSPACE.iterdir()):
+                (_WORKSPACE / "welcome.md").write_text("# OS Workspace\nWelcome to your workspace.\n", encoding="utf-8")
+        except Exception:
+            pass
 
     if _WORKSPACE.exists():
         walk(_WORKSPACE, 0)

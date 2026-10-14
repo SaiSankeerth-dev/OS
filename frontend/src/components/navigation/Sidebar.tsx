@@ -9,6 +9,7 @@ import {
   Clock,
   Link2,
   Brain,
+  Cpu,
 } from 'lucide-react';
 import { NavView } from '../../types/ui';
 import { useApp } from '../../context/AppContext';
@@ -26,6 +27,7 @@ export const Sidebar: React.FC = () => {
 
   const navItems: NavItem[] = [
     { id: 'home', label: 'Overview', icon: Home },
+    { id: 'hud', label: 'Cyber HUD', icon: Cpu, badgeVariant: 'cyan' },
     { id: 'chat', label: 'Ask OS', icon: Sparkles },
     { id: 'plan', label: 'Plan & Day', icon: Calendar },
     { id: 'tasks', label: 'Commitments', icon: CheckSquare },
