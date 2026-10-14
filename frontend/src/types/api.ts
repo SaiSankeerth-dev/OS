@@ -98,11 +98,44 @@ export interface ActivityItem {
   verified?: boolean;
 }
 
+export interface CredField {
+  key: string;
+  label: string;
+  help?: string;
+  secret: boolean;
+  placeholder?: string;
+}
+
+export interface ConnectorActionSpec {
+  name: string;
+  label: string;
+  description: string;
+  needs_approval: boolean;
+  params: Array<{
+    name: string;
+    label: string;
+    required: boolean;
+    placeholder?: string;
+  }>;
+}
+
+export interface ConnectorDefaultField {
+  key: string;
+  label: string;
+  placeholder?: string;
+  help?: string;
+  value?: string;
+}
+
 export interface Connector {
   id: string;
   name: string;
   icon: string;
+  tagline?: string;
+  color?: string;
   category?: string;
+  auth_kind?: 'google_oauth' | 'microsoft_oauth' | 'token' | 'fields' | string;
+  cred_group?: string;
   state: 'available' | 'granted' | 'connected' | 'setup_error' | 'denied' | string;
   scopes: string[];
   scopes_granted: string[];
@@ -111,6 +144,13 @@ export interface Connector {
   health_msg?: string;
   health_at?: number;
   last_used_at?: number;
+  setup_steps?: string[];
+  note?: string;
+  docs_url?: string;
+  try_it?: string[];
+  defaults?: ConnectorDefaultField[];
+  cred_fields?: CredField[];
+  actions?: ConnectorActionSpec[];
 }
 
 export interface HomeViewData {

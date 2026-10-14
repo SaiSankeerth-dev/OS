@@ -159,9 +159,61 @@ export const api = {
     return request<{ connectors: Connector[] }>('/api/connectors');
   },
 
+  async getConnector(cid: string): Promise<Connector> {
+    return request<Connector>(`/api/connectors/${cid}`);
+  },
+
+  async grantConnector(cid: string, scopes?: string[]): Promise<{ ok: boolean; status: any }> {
+    return request(`/api/connectors/${cid}/grant`, {
+      method: 'POST',
+      body: JSON.stringify({ scopes: scopes || [] }),
+    });
+  },
+
+  async denyConnector(cid: string): Promise<{ ok: boolean }> {
+    return request(`/api/connectors/${cid}/deny`, {
+      method: 'POST',
+    });
+  },
+
+  async revokeConnector(cid: string): Promise<{ ok: boolean }> {
+    return request(`/api/connectors/${cid}/revoke`, {
+      method: 'POST',
+    });
+  },
+
+  async saveConnectorCredentials(
+    cid: string,
+    label: string,
+    fields: Record<string, string>
+  ): Promise<{ ok: boolean; status: any }> {
+    return request(`/api/connectors/${cid}/credentials`, {
+      method: 'POST',
+      body: JSON.stringify({ label, fields }),
+    });
+  },
+
+  async startConnectorOAuth(cid: string): Promise<{ url: string }> {
+    return request<{ url: string }>(`/api/connectors/${cid}/oauth/start`);
+  },
+
   async testConnector(cid: string): Promise<{ ok: boolean; status: any }> {
     return request(`/api/connectors/${cid}/test`, {
       method: 'POST',
+    });
+  },
+
+  async getConnectorSettings(cid: string): Promise<{ settings: Record<string, string> }> {
+    return request<{ settings: Record<string, string> }>(`/api/connectors/${cid}/settings`);
+  },
+
+  async saveConnectorSettings(
+    cid: string,
+    settings: Record<string, string>
+  ): Promise<{ ok: boolean; settings: Record<string, string> }> {
+    return request(`/api/connectors/${cid}/settings`, {
+      method: 'POST',
+      body: JSON.stringify({ settings }),
     });
   },
 

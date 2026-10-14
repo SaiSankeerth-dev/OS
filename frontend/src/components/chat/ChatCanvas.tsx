@@ -46,6 +46,14 @@ export const ChatCanvas: React.FC = () => {
     scrollToBottom();
   }, [messages, isStreaming]);
 
+  useEffect(() => {
+    const pending = localStorage.getItem('os_pending_chat_prompt');
+    if (pending) {
+      localStorage.removeItem('os_pending_chat_prompt');
+      handleSend(pending);
+    }
+  }, []);
+
   const handleSend = (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
     if (!query || isStreaming) return;
