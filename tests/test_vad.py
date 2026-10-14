@@ -70,8 +70,14 @@ def test_legacy_detect_speech_stereo():
 # ---------- Silero backend (skipped when torch/silero missing) ----------
 
 def _needs_silero():
-    pytest.importorskip("torch", reason="torch not installed")
-    pytest.importorskip("silero_vad", reason="silero-vad not installed")
+    try:
+        import torch
+    except Exception as e:
+        pytest.skip(f"torch not working on this host: {e}")
+    try:
+        import silero_vad
+    except Exception as e:
+        pytest.skip(f"silero-vad not working on this host: {e}")
 
 
 def test_silero_backend_loads():
