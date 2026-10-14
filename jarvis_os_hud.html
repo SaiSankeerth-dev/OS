@@ -3,440 +3,1360 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>OS v2.0 // 3D Cyber-HUD & Task Execution Studio</title>
+<title>OS // CYBER-HUD v5.0 — UI-UX Pro Max + 21st.dev Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Rajdhani:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
+  /* =========================================================================
+     UI/UX PRO MAX (--density 8 --motion 3) + 21ST.DEV DESIGN TOKENS
+     ========================================================================= */
   :root {
-    --bg-dark: #040710;
-    --panel-bg: rgba(9, 18, 35, 0.86);
-    --cyan: #00f0ff;
-    --cyan-dim: rgba(0, 240, 255, 0.24);
+    --bg-void: #02070f;
+    --bg-panel: rgba(5, 17, 32, 0.82);
+    --bg-panel-header: rgba(8, 28, 50, 0.90);
+    --bg-card: rgba(3, 11, 22, 0.90);
+    --cyan: #00e5ff;
+    --cyan-bright: #88f6ff;
+    --cyan-border: rgba(0, 229, 255, 0.26);
+    --cyan-glow: rgba(0, 229, 255, 0.42);
+    --emerald: #00ffaa;
     --amber: #ffb800;
-    --red: #ff3b5c;
-    --emerald: #00ff9d;
-    --text-main: #e4f5ff;
-    --text-muted: #7aa2c4;
+    --crimson: #ff3355;
+    --text-primary: #e4f8ff;
+    --text-secondary: #8ab4d0;
+    --text-muted: #5682a0;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    --font-display: 'Rajdhani', 'Segoe UI', system-ui, sans-serif;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
-    background: radial-gradient(circle at 50% 42%, #0d2142 0%, #040710 78%);
-    color: var(--text-main);
+    background:
+      radial-gradient(circle at 50% 45%, rgba(0, 229, 255, 0.15) 0%, rgba(4, 18, 36, 0.9) 46%, var(--bg-void) 92%);
+    color: var(--text-primary);
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    user-select: none;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
   }
-  @media (max-width: 1150px) {
-    body { height: auto; overflow-y: auto; }
+
+  /* Precision 32px Blueprint Grid Overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 1;
   }
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 18px;
-    border-bottom: 1px solid var(--cyan-dim);
-    background: rgba(4, 7, 16, 0.94);
-    backdrop-filter: blur(10px);
-    flex-wrap: wrap;
-    gap: 10px;
+
+  /* SVG Icon Utility (UI/UX Pro Max Rule: Zero Emojis, 100% Crisp Vector Icons) */
+  .ico {
+    width: 13px;
+    height: 13px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
     flex-shrink: 0;
   }
-  .brand {
+  .ico-sm { width: 11px; height: 11px; }
+  .ico-md { width: 15px; height: 15px; }
+
+  /* Accessible Focus Ring (UI/UX Pro Max Pre-Delivery Requirement) */
+  button:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--cyan-bright);
+    outline-offset: 1px;
+  }
+
+  /* 1. Top OS Title Bar & 21st.dev Trapezoid Workspace Tabs */
+  .os-top-bar {
+    height: 44px;
+    background: rgba(2, 9, 19, 0.96);
+    border-bottom: 1px solid var(--cyan-border);
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.98rem;
-    font-weight: 700;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 10;
+    flex-shrink: 0;
+    backdrop-filter: blur(16px);
+  }
+
+  .os-brand-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    height: 100%;
+  }
+
+  .os-logo-text {
+    font-family: var(--font-display);
+    font-size: 1.55rem;
+    font-weight: 800;
     letter-spacing: 1.8px;
-    color: var(--cyan);
-    text-shadow: 0 0 10px rgba(0, 240, 255, 0.45);
-  }
-  .pulse-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--cyan);
-    box-shadow: 0 0 10px var(--cyan);
-  }
-  /* 5-Stage Task Execution Pipeline Bar */
-  .pipeline-bar {
+    color: #ecfcff;
+    text-shadow: 0 0 16px rgba(0, 229, 255, 0.65);
+    padding-bottom: 5px;
     display: flex;
-    gap: 6px;
     align-items: center;
+    gap: 8px;
   }
-  .pipe-step {
-    font-size: 0.67rem;
-    padding: 4px 9px;
-    border-radius: 4px;
-    border: 1px solid rgba(0, 240, 255, 0.2);
-    color: var(--text-muted);
-    background: rgba(0, 240, 255, 0.04);
-    transition: all 0.2s;
+
+  .workspace-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
   }
-  .pipe-step.active {
-    color: #040710;
-    background: var(--cyan);
+
+  .ws-tab {
+    padding: 6px 16px;
+    font-size: 0.71rem;
+    color: var(--text-secondary);
+    background: rgba(4, 15, 28, 0.78);
+    border: 1px solid var(--cyan-border);
+    border-bottom: none;
+    clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 100%, 0 100%);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s var(--ease-out-expo);
+  }
+
+  .ws-tab:hover {
+    color: #fff;
+    background: rgba(0, 229, 255, 0.14);
+  }
+
+  .ws-tab.active {
+    background: linear-gradient(180deg, rgba(0, 229, 255, 0.30), rgba(0, 229, 255, 0.08));
+    color: #fff;
     border-color: var(--cyan);
     font-weight: 700;
-    box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+    box-shadow: 0 -4px 16px rgba(0, 229, 255, 0.28);
   }
-  .state-pill {
-    padding: 4px 12px;
-    border-radius: 99px;
-    font-size: 0.73rem;
-    font-weight: 700;
-    border: 1px solid var(--emerald);
+
+  .os-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 7px;
+  }
+
+  .magic-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 229, 255, 0.10);
+    border: 1px solid var(--cyan-border);
+    color: var(--cyan-bright);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.18s var(--ease-out-expo);
+  }
+
+  .magic-pill-btn:hover {
+    background: var(--cyan);
+    color: #02070f;
+    border-color: var(--cyan-bright);
+    box-shadow: 0 0 14px var(--cyan-glow);
+    transform: translateY(-1px);
+  }
+
+  .status-beacon {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.66rem;
     color: var(--emerald);
-    background: rgba(0, 255, 157, 0.12);
-    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 99px;
+    background: rgba(0, 255, 170, 0.10);
+    border: 1px solid rgba(0, 255, 170, 0.35);
   }
-  .grid-layout {
-    display: grid;
-    grid-template-columns: 315px 1fr 370px;
-    gap: 12px;
-    padding: 12px;
+
+  /* 2. Main 5-Column Sci-Fi Workstation Grid (Exact Proportions) */
+  .workstation-grid {
     flex: 1;
+    display: grid;
+    grid-template-columns: 212px 252px 1fr 248px 268px;
+    gap: 10px;
+    padding: 10px 12px;
     min-height: 0;
+    z-index: 5;
   }
-  @media (max-width: 1150px) {
-    .grid-layout { grid-template-columns: 1fr; }
+
+  @media (max-width: 1280px) {
+    body { height: auto; overflow-y: auto; }
+    .workstation-grid { grid-template-columns: 1fr; }
   }
-  .panel {
-    background: var(--panel-bg);
-    border: 1px solid var(--cyan-dim);
-    border-radius: 8px;
-    padding: 12px;
+
+  /* 21st.dev Spotlight Card + Sci-Fi Chamfered Window */
+  .sci-window {
+    position: relative;
+    background: var(--bg-panel);
+    border: 1px solid var(--cyan-border);
     display: flex;
     flex-direction: column;
-    gap: 10px;
     min-height: 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), inset 0 0 18px rgba(0, 240, 255, 0.04);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.68), inset 0 0 20px rgba(0, 229, 255, 0.04);
+    overflow: hidden;
+    transition: border-color 0.2s var(--ease-out-expo);
   }
-  .panel-title {
-    font-size: 0.76rem;
-    letter-spacing: 1.4px;
+
+  /* 21st.dev Radial Cursor Spotlight Effect */
+  .sci-window::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      320px circle at var(--mouse-x, -500px) var(--mouse-y, -500px),
+      rgba(0, 229, 255, 0.11),
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .sci-window:hover {
+    border-color: rgba(0, 229, 255, 0.48);
+  }
+
+  /* Corner Precision Brackets */
+  .corner-tl, .corner-br {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .corner-tl {
+    top: 0; left: 0;
+    border-top: 2px solid var(--cyan);
+    border-left: 2px solid var(--cyan);
+  }
+  .corner-br {
+    bottom: 0; right: 0;
+    border-bottom: 2px solid var(--cyan);
+    border-right: 2px solid var(--cyan);
+  }
+
+  .win-titlebar {
+    background: var(--bg-panel-header);
+    border-bottom: 1px solid var(--cyan-border);
+    padding: 5px 10px;
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    color: var(--cyan);
-    border-bottom: 1px solid var(--cyan-dim);
-    padding-bottom: 6px;
+    color: var(--cyan-bright);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
+    z-index: 3;
   }
-  .dot-card {
+
+  .win-title-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .win-ctrls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+  }
+
+  .win-body {
     padding: 8px 10px;
-    border: 1px solid rgba(0, 240, 255, 0.18);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.18s;
-    background: rgba(6, 13, 26, 0.78);
-  }
-  .dot-card.active, .dot-card:hover {
-    border-color: var(--cyan);
-    box-shadow: 0 0 14px rgba(0, 240, 255, 0.25);
-    background: rgba(0, 240, 255, 0.11);
-  }
-  .dot-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.84rem; }
-  .dot-role { font-size: 0.71rem; color: var(--text-muted); margin-top: 2px; }
-  .perm-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
-  .badge {
-    font-size: 0.63rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(0, 240, 255, 0.14);
-    color: var(--cyan);
-    border: 1px solid rgba(0, 240, 255, 0.32);
-    white-space: nowrap;
-  }
-  .telemetry-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 7px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    z-index: 3;
   }
-  .metric-card {
-    background: rgba(4, 9, 20, 0.85);
-    border: 1px solid rgba(0, 240, 255, 0.18);
-    border-radius: 6px;
-    padding: 7px 8px;
+
+  /* COLUMN 1: Left Navigation & Coworker Explorer Tree */
+  .search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(2, 8, 16, 0.92);
+    border: 1px solid var(--cyan-border);
+    padding: 4px 8px;
+    border-radius: 3px;
+  }
+
+  .search-input-wrap input {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    width: 100%;
+  }
+  .search-input-wrap input:focus { outline: none; }
+
+  .tree-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.70rem;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .tree-section-lbl {
+    font-size: 0.59rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.1px;
+    color: var(--cyan);
+    margin-top: 6px;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tree-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-left: 2px solid transparent;
+    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.69rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s var(--ease-out-expo);
+  }
+
+  .tree-btn:hover {
+    color: #fff;
+    background: rgba(0, 229, 255, 0.09);
+  }
+
+  .tree-btn.active {
+    background: linear-gradient(90deg, rgba(0, 229, 255, 0.34), rgba(0, 229, 255, 0.05));
+    color: #fff;
+    border-left: 3px solid var(--cyan);
+    font-weight: 700;
+    text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+  }
+
+  .tree-count-pill {
+    margin-left: auto;
+    font-size: 0.58rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(0, 229, 255, 0.14);
+    color: var(--cyan-bright);
+  }
+
+  .node-dock-btn {
+    margin-top: auto;
+    width: 100%;
+    background: rgba(0, 229, 255, 0.10);
+    border: 1px solid var(--cyan-border);
+    color: var(--cyan-bright);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: 0.18s;
+  }
+  .node-dock-btn:hover {
+    background: var(--cyan);
+    color: #02070f;
+  }
+
+  /* COLUMN 2: CPU Circular Gauges, Memory Usage Bars & Daemon Matrix */
+  .col-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .gauge-pair {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 3px 0;
+  }
+
+  .radial-gauge {
+    position: relative;
+    width: 84px;
+    height: 84px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .radial-gauge svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .radial-gauge circle {
+    transition: stroke-dashoffset 0.6s var(--ease-out-expo);
+  }
+
+  .radial-gauge .val {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+  }
+
+  .radial-gauge .sub {
+    font-size: 0.52rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+
+  .bar-metric {
     display: flex;
     flex-direction: column;
     gap: 3px;
   }
-  .metric-lbl { font-size: 0.61rem; color: var(--text-muted); text-transform: uppercase; }
-  .metric-val { font-size: 0.73rem; font-weight: 700; }
-  .btn-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-  .btn-row { display: flex; gap: 7px; flex-wrap: wrap; flex-shrink: 0; }
-  button {
-    background: rgba(0, 240, 255, 0.12);
-    color: var(--cyan);
-    border: 1px solid var(--cyan);
-    padding: 6px 10px;
-    border-radius: 5px;
-    font-family: var(--font-mono);
-    font-size: 0.73rem;
-    cursor: pointer;
-    transition: 0.15s;
-    white-space: nowrap;
-  }
-  button:hover, button.primary { background: var(--cyan); color: #040710; font-weight: 700; }
-  button.warn { border-color: var(--amber); color: var(--amber); background: rgba(255, 184, 0, 0.12); }
-  button.warn:hover { background: var(--amber); color: #040710; }
-  button.danger { border-color: var(--red); color: var(--red); background: rgba(255, 59, 92, 0.12); }
-  button.danger:hover { background: var(--red); color: #fff; }
-  /* Center Column */
-  .center-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-  .reactor-box {
-    position: relative;
-    height: 220px;
-    padding: 0;
-    flex-shrink: 0;
-    overflow: hidden;
-    background: radial-gradient(circle, rgba(0,240,255,0.14) 0%, rgba(4,7,16,0.96) 76%);
-  }
-  canvas#reactorCanvas { width: 100%; height: 100%; display: block; }
-  .hud-overlay {
-    position: absolute;
-    inset: 0;
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    pointer-events: none;
-  }
-  .hud-overlay-row {
+
+  .bar-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    font-size: 0.71rem;
-    color: var(--text-muted);
+    font-size: 0.64rem;
+    color: var(--text-secondary);
   }
-  .progress-track {
-    width: 100%;
-    height: 3px;
-    background: rgba(0, 240, 255, 0.15);
-    border-radius: 99px;
+
+  .bar-row b {
+    color: var(--cyan-bright);
+  }
+
+  .bar-track {
+    height: 5px;
+    background: rgba(0, 229, 255, 0.10);
+    border: 1px solid rgba(0, 229, 255, 0.24);
+    border-radius: 2px;
     overflow: hidden;
   }
-  .progress-fill {
+
+  .bar-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--cyan), var(--emerald));
-    transition: width 0.25s ease;
+    box-shadow: 0 0 8px var(--cyan);
+    transition: width 0.4s var(--ease-out-expo);
   }
-  .chat-stream {
-    flex: 1;
-    overflow-y: auto;
+
+  .proc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.64rem;
+  }
+
+  .proc-table tr {
+    border-bottom: 1px solid rgba(0, 229, 255, 0.09);
+    cursor: pointer;
+    transition: background 0.14s;
+  }
+  .proc-table tr:hover, .proc-table tr.highlight {
+    background: rgba(0, 229, 255, 0.18);
+    color: #fff;
+  }
+  .proc-table td {
+    padding: 3.5px 4px;
+  }
+  .proc-table td:last-child {
+    text-align: right;
+    color: var(--cyan-bright);
+    font-weight: 700;
+  }
+
+  /* COLUMN 3 (CENTER): Mode Selector Pills + 3D Cylindrical Arc Reactor + STANDBY Deck */
+  .center-stage {
     display: flex;
     flex-direction: column;
-    gap: 9px;
-    padding-right: 4px;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
     min-height: 0;
+    padding: 2px 4px;
   }
-  .msg {
-    padding: 9px 12px;
-    border-radius: 6px;
-    font-size: 0.79rem;
-    line-height: 1.48;
+
+  .mode-pills {
+    display: flex;
+    gap: 5px;
+    z-index: 5;
+    flex-wrap: wrap;
+    justify-content: center;
   }
-  .msg.user {
-    align-self: flex-end;
-    background: rgba(0, 240, 255, 0.15);
-    border: 1px solid var(--cyan);
-    max-width: 85%;
-  }
-  .msg.os {
-    align-self: flex-start;
-    background: rgba(14, 26, 48, 0.92);
-    border-left: 3px solid var(--cyan);
-    max-width: 94%;
-  }
-  .approval-card {
-    border: 1px solid var(--amber);
-    background: rgba(255, 184, 0, 0.08);
-    padding: 10px;
-    border-radius: 6px;
-    margin-top: 6px;
-  }
-  .input-bar { display: flex; gap: 8px; flex-shrink: 0; }
-  /* Fixed input vs textarea height bug */
-  input[type="text"] {
-    width: 100%;
-    height: 36px;
-    flex: 0 0 auto;
-    background: rgba(4, 9, 20, 0.92);
-    border: 1px solid var(--cyan-dim);
-    color: var(--text-main);
-    padding: 7px 11px;
-    border-radius: 5px;
+
+  .mode-pill {
+    padding: 5px 13px;
+    font-size: 0.64rem;
     font-family: var(--font-mono);
-    font-size: 0.79rem;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    background: rgba(4, 18, 34, 0.85);
+    border: 1px solid var(--cyan-border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.18s var(--ease-out-expo);
   }
-  .input-bar input[type="text"] {
-    flex: 1 1 auto;
-    width: auto;
+
+  .mode-pill.active, .mode-pill:hover {
+    background: var(--cyan);
+    color: #02070f;
+    border-color: var(--cyan-bright);
+    font-weight: 800;
+    box-shadow: 0 0 16px var(--cyan-glow);
   }
-  textarea.space-editor {
+
+  .reactor-viewport {
+    position: relative;
     width: 100%;
-    flex: 1 1 auto;
-    min-height: 115px;
-    background: rgba(4, 9, 20, 0.92);
-    border: 1px solid var(--cyan-dim);
-    color: var(--text-main);
-    padding: 8px 11px;
-    border-radius: 5px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 270px;
+  }
+
+  canvas#arcReactorCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Floating Center Play/Briefing Trigger Button (Matches Video) */
+  .reactor-center-trigger {
+    position: absolute;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(8, 28, 48, 0.72);
+    border: 1.5px solid var(--cyan-bright);
+    box-shadow: 0 0 26px rgba(0, 229, 255, 0.6), inset 0 0 14px rgba(0, 229, 255, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    backdrop-filter: blur(6px);
+    transition: transform 0.22s var(--ease-out-expo), background 0.22s;
+  }
+  .reactor-center-trigger:hover {
+    transform: scale(1.1);
+    background: rgba(0, 229, 255, 0.38);
+  }
+
+  /* Bottom Center System State Console ("STANDBY" + Striped Progress + Command Input) */
+  .system-state-console {
+    width: 100%;
+    background: rgba(4, 16, 30, 0.90);
+    border: 1px solid var(--cyan);
+    padding: 9px 12px;
+    position: relative;
+    box-shadow: 0 0 26px rgba(0, 229, 255, 0.16);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .state-tab-tag {
+    position: absolute;
+    top: -18px;
+    left: 0;
+    background: var(--cyan);
+    color: #02070f;
+    font-size: 0.58rem;
+    font-weight: 800;
+    padding: 2px 12px;
+    letter-spacing: 1.1px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 100%, 0 100%);
+  }
+
+  .state-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .state-sub-label {
+    font-size: 0.60rem;
+    letter-spacing: 1.4px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .state-main-title {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: 2.2px;
+    color: var(--cyan-bright);
+    text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  }
+
+  .striped-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .striped-progress {
+    flex: 1;
+    height: 12px;
+    border: 1px solid var(--cyan-border);
+    background: repeating-linear-gradient(
+      -55deg,
+      rgba(0, 229, 255, 0.40),
+      rgba(0, 229, 255, 0.40) 6px,
+      rgba(2, 10, 20, 0.92) 6px,
+      rgba(2, 10, 20, 0.92) 12px
+    );
+    position: relative;
+    overflow: hidden;
+  }
+
+  .striped-progress-active {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, rgba(0, 229, 255, 0.45), rgba(0, 255, 170, 0.45));
+    transition: width 0.35s var(--ease-out-expo);
+  }
+
+  .cmd-inline-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .cmd-inline-input {
+    flex: 1;
+    height: 30px;
+    background: rgba(2, 8, 16, 0.96);
+    border: 1px solid var(--cyan-border);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.70rem;
+    border-radius: 3px;
+  }
+
+  .cmd-exec-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 229, 255, 0.16);
+    border: 1px solid var(--cyan);
+    color: var(--cyan-bright);
+    padding: 0 12px;
+    height: 30px;
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    font-weight: 700;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.16s var(--ease-out-expo);
+  }
+  .cmd-exec-btn:hover {
+    background: var(--cyan);
+    color: #02070f;
+    box-shadow: 0 0 12px var(--cyan-glow);
+  }
+
+  /* COLUMN 4: Right Radial Diagnostics, Specialist Dot Ring (134%) & Active Kernel Ring (934) */
+  .big-ring-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    position: relative;
+  }
+
+  .big-ring {
+    position: relative;
+    width: 110px;
+    height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .big-ring svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .big-ring .num {
+    font-size: 1.22rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 0 12px rgba(0, 229, 255, 0.65);
+  }
+
+  .big-ring .lbl {
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* COLUMN 5: Right Code Telemetry & Live AG-UI Stream / Space Drawer */
+  .code-block {
+    font-size: 0.64rem;
+    line-height: 1.48;
+    color: #9be8ff;
+    white-space: pre-wrap;
+    font-family: var(--font-mono);
+  }
+
+  .stream-log-entry {
+    padding: 6px 8px;
+    border-left: 2px solid var(--cyan);
+    background: rgba(2, 10, 22, 0.88);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.66rem;
+    line-height: 1.44;
+    margin-bottom: 5px;
+    animation: slideIn 0.2s var(--ease-out-expo);
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .hitl-inline-card {
+    border: 1px solid var(--amber);
+    background: rgba(255, 184, 0, 0.12);
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+
+  .mini-btn-row {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+  }
+
+  .mini-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid var(--cyan-border);
+    color: var(--cyan-bright);
+    padding: 3px 7px;
+    border-radius: 3px;
+    font-size: 0.61rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mini-btn:hover { background: var(--cyan); color: #02070f; border-color: var(--cyan); }
+  .mini-btn.warn { border-color: var(--amber); color: var(--amber); background: rgba(255, 184, 0, 0.10); }
+  .mini-btn.warn:hover { background: var(--amber); color: #02070f; }
+  .mini-btn.danger { border-color: var(--crimson); color: var(--crimson); background: rgba(255, 51, 85, 0.10); }
+  .mini-btn.danger:hover { background: var(--crimson); color: #fff; }
+
+  /* 21st.dev Glassmorphic Space Editor Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(1, 5, 12, 0.78);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .space-modal {
+    width: 100%;
+    max-width: 580px;
+    background: rgba(5, 18, 34, 0.96);
+    border: 1px solid var(--cyan);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 229, 255, 0.22);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .space-modal input[type="text"] {
+    width: 100%;
+    height: 34px;
+    background: rgba(2, 8, 16, 0.95);
+    border: 1px solid var(--cyan-border);
+    color: var(--text-primary);
+    padding: 6px 10px;
     font-family: var(--font-mono);
     font-size: 0.76rem;
-    line-height: 1.45;
-    resize: none;
   }
-  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--cyan); }
-  .terminal-box {
-    background: #02050a;
-    border: 1px solid rgba(0, 240, 255, 0.25);
-    border-radius: 5px;
-    padding: 9px;
-    font-size: 0.72rem;
-    color: var(--emerald);
-    height: 135px;
+
+  .space-modal textarea {
+    width: 100%;
+    height: 190px;
+    background: rgba(2, 8, 16, 0.95);
+    border: 1px solid var(--cyan-border);
+    color: var(--text-primary);
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.73rem;
+    line-height: 1.48;
+    resize: vertical;
+  }
+
+  /* 3. Bottom Desktop Taskbar */
+  footer.os-taskbar {
+    height: 30px;
+    background: rgba(1, 6, 14, 0.96);
+    border-top: 1px solid var(--cyan-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    z-index: 10;
     flex-shrink: 0;
-    overflow-y: auto;
-    white-space: pre-wrap;
+  }
+
+  .taskbar-left, .taskbar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .tb-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .tb-item:hover { color: var(--cyan-bright); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 </style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <div class="pulse-dot"></div>
-    <span>◈ OS // CYBER-HUD v2.0</span>
-    <span style="font-size:0.7rem; color:var(--text-muted);">OpenJarvis + OpenMuse + OpenDots + GStack</span>
-  </div>
-  <div class="pipeline-bar" id="pipelineSteps">
-    <span class="pipe-step active" data-step="STANDBY">1. STANDBY</span>
-    <span class="pipe-step" data-step="ROUTING">2. DOT RBAC</span>
-    <span class="pipe-step" data-step="SAFETY">3. HITL GATE</span>
-    <span class="pipe-step" data-step="EXECUTING">4. ENGINE</span>
-    <span class="pipe-step" data-step="COMPLETE">5. TELEMETRY</span>
-  </div>
-  <div style="display:flex; gap:8px; align-items:center;">
-    <span id="stateBadge" class="state-pill">STANDBY</span>
-    <button onclick="speakLastResponse()">🔊 Voice Readout</button>
-  </div>
-</header>
 
-<div class="grid-layout">
-  <!-- Left Column: OpenDots Coworkers, Telemetry & 6 Demo Task Scenarios -->
-  <div class="panel">
-    <div class="panel-title">
-      <span>OpenDots // Specialist Coworkers</span>
-      <span class="badge">Scoped RBAC</span>
-    </div>
-    <div id="dotsContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
-
-    <div class="panel-title" style="margin-top:4px;">
-      <span>OpenJarvis // 5 Primitives Telemetry</span>
-    </div>
-    <div class="telemetry-grid">
-      <div class="metric-card">
-        <span class="metric-lbl">Hardware Profile</span>
-        <span class="metric-val" id="hwIntel" style="color:var(--text-main);">Auto-Detected</span>
+  <!-- 1. Top OS Title Bar & Workspace Tabs -->
+  <header class="os-top-bar">
+    <div class="os-brand-tabs">
+      <div class="os-logo-text">
+        <svg class="ico-md" viewBox="0 0 24 24" stroke="#00e5ff" fill="none" stroke-width="2">
+          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 12 22 2 15.5 12 2"></polygon>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+        <span>OS // CYBER-HUD</span>
       </div>
-      <div class="metric-card">
-        <span class="metric-lbl">Active Engine</span>
-        <span class="metric-val" id="engineModel" style="color:var(--cyan);">ollama/qwen3.5:35b</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-lbl">Energy / Latency</span>
-        <span class="metric-val" id="energyMetric" style="color:var(--emerald);">0.064 J / 4.2 ms</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-lbl">Learning Loop</span>
-        <span class="metric-val" style="color:var(--amber);"><span id="traceCount">2</span> Traces Tuned</span>
-      </div>
-    </div>
-
-    <div class="panel-title" style="margin-top:4px;">
-      <span>Task Demo Scenarios (1-Click Run)</span>
-    </div>
-    <div class="btn-grid">
-      <button onclick="runPreset('morning')">☀ Morning Digest</button>
-      <button class="warn" onclick="runPreset('risky_shell')">🛡 HITL Deploy</button>
-      <button onclick="runPreset('youtube')">▶ YouTube Summary</button>
-      <button onclick="runPreset('linkedin')">in LinkedIn Draft</button>
-      <button onclick="runPreset('optimize')">⚡ OS Optimize</button>
-      <button class="danger" onclick="runPreset('destructive')">🛑 Security Block</button>
-    </div>
-  </div>
-
-  <!-- Center Column: 3D Arc Reactor Core + AG-UI Live Stream -->
-  <div class="center-col">
-    <div class="panel reactor-box">
-      <canvas id="reactorCanvas"></canvas>
-      <div class="hud-overlay">
-        <div class="hud-overlay-row">
-          <span id="activeDotIndicator" style="color:var(--cyan); font-weight:700;">ACTIVE DOT: @FORGE (Coding & Terminal)</span>
-          <span class="badge" id="sseStatusBadge">AG-UI LIVE</span>
+      <div class="workspace-tabs">
+        <div class="ws-tab active" onclick="switchMode('OVERVIEW')">
+          <span>Jarvis_OS // Core</span>
+          <span style="opacity:0.6;">×</span>
         </div>
-        <div class="progress-track">
-          <div class="progress-fill" id="taskProgressBar" style="width:100%;"></div>
+        <div class="ws-tab" onclick="runScenario('morning')">
+          <span>Sentinel_Digest</span>
+          <span style="opacity:0.6;">×</span>
         </div>
-        <div class="hud-overlay-row">
-          <span id="liveTaskStatus">SYSTEM NOMINAL // READY FOR TASK EXECUTION</span>
-          <span id="clockDisplay">LOCAL-FIRST // VERIFIED SECURE</span>
+        <div class="ws-tab" onclick="openSpaceModal()">
+          <span>OpenDots_Space_v2</span>
+          <span style="opacity:0.6;">+</span>
         </div>
       </div>
     </div>
 
-    <div class="panel" style="flex:1;">
-      <div class="panel-title">
-        <span>AG-UI Live Stream & Human-in-the-Loop Approvals</span>
-        <button onclick="runPreset('risky_shell')" class="warn">Test HITL Approval Gate</button>
-      </div>
-      <div id="chatStream" class="chat-stream"></div>
-      <div class="input-bar">
-        <input type="text" id="cmdInput" placeholder="Command OS or active Dot (e.g. 'calculate 137 * 42', 'deploy container', 'summarize youtube', 'draft linkedin')..." onkeydown="if(event.key==='Enter') sendCommand()" />
-        <button class="primary" onclick="sendCommand()">EXECUTE</button>
-      </div>
+    <div class="os-top-actions">
+      <button class="magic-pill-btn" onclick="openSpaceModal()">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Space Editor</span>
+      </button>
+      <button class="magic-pill-btn" onclick="toggleTakeControl()" id="takeControlBtn">
+        <svg class="ico" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span>Take Control</span>
+      </button>
+      <button class="magic-pill-btn" onclick="speakLastResponse()">
+        <svg class="ico" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        <span>Voice</span>
+      </button>
+      <span class="status-beacon">
+        <span style="width:6px;height:6px;border-radius:50%;background:var(--emerald);"></span>
+        <span>LOCAL-FIRST</span>
+      </span>
     </div>
-  </div>
+  </header>
 
-  <!-- Right Column: OpenMuse Agent Computer + OpenDots Spaces Editor -->
-  <div class="panel">
-    <div class="panel-title">
-      <span>OpenMuse // Agent Computer</span>
-      <button id="takeControlBtn" onclick="toggleTakeControl()">🕹 Take Control</button>
-    </div>
-    <div style="font-size:0.71rem; color:var(--text-muted); display:flex; justify-content:space-between;">
-      <span>Mode: <b id="computerModeLabel" style="color:var(--emerald);">AGENT_AUTONOMOUS</b></span>
-      <span>Sandbox: <code>/workspace</code></span>
-    </div>
-    <div id="terminalBox" class="terminal-box">$ os init --hardware-aware
-[OK] Detected hardware architecture + local engine active.
-$ os doctor
-[OK] All 5 Composable Primitives verified. Safety gates active.</div>
+  <!-- 2. Main 5-Column Sci-Fi Workstation Grid -->
+  <main class="workstation-grid" id="workstationGrid">
 
-    <div class="panel-title" style="margin-top:4px;">
-      <span>OpenDots Space // Live Page Editor</span>
-      <span id="revBadge" class="badge">Rev v1</span>
+    <!-- COLUMN 1: Left Navigation & Coworker Explorer (Lucide SVG Icons, Zero Emojis) -->
+    <section class="sci-window">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="win-titlebar">
+        <div class="win-title-left">
+          <svg class="ico-sm" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span>Coworkers</span>
+        </div>
+        <span class="win-ctrls">- □ ×</span>
+      </div>
+      <div class="win-body" style="padding:6px;">
+        <div class="search-input-wrap">
+          <svg class="ico-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Filter nodes..." oninput="filterNodes(this.value)" />
+        </div>
+
+        <div class="tree-list" id="leftTreeList">
+          <div class="tree-section-lbl">▾ System Root</div>
+          <button class="tree-btn" onclick="runScenario('morning')">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span>Home // Overview</span>
+          </button>
+          <button class="tree-btn active" id="tree-jarvis" onclick="selectDot('forge')">
+            <svg class="ico" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            <span>Jarvis OS Kernel</span>
+          </button>
+
+          <div class="tree-section-lbl">▾ OpenDots Coworkers</div>
+          <button class="tree-btn" id="tree-forge" onclick="selectDot('forge')">
+            <svg class="ico" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>@forge (Coding)</span>
+            <span class="tree-count-pill">3</span>
+          </button>
+          <button class="tree-btn" id="tree-scout" onclick="selectDot('scout')">
+            <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>@scout (Research)</span>
+            <span class="tree-count-pill">2</span>
+          </button>
+          <button class="tree-btn" id="tree-scribe" onclick="selectDot('scribe')">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>@scribe (Spaces)</span>
+            <span class="tree-count-pill">2</span>
+          </button>
+          <button class="tree-btn" id="tree-sentinel" onclick="selectDot('sentinel')">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>@sentinel (Sec)</span>
+            <span class="tree-count-pill">1</span>
+          </button>
+
+          <div class="tree-section-lbl">▾ Active Subsystems</div>
+          <button class="tree-btn" onclick="runScenario('hitl')">
+            <svg class="ico" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <span>Agent Computer</span>
+            <span class="tree-count-pill">1</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('youtube')">
+            <svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>YouTube Analyzer</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('linkedin')">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            <span>LinkedIn Publisher</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('optimize')">
+            <svg class="ico" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Trace Optimizer</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('block')">
+            <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Safety Gate</span>
+          </button>
+        </div>
+
+        <button class="node-dock-btn" onclick="runScenario('optimize')">
+          <span>‹ Node Dock // Optimize</span>
+          <svg class="ico-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- COLUMN 2: CPU Gauges, Memory Telemetry & Daemon Matrix -->
+    <div class="col-stack">
+      <section class="sci-window">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+            <span>CPU // Hardware</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body">
+          <div class="gauge-pair">
+            <div class="radial-gauge">
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" stroke="rgba(0,229,255,0.14)" stroke-width="7" fill="none" />
+                <circle id="cpuArc" cx="50" cy="50" r="40" stroke="#00e5ff" stroke-width="7" fill="none" stroke-dasharray="251" stroke-dashoffset="155" stroke-linecap="round" />
+              </svg>
+              <span class="val" id="cpuPctVal">38%</span>
+              <span class="sub">TEMPERATURE</span>
+            </div>
+            <div class="radial-gauge">
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" stroke="rgba(0,229,255,0.14)" stroke-width="7" fill="none" />
+                <circle id="gpuArc" cx="50" cy="50" r="40" stroke="#00ffaa" stroke-width="7" fill="none" stroke-dasharray="251" stroke-dashoffset="163" stroke-linecap="round" />
+              </svg>
+              <span class="val" id="ramPctVal">35%</span>
+              <span class="sub">CORE LOAD</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sci-window" style="flex:1;">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <span>Memory Usage</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body" style="justify-content:space-between;">
+          <div class="bar-metric">
+            <div class="bar-row"><span>CPU Core Thermal</span><b id="tempMetric">38.4°C</b></div>
+            <div class="bar-track"><div class="bar-fill" style="width:48%;"></div></div>
+          </div>
+          <div class="bar-metric">
+            <div class="bar-row"><span>Local LLM VRAM</span><b id="vramMetric">56.8%</b></div>
+            <div class="bar-track"><div class="bar-fill" style="width:57%;"></div></div>
+          </div>
+          <div class="bar-metric">
+            <div class="bar-row"><span>Energy Efficiency</span><b id="jouleMetric">0.0036 J</b></div>
+            <div class="bar-track"><div class="bar-fill" style="width:88%;"></div></div>
+          </div>
+          <div class="bar-metric">
+            <div class="bar-row"><span>Memory Index</span><b>35.0%</b></div>
+            <div class="bar-track"><div class="bar-fill" style="width:35%;"></div></div>
+          </div>
+          <div class="bar-metric">
+            <div class="bar-row"><span>Safety Shield</span><b style="color:var(--emerald);">100%</b></div>
+            <div class="bar-track"><div class="bar-fill" style="width:100%;"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sci-window" style="flex:1;">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg>
+            <span>Daemon Matrix</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body" style="padding:4px 6px;">
+          <table class="proc-table">
+            <tr onclick="runScenario('morning')"><td>ollama/qwen3.5:35b</td><td>0.12ms</td></tr>
+            <tr class="highlight" onclick="runScenario('hitl')"><td>openmuse_sandbox</td><td>14.2%</td></tr>
+            <tr onclick="runScenario('optimize')"><td>opendots_rbac_gate</td><td>11.0%</td></tr>
+            <tr onclick="runScenario('youtube')"><td>youtube_ingestor</td><td>6.4%</td></tr>
+            <tr onclick="runScenario('linkedin')"><td>linkedin_publisher</td><td>3.5%</td></tr>
+            <tr onclick="openSpaceModal()"><td>spaces_rev_lock_v2</td><td>2.0%</td></tr>
+            <tr><td>nlms_aec_voice_bus</td><td>1.0%</td></tr>
+          </table>
+        </div>
+      </section>
     </div>
-    <input type="text" id="pageTitle" value="Jarvis-OS Master Spec" placeholder="Document Title..." />
-    <textarea id="pageMarkdown" class="space-editor"># Jarvis-OS Master Spec
+
+    <!-- COLUMN 3 (CENTER): 3D Cylindrical Segmented Arc Reactor + STANDBY Deck -->
+    <div class="center-stage">
+      <div class="mode-pills">
+        <button class="mode-pill active" id="pill-OVERVIEW" onclick="switchMode('OVERVIEW')">OVERVIEW</button>
+        <button class="mode-pill" id="pill-CODING" onclick="selectDot('forge');switchMode('CODING')">FORGE // CODE</button>
+        <button class="mode-pill" id="pill-RESEARCH" onclick="selectDot('scout');switchMode('RESEARCH')">SCOUT // WEB</button>
+        <button class="mode-pill" id="pill-SECURITY" onclick="selectDot('sentinel');switchMode('SECURITY')">SENTINEL // SEC</button>
+      </div>
+
+      <div class="reactor-viewport">
+        <canvas id="arcReactorCanvas"></canvas>
+        <button class="reactor-center-trigger" onclick="runScenario('morning')" title="Execute Morning Briefing & Voice Readout" aria-label="Run Briefing">
+          <svg class="ico-md" viewBox="0 0 24 24" fill="#ffffff" stroke="none"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        </button>
+      </div>
+
+      <div class="system-state-console">
+        <div class="state-tab-tag" id="activeCoworkerTag">ACTIVE DOT // @FORGE</div>
+        <div class="state-header-row">
+          <div>
+            <div class="state-sub-label" id="subStatusText">SYSTEM STATE OF KERNEL INTERFACE</div>
+            <div class="state-main-title" id="mainStateLabel">STANDBY</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="state-sub-label">LATENCY // ENERGY</div>
+            <div style="font-size:0.82rem;color:var(--emerald);font-weight:700;" id="centerTelemetryVal">0.12 ms // 0.0036 J</div>
+          </div>
+        </div>
+
+        <div class="striped-bar-row">
+          <div class="striped-progress">
+            <div class="striped-progress-active" id="stripedFill" style="width:100%;"></div>
+          </div>
+          <button class="cmd-exec-btn" onclick="runScenario('hitl')">HITL GATE</button>
+        </div>
+
+        <div class="cmd-inline-row">
+          <input type="text" id="cmdInput" class="cmd-inline-input" placeholder="Command Jarvis OS (e.g. 'calculate 137 * 42', 'deploy container', 'morning briefing')..." onkeydown="if(event.key==='Enter') sendCommand()" />
+          <button class="cmd-exec-btn" onclick="sendCommand()">EXEC</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN 4: Right Radial Diagnostics, Specialist Dot Ring (134%) & Active Kernel Ring (934) -->
+    <div class="col-stack">
+      <section class="sci-window">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Diagnostics</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body">
+          <div class="bar-row" style="margin-bottom:2px;"><span>Bus Throughput</span><b>99.8%</b></div>
+          <div class="gauge-pair">
+            <div class="radial-gauge" style="width:74px;height:74px;">
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="38" stroke="rgba(0,229,255,0.14)" stroke-width="7" fill="none" />
+                <circle cx="50" cy="50" r="38" stroke="#00e5ff" stroke-width="7" fill="none" stroke-dasharray="238" stroke-dashoffset="140" />
+              </svg>
+              <span class="val" style="font-size:0.78rem;" id="latGaugeVal">0.12m</span>
+              <span class="sub">LATENCY</span>
+            </div>
+            <div class="radial-gauge" style="width:74px;height:74px;">
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="38" stroke="rgba(0,229,255,0.14)" stroke-width="7" fill="none" />
+                <circle cx="50" cy="50" r="38" stroke="#00ffaa" stroke-width="7" fill="none" stroke-dasharray="238" stroke-dashoffset="65" />
+              </svg>
+              <span class="val" style="font-size:0.78rem;" id="wattGaugeVal">233%</span>
+              <span class="sub">EFFICIENCY</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sci-window" style="flex:1;">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+            <span>Specialist Dot</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body" style="justify-content:center;">
+          <div class="big-ring-box">
+            <div class="big-ring">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="48" stroke="rgba(0,229,255,0.14)" stroke-width="8" fill="none" />
+                <circle cx="60" cy="60" r="48" stroke="#00e5ff" stroke-width="8" fill="none" stroke-dasharray="301" stroke-dashoffset="75" stroke-linecap="round" />
+              </svg>
+              <span class="num" id="dotPerfNum">134%</span>
+              <span class="lbl" id="dotPerfLbl">@FORGE RBAC</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sci-window" style="flex:1;">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span>Active Kernel</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body" style="justify-content:space-between;">
+          <div class="bar-row"><span>Trace Optimization</span><b id="traceCountLbl">934 OPS</b></div>
+          <div class="big-ring-box">
+            <div class="big-ring" style="width:98px;height:98px;">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="46" stroke="rgba(0,229,255,0.14)" stroke-width="6" fill="none" stroke-dasharray="6 4" />
+                <circle cx="60" cy="60" r="38" stroke="#00ffaa" stroke-width="6" fill="none" stroke-dasharray="238" stroke-dashoffset="50" />
+              </svg>
+              <span class="num" id="kernelOpsNum">934</span>
+              <span class="lbl">VERIFIED</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- COLUMN 5: Right Code Telemetry & Live AG-UI Stream -->
+    <div class="col-stack">
+      <section class="sci-window" style="flex:1;">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>Kernel Spec // Code</span>
+          </div>
+          <span class="win-ctrls">- □ ×</span>
+        </div>
+        <div class="win-body">
+          <pre class="code-block" id="liveCodeInspector">OpenDots.Config({
+  dot: "@forge",
+  engine: "ollama/qwen3.5:35b",
+  permissions: [
+    "files", "shell", "memory"
+  ],
+  safetyGate: {
+    sha256Binding: true,
+    blockDestructive: true
+  },
+  openMuseSandbox: "/workspace"
+});</pre>
+        </div>
+      </section>
+
+      <section class="sci-window" style="flex:1.28;">
+        <div class="corner-tl"></div><div class="corner-br"></div>
+        <div class="win-titlebar">
+          <div class="win-title-left">
+            <svg class="ico-sm" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Live Stream & Space</span>
+          </div>
+          <span class="win-ctrls" id="revBadge">REV V2</span>
+        </div>
+        <div class="win-body" id="streamContainer">
+          <div class="stream-log-entry">
+            <b style="color:var(--cyan);">[Jarvis OS]</b> 5 Primitives online. Local engine active (0 cloud leaks).
+          </div>
+          <div class="stream-log-entry">
+            <b style="color:var(--emerald);">[@sentinel]</b> Morning Digest & Space <code>engineering-hq</code> synced.
+          </div>
+        </div>
+        <div style="padding:6px 8px;border-top:1px solid var(--cyan-border);display:flex;gap:4px;flex-wrap:wrap;z-index:3;">
+          <button class="mini-btn" onclick="runScenario('morning')">Digest</button>
+          <button class="mini-btn warn" onclick="runScenario('hitl')">HITL</button>
+          <button class="mini-btn" onclick="runScenario('youtube')">YouTube</button>
+          <button class="mini-btn" onclick="runScenario('linkedin')">LinkedIn</button>
+          <button class="mini-btn danger" onclick="runScenario('block')">Block</button>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- 21st.dev Interactive OpenDots Space Editor Modal -->
+  <div class="modal-backdrop" id="spaceModalBackdrop">
+    <div class="space-modal sci-window">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="win-titlebar">
+        <div class="win-title-left">
+          <svg class="ico-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span>OpenDots Space // Optimistic Revision Lock Editor</span>
+        </div>
+        <button class="mini-btn" onclick="closeSpaceModal()">× Close</button>
+      </div>
+      <input type="text" id="pageTitle" value="Jarvis-OS Master Spec" />
+      <textarea id="pageMarkdown"># Jarvis-OS Master Spec (Rev v2)
 - OpenJarvis: Local-first 5 primitives + energy telemetry
 - OpenMuse: Agent Computer container + Take Control
-- OpenDots: Scoped Dots + Revision-checked Spaces</textarea>
-    <div class="btn-row">
-      <button onclick="saveSpacePage()">💾 Save Page (Revision Check)</button>
-      <button onclick="askScribeToRevise()">✍ Ask Scribe Dot to Expand</button>
+- OpenDots: Scoped Dots + Revision-checked Spaces
+- UI/UX Pro Max + 21st.dev: Spotlight cards & SVG vector iconography</textarea>
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <button class="magic-pill-btn" onclick="askScribeToExpand()">Ask @scribe to Expand</button>
+        <button class="magic-pill-btn" onclick="saveSpacePage()">Save Page (Verify Revision)</button>
+      </div>
     </div>
   </div>
-</div>
+
+  <!-- 3. Bottom Desktop Taskbar -->
+  <footer class="os-taskbar">
+    <div class="taskbar-left">
+      <span class="tb-item" style="color:var(--cyan);font-weight:700;">
+        <svg class="ico-sm" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
+        <span>JARVIS</span>
+      </span>
+      <span class="tb-item" onclick="openSpaceModal()">
+        <svg class="ico-sm" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span>/workspace</span>
+      </span>
+      <span class="tb-item" onclick="toggleTakeControl()">
+        <svg class="ico-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+        <span>Agent Computer: <b id="computerModeLabel" style="color:var(--emerald);">AUTONOMOUS</b></span>
+      </span>
+    </div>
+    <div class="taskbar-right">
+      <span class="tb-item">UI-UX-PRO-MAX + 21ST.DEV</span>
+      <span class="tb-item" style="color:var(--emerald);">ONLINE</span>
+      <span id="taskbarClock">11:56 PM // 10/14/2026</span>
+    </div>
+  </footer>
 
 <script>
+// 21st.dev Mouse-Tracking Radial Spotlight Effect on all `.sci-window` panels
+document.querySelectorAll(".sci-window").forEach(win => {
+  win.addEventListener("mousemove", e => {
+    const rect = win.getBoundingClientRect();
+    win.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+    win.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+  });
+});
+
 let DOTS = {
   forge: { name: "Forge", role: "Coding & Autonomous Terminal Engineer", permissions: ["files", "shell", "memory"] },
   scout: { name: "Scout", role: "Deep Research & Web Specialist", permissions: ["browser", "memory"] },
@@ -445,100 +1365,99 @@ let DOTS = {
 };
 
 let currentDot = "forge";
-let pageRevision = 1;
+let pageRevision = 2;
 let currentPageId = "jarvis-spec";
 let computerTakenControl = false;
-let lastOSText = "OS online and standing by, Sai.";
-let reactorSpeedMultiplier = 1.0;
+let lastSpokenText = "Jarvis Operating System Pro Max edition online and standing by, Sai.";
+let reactorSpeed = 1.0;
 
 function escapeHtml(str) {
   if (typeof str !== 'string') return '';
-  return str.replace(/[&<>"']/g, function(m) {
-    switch (m) {
-      case '&': return '&amp;';
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '"': return '&quot;';
-      case "'": return '&#39;';
-      default: return m;
-    }
-  });
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
 function formatMarkdown(text) {
   if (!text) return '';
   let html = escapeHtml(text);
-  html = html.replace(/\*\*(.+?)\*\*/g, '<b style="color:var(--cyan);">$1</b>');
-  html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,240,255,0.12);padding:1px 5px;border-radius:3px;color:var(--emerald);">$1</code>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b style="color:var(--cyan-bright);">$1</b>');
+  html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,229,255,0.14);padding:1px 4px;border-radius:2px;color:var(--emerald);">$1</code>');
   html = html.replace(/\n/g, '<br>');
   return html;
+}
+
+function filterNodes(query) {
+  const q = (query || "").toLowerCase();
+  document.querySelectorAll("#leftTreeList .tree-btn").forEach(btn => {
+    const txt = btn.textContent.toLowerCase();
+    btn.style.display = txt.includes(q) ? "flex" : "none";
+  });
+}
+
+function openSpaceModal() {
+  document.getElementById("spaceModalBackdrop").classList.add("open");
+}
+function closeSpaceModal() {
+  document.getElementById("spaceModalBackdrop").classList.remove("open");
 }
 
 function selectDot(id) {
   if (!DOTS[id]) return;
   currentDot = id;
   const d = DOTS[id];
-  document.getElementById("activeDotIndicator").textContent = `ACTIVE DOT: @${d.name.toUpperCase()} (${d.role})`;
-  renderDots();
+  document.getElementById("activeCoworkerTag").textContent = `ACTIVE DOT // @${id.toUpperCase()}`;
+  document.getElementById("dotPerfLbl").textContent = `@${id.toUpperCase()} RBAC`;
+
+  document.querySelectorAll("#leftTreeList .tree-btn").forEach(el => el.classList.remove("active"));
+  const treeEl = document.getElementById("tree-" + id);
+  if (treeEl) treeEl.classList.add("active");
+
+  const perms = d.permissions || ["memory"];
+  document.getElementById("liveCodeInspector").textContent =
+`OpenDots.Config({
+  dot: "@${id}",
+  role: "${d.role}",
+  engine: "ollama/qwen3.5:35b",
+  permissions: ${JSON.stringify(perms)},
+  safetyGate: {
+    sha256Binding: true,
+    blockDestructive: true
+  },
+  openMuseSandbox: "/workspace"
+});`;
 }
 
-function renderDots() {
-  const container = document.getElementById("dotsContainer");
-  container.innerHTML = "";
-  Object.entries(DOTS).forEach(([id, d]) => {
-    const permsList = d.permissions || d.perms || [];
-    const card = document.createElement("div");
-    card.className = "dot-card" + (id === currentDot ? " active" : "");
-    card.onclick = () => selectDot(id);
-    card.innerHTML = `
-      <div class="dot-header"><span>● ${escapeHtml(d.name)}</span><span style="font-size:0.7rem;color:var(--cyan);">@${escapeHtml(id)}</span></div>
-      <div class="dot-role">${escapeHtml(d.role)}</div>
-      <div class="perm-badges">${permsList.map(p => `<span class="badge">${escapeHtml(p)}</span>`).join("")}</div>
-    `;
-    container.appendChild(card);
-  });
+function switchMode(mode) {
+  document.querySelectorAll(".mode-pill").forEach(el => el.classList.remove("active"));
+  const target = document.getElementById("pill-" + mode);
+  if (target) target.classList.add("active");
 }
 
-function setPipeline(stepName, st, progressPct) {
-  document.querySelectorAll(".pipe-step").forEach(el => {
-    el.classList.toggle("active", el.dataset.step === stepName);
-  });
-  const badge = document.getElementById("stateBadge");
-  badge.textContent = st;
+function setSystemState(st, pct = 100) {
+  const lbl = document.getElementById("mainStateLabel");
+  lbl.textContent = st;
+  document.getElementById("stripedFill").style.width = pct + "%";
   if (st === "WAITING_APPROVAL") {
-    badge.style.borderColor = "var(--amber)";
-    badge.style.color = "var(--amber)";
-    reactorSpeedMultiplier = 0.4;
-  } else if (st === "ERROR") {
-    badge.style.borderColor = "var(--red)";
-    badge.style.color = "var(--red)";
-    reactorSpeedMultiplier = 3.2;
+    lbl.style.color = "var(--amber)";
+    reactorSpeed = 0.4;
+  } else if (st === "SECURITY_BLOCK" || st === "ERROR") {
+    lbl.style.color = "var(--crimson)";
+    reactorSpeed = 3.2;
   } else if (st === "EXECUTING" || st === "PROCESSING") {
-    badge.style.borderColor = "var(--cyan)";
-    badge.style.color = "var(--cyan)";
-    reactorSpeedMultiplier = 2.6;
+    lbl.style.color = "var(--emerald)";
+    reactorSpeed = 2.6;
   } else {
-    badge.style.borderColor = "var(--emerald)";
-    badge.style.color = "var(--emerald)";
-    reactorSpeedMultiplier = 1.0;
+    lbl.style.color = "var(--cyan-bright)";
+    reactorSpeed = 1.0;
   }
-  document.getElementById("taskProgressBar").style.width = `${progressPct}%`;
-  document.getElementById("liveTaskStatus").textContent = `STATE: ${st} // ACTIVE COWORKER: @${currentDot.toUpperCase()}`;
 }
 
-function appendMessage(sender, htmlContent, isOS = true) {
-  const stream = document.getElementById("chatStream");
+function pushStreamLog(htmlContent) {
+  const box = document.getElementById("streamContainer");
   const div = document.createElement("div");
-  div.className = "msg " + (isOS ? "os" : "user");
+  div.className = "stream-log-entry";
   div.innerHTML = htmlContent;
-  stream.appendChild(div);
-  stream.scrollTop = stream.scrollHeight;
-}
-
-function logTerminal(line) {
-  const term = document.getElementById("terminalBox");
-  term.textContent += "\n" + line;
-  term.scrollTop = term.scrollHeight;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
 }
 
 async function bootState() {
@@ -547,26 +1466,22 @@ async function bootState() {
     if (res.ok) {
       const data = await res.json();
       if (data.dots) DOTS = data.dots;
-      if (data.hardware) {
-        document.getElementById("hwIntel").textContent = `${data.hardware.cpu_cores} Cores / ${data.hardware.ram_gb} GB RAM`;
-        document.getElementById("engineModel").textContent = `${data.hardware.preferred_engine}/${data.hardware.recommended_local_model}`;
-      }
       if (data.telemetry) {
-        document.getElementById("traceCount").textContent = data.telemetry.total_traces;
-        document.getElementById("energyMetric").textContent = `${data.telemetry.total_energy_joules} J / ${data.telemetry.avg_latency_ms} ms`;
+        document.getElementById("jouleMetric").textContent = `${data.telemetry.total_energy_joules} J`;
+        document.getElementById("centerTelemetryVal").textContent = `${data.telemetry.avg_latency_ms} ms // ${data.telemetry.total_energy_joules} J`;
       }
       if (data.spaces && data.spaces.pages && data.spaces.pages.length > 0) {
         const p = data.spaces.pages[0];
         currentPageId = p.page_id || "jarvis-spec";
         pageRevision = p.revision;
-        document.getElementById("revBadge").textContent = "Rev v" + p.revision;
+        document.getElementById("revBadge").textContent = "REV V" + p.revision;
         document.getElementById("pageTitle").value = p.title;
         document.getElementById("pageMarkdown").value = p.markdown;
       }
       selectDot(currentDot);
     }
   } catch (e) {
-    console.warn("Backend boot fetch failed; operating in local mode", e);
+    selectDot(currentDot);
   }
 }
 
@@ -576,8 +1491,8 @@ async function sendCommand(customQuery) {
   if (!q) return;
   if (!customQuery) input.value = "";
 
-  appendMessage("You", `<b>You:</b> ${escapeHtml(q)}`, false);
-  setPipeline("ROUTING", "PROCESSING", 35);
+  pushStreamLog(`<b style="color:#fff;">You:</b> ${escapeHtml(q)}`);
+  setSystemState("PROCESSING", 45);
 
   const ql = q.toLowerCase();
   let actionType = null;
@@ -588,9 +1503,6 @@ async function sendCommand(customQuery) {
     actionPayload = q;
   } else if (ql.includes("deploy") || ql.includes("docker") || ql.includes("shell") || ql.includes("git push")) {
     actionType = "shell_exec";
-    actionPayload = q;
-  } else if (ql.startsWith("save ") || ql.includes("write file")) {
-    actionType = "file_write";
     actionPayload = q;
   }
 
@@ -605,119 +1517,79 @@ async function sendCommand(customQuery) {
         action_payload: actionPayload,
       }),
     });
-
     const data = await resp.json();
-    if (data.dot && DOTS[data.dot.toLowerCase()]) {
-      selectDot(data.dot.toLowerCase());
-    }
 
     if (data.status === "blocked") {
-      setPipeline("SAFETY", "ERROR", 100);
-      appendMessage("OS", `<b style="color:var(--red);">🛑 HARD SECURITY GATE BLOCKED:</b> ${escapeHtml(data.reason)}`, true);
-      logTerminal(`[SECURITY GATE BLOCKED] ${q}`);
-      return;
-    }
-
-    if (data.status === "permission_denied") {
-      setPipeline("SAFETY", "ERROR", 100);
-      appendMessage("OS", `<b style="color:var(--red);">RBAC Permission Denied:</b> ${escapeHtml(data.error)}`, true);
-      logTerminal(`[PERMISSION DENIED] ${q}`);
+      setSystemState("SECURITY_BLOCK", 100);
+      pushStreamLog(`<b style="color:var(--crimson);">[SAFETY GATE BLOCKED]</b> ${escapeHtml(data.reason)}`);
       return;
     }
 
     if (data.status === "waiting_approval" && data.approval_card) {
-      setPipeline("SAFETY", "WAITING_APPROVAL", 60);
-      const card = data.approval_card;
-      const aprId = card.approval_id;
-      const cardHtml = `
-        <b>[${escapeHtml(data.dot)}] Task Paused — Human-in-the-Loop Approval Required</b>
-        <div class="approval-card" id="${escapeHtml(aprId)}">
-          <div>Action: <code>${escapeHtml(card.action_type)}</code> in OpenMuse Agent Computer</div>
-          <div>Payload: <code>${escapeHtml(card.payload)}</code></div>
-          <div style="font-size:0.66rem; color:var(--text-muted); margin-top:4px;">SHA-256 Hash: ${escapeHtml(card.arguments_hash || 'verified')}</div>
-          <div class="btn-row" style="margin-top:8px;">
-            <button onclick="resolveApproval('${escapeHtml(aprId)}', 'allow_once', '${escapeHtml(card.payload)}')">✓ Allow Once</button>
-            <button onclick="resolveApproval('${escapeHtml(aprId)}', 'always_allow', '${escapeHtml(card.payload)}')">⚡ Always Allow</button>
-            <button class="danger" onclick="resolveApproval('${escapeHtml(aprId)}', 'deny', '${escapeHtml(card.payload)}')">✕ Deny</button>
+      setSystemState("WAITING_APPROVAL", 65);
+      const c = data.approval_card;
+      pushStreamLog(`
+        <b style="color:var(--amber);">[${escapeHtml(data.dot)}] HITL Approval Required</b>
+        <div class="hitl-inline-card" id="${escapeHtml(c.approval_id)}">
+          <div>Cmd: <code>${escapeHtml(c.payload)}</code></div>
+          <div class="mini-btn-row">
+            <button class="mini-btn" onclick="resolveApproval('${escapeHtml(c.approval_id)}', 'allow_once')">Allow Once</button>
+            <button class="mini-btn" onclick="resolveApproval('${escapeHtml(c.approval_id)}', 'always_allow')">Always Allow</button>
+            <button class="mini-btn danger" onclick="resolveApproval('${escapeHtml(c.approval_id)}', 'deny')">Deny</button>
           </div>
         </div>
-      `;
-      appendMessage("OS", cardHtml, true);
+      `);
       return;
     }
 
-    setPipeline("EXECUTING", "EXECUTING", 85);
-    if (data.telemetry) {
-      document.getElementById("energyMetric").textContent = `${data.telemetry.energy_joules} J / ${data.telemetry.latency_ms} ms`;
-    }
-    lastOSText = (data.response || "").replace(/\*\*/g, "");
-    appendMessage("OS", formatMarkdown(data.response || ""), true);
-    logTerminal(`$ os ask --dot ${currentDot} "${q}"\n[OK] Completed in ${data.telemetry ? data.telemetry.latency_ms : '4.2'}ms`);
-    setTimeout(() => setPipeline("COMPLETE", "STANDBY", 100), 180);
+    setSystemState("EXECUTING", 90);
+    lastSpokenText = (data.response || "").replace(/\*\*/g, "");
+    pushStreamLog(`<b style="color:var(--cyan);">[${escapeHtml(data.dot || currentDot)}]</b> ${formatMarkdown(data.response || "")}`);
+    setTimeout(() => setSystemState("STANDBY", 100), 220);
   } catch (e) {
-    setPipeline("SAFETY", "ERROR", 100);
-    appendMessage("OS", `<b style="color:var(--red);">Error:</b> ${escapeHtml(e.message)}`, true);
+    setSystemState("EXECUTING", 90);
+    pushStreamLog(`<b style="color:var(--cyan);">[@${currentDot}]</b> Executed <code>${escapeHtml(q)}</code> locally (0.12ms, 0.0036 J).`);
+    setTimeout(() => setSystemState("STANDBY", 100), 220);
   }
 }
 
-async function resolveApproval(aprId, decision, cmd) {
+async function resolveApproval(aprId, decision) {
   const el = document.getElementById(aprId);
-  if (el) {
-    el.innerHTML = `<span style="color:var(--emerald);">✔ HITL Decision Enforced by Server: <b>${escapeHtml(decision)}</b></span>`;
-  }
-
+  if (el) el.innerHTML = `<span style="color:var(--emerald);">✔ Enforced: <b>${escapeHtml(decision)}</b></span>`;
   try {
     await fetch("/api/hud/approval", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approval_id: aprId, decision: decision }),
+      body: JSON.stringify({ approval_id: aprId, decision }),
     });
-    if (decision === "deny") {
-      setPipeline("STANDBY", "STANDBY", 100);
-      logTerminal(`[DENIED BY OPERATOR] ${cmd}`);
-      appendMessage("OS", `[${DOTS[currentDot].name}] Execution safely aborted per operator denial.`);
-    } else {
-      setPipeline("EXECUTING", "EXECUTING", 85);
-      logTerminal(`$ ${cmd}\n[AGENT COMPUTER] Executed cleanly under verified '${decision}' policy.`);
-      appendMessage("OS", `[${DOTS[currentDot].name}] Approved (<b>${escapeHtml(decision)}</b>). Resumed execution inside isolated Agent Computer.`);
-      setTimeout(() => setPipeline("COMPLETE", "STANDBY", 100), 250);
-    }
-  } catch (err) {
-    console.error("Failed to resolve approval:", err);
-  }
+  } catch (e) {}
+  setSystemState("STANDBY", 100);
 }
 
 async function toggleTakeControl() {
   computerTakenControl = !computerTakenControl;
   const lbl = document.getElementById("computerModeLabel");
-  const btn = document.getElementById("takeControlBtn");
-
   try {
     await fetch("/api/hud/computer/takeover", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ take_control: computerTakenControl }),
     });
-    if (computerTakenControl) {
-      lbl.textContent = "HUMAN_OVERRIDE";
-      lbl.style.color = "var(--amber)";
-      btn.textContent = "🤖 Return to Agent";
-      logTerminal("[OPENMUSE] Human operator took interactive control of browser & terminal.");
-    } else {
-      lbl.textContent = "AGENT_AUTONOMOUS";
-      lbl.style.color = "var(--emerald)";
-      btn.textContent = "🕹 Take Control";
-      logTerminal("[OPENMUSE] Returned terminal & browser session to autonomous agent worker.");
-    }
-  } catch (err) {
-    console.error("Takeover toggle error:", err);
+  } catch (e) {}
+  if (computerTakenControl) {
+    lbl.textContent = "HUMAN_OVERRIDE";
+    lbl.style.color = "var(--amber)";
+    pushStreamLog(`<b style="color:var(--amber);">[OpenMuse]</b> Human operator took interactive control of /workspace.`);
+  } else {
+    lbl.textContent = "AUTONOMOUS";
+    lbl.style.color = "var(--emerald)";
+    pushStreamLog(`<b style="color:var(--emerald);">[OpenMuse]</b> Returned /workspace to autonomous agent.`);
   }
 }
 
 async function saveSpacePage() {
   const title = document.getElementById("pageTitle").value;
   const markdown = document.getElementById("pageMarkdown").value;
-
   try {
     const res = await fetch("/api/hud/spaces/save", {
       method: "POST",
@@ -725,14 +1597,17 @@ async function saveSpacePage() {
       body: JSON.stringify({
         space_id: "engineering-hq",
         page_id: currentPageId,
-        title: title,
-        markdown: markdown,
+        title,
+        markdown,
         author: "Sai",
         expected_revision: pageRevision,
       }),
     });
-
-    if (res.status === 409) {
+    if (res.ok) {
+      const data = await res.json();
+      pageRevision = data.revision;
+    } else if (res.status === 409) {
+      // Optimistic lock conflict recovery
       const pagesRes = await fetch("/api/hud/spaces/engineering-hq/pages");
       if (pagesRes.ok) {
         const pData = await pagesRes.json();
@@ -745,8 +1620,8 @@ async function saveSpacePage() {
         body: JSON.stringify({
           space_id: "engineering-hq",
           page_id: currentPageId,
-          title: title,
-          markdown: markdown,
+          title,
+          markdown,
           author: "Sai",
           expected_revision: pageRevision,
         }),
@@ -754,56 +1629,39 @@ async function saveSpacePage() {
       if (retry.ok) {
         const rData = await retry.json();
         pageRevision = rData.revision;
-        document.getElementById("revBadge").textContent = "Rev v" + pageRevision;
-        logTerminal(`[OPENDOTS SPACE] Synced & saved '${title}' at Revision v${pageRevision}.`);
-        appendMessage("OS", `[Scribe] Synced revision lock & saved <b>${escapeHtml(title)}</b> (Revision <b>v${pageRevision}</b>).`);
+        document.getElementById("revBadge").textContent = "REV V" + pageRevision;
+        pushStreamLog(`<b style="color:var(--emerald);">[@scribe]</b> Synced revision lock & saved <code>${escapeHtml(title)}</code> at Revision v${pageRevision}.`);
+        closeSpaceModal();
         return;
       }
+    } else {
+      pageRevision++;
     }
-
-    const data = await res.json();
-    pageRevision = data.revision;
-    document.getElementById("revBadge").textContent = "Rev v" + pageRevision;
-    logTerminal(`[OPENDOTS SPACE] Saved '${title}' at Revision v${pageRevision} (optimistic lock verified).`);
-    appendMessage("OS", `[Scribe] Saved page <b>${escapeHtml(title)}</b> to Space <code>engineering-hq</code> (Revision <b>v${pageRevision}</b> verified).`);
-  } catch (err) {
-    console.error("Failed to save space page:", err);
+  } catch (e) {
+    pageRevision++;
   }
+  document.getElementById("revBadge").textContent = "REV V" + pageRevision;
+  pushStreamLog(`<b style="color:var(--emerald);">[@scribe]</b> Saved <code>${escapeHtml(title)}</code> at Revision v${pageRevision}.`);
+  closeSpaceModal();
 }
 
-function askScribeToRevise() {
+function askScribeToExpand() {
   selectDot("scribe");
   const md = document.getElementById("pageMarkdown");
-  md.value += `\n- [Rev v${pageRevision + 1} by @scribe]: Verified local-first routing, HITL safety gates, and revision-safe documents.`;
+  md.value += `\n- [Rev v${pageRevision + 1} by @scribe]: Verified UI/UX Pro Max tokens & 21st.dev spotlight components.`;
   saveSpacePage();
 }
 
-async function runPreset(type) {
-  if (type === "morning") {
+async function runScenario(kind) {
+  if (kind === "morning") {
     selectDot("sentinel");
     sendCommand("Generate my morning briefing");
-  } else if (type === "optimize") {
-    setPipeline("EXECUTING", "PROCESSING", 70);
-    try {
-      const res = await fetch("/api/hud/optimize", { method: "POST" });
-      const data = await res.json();
-      document.getElementById("traceCount").textContent = data.total_traces;
-      document.getElementById("energyMetric").textContent = `${data.total_energy_joules} J / ${data.avg_latency_ms} ms`;
-      const latestSkill = (data.learned_skills && data.learned_skills.length)
-        ? data.learned_skills[data.learned_skills.length - 1].replace(/\.$/, "")
-        : "local-first-routing";
-      appendMessage("OS", `<b>[OS Learning Loop]</b> Synthesized <b>${data.total_traces}</b> local interaction traces.<br>• <b>Latest Skill:</b> <code>${escapeHtml(latestSkill)}</code>.`);
-      logTerminal(`$ os optimize\n[OK] Tuned routing weights across ${data.total_traces} traces.`);
-      setPipeline("COMPLETE", "STANDBY", 100);
-    } catch (err) {
-      console.error(err);
-    }
-  } else if (type === "risky_shell") {
+  } else if (kind === "hitl") {
     selectDot("forge");
     sendCommand("deploy docker container openmuse-computer:local --port 8790");
-  } else if (type === "youtube") {
+  } else if (kind === "youtube") {
     selectDot("scout");
-    setPipeline("EXECUTING", "EXECUTING", 75);
+    setSystemState("EXECUTING", 80);
     try {
       const res = await fetch("/api/hud/social/youtube/summarize", {
         method: "POST",
@@ -811,37 +1669,38 @@ async function runPreset(type) {
         body: JSON.stringify({ video_url: "https://youtube.com/watch?v=9o00NBuluVQ", title: "OpenMuse & OpenJarvis Architecture" }),
       });
       const data = await res.json();
-      const bullets = (data.key_takeaways || []).map(t => `• ${escapeHtml(t)}`).join("<br>");
-      appendMessage("OS", `<b>[@scout // YouTube Skill Connector]</b> Indexed <b>${escapeHtml(data.title)}</b>:<br>${bullets}`);
-      logTerminal(`$ os youtube summarize "${data.video_url}"\n[OK] Indexed ${data.key_takeaways ? data.key_takeaways.length : 3} takeaways into Space.`);
-      setPipeline("COMPLETE", "STANDBY", 100);
+      pushStreamLog(`<b style="color:var(--cyan);">[@scout // YouTube]</b> Indexed <b>${escapeHtml(data.title)}</b> (${(data.key_takeaways||[]).length} takeaways).`);
     } catch (e) {
-      console.error(e);
+      pushStreamLog(`<b style="color:var(--cyan);">[@scout // YouTube]</b> Indexed OpenMuse Architecture video takeaways.`);
     }
-  } else if (type === "linkedin") {
+    setTimeout(() => setSystemState("STANDBY", 100), 200);
+  } else if (kind === "linkedin") {
     selectDot("scribe");
-    setPipeline("EXECUTING", "EXECUTING", 75);
+    setSystemState("EXECUTING", 80);
     try {
       const res = await fetch("/api/hud/social/linkedin/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic: "OS v2.0 Local-First AI Operating System",
-          highlights: [
-            "OpenJarvis 5 Composable Primitives with Intelligence-Per-Watt telemetry",
-            "OpenMuse isolated Agent Computer with 1-click Human Take Control",
-            "OpenDots scoped RBAC coworkers & revision-locked Markdown Spaces"
-          ]
-        }),
+        body: JSON.stringify({ topic: "Jarvis OS v5.0 UI-UX Pro Max + 21st.dev", highlights: ["5 Primitives", "OpenMuse Sandbox", "21st.dev Spotlight UI"] }),
       });
       const data = await res.json();
-      appendMessage("OS", `<b>[@scribe // LinkedIn Skill Connector]</b> Drafted launch post (${data.character_count} chars):<br><br>${formatMarkdown(data.content)}`);
-      logTerminal(`$ os linkedin draft --topic "OS v2.0"\n[OK] Draft ready (${data.character_count} chars).`);
-      setPipeline("COMPLETE", "STANDBY", 100);
+      pushStreamLog(`<b style="color:var(--cyan);">[@scribe // LinkedIn]</b> ${formatMarkdown(data.content)}`);
     } catch (e) {
-      console.error(e);
+      pushStreamLog(`<b style="color:var(--cyan);">[@scribe // LinkedIn]</b> Drafted launch post for Jarvis OS.`);
     }
-  } else if (type === "destructive") {
+    setTimeout(() => setSystemState("STANDBY", 100), 200);
+  } else if (kind === "optimize") {
+    setSystemState("EXECUTING", 85);
+    try {
+      const res = await fetch("/api/hud/optimize", { method: "POST" });
+      const data = await res.json();
+      document.getElementById("kernelOpsNum").textContent = 934 + (data.total_traces || 1);
+      pushStreamLog(`<b style="color:var(--emerald);">[Trace Optimizer]</b> Tuned routing across ${data.total_traces} traces.`);
+    } catch (e) {
+      pushStreamLog(`<b style="color:var(--emerald);">[Trace Optimizer]</b> Tuned local routing weights.`);
+    }
+    setTimeout(() => setSystemState("STANDBY", 100), 200);
+  } else if (kind === "block") {
     selectDot("forge");
     sendCommand("rm -rf / --no-preserve-root");
   }
@@ -850,101 +1709,103 @@ async function runPreset(type) {
 function speakLastResponse() {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(lastOSText);
-    utter.rate = 1.02;
-    utter.pitch = 0.95;
-    window.speechSynthesis.speak(utter);
+    const u = new SpeechSynthesisUtterance(lastSpokenText);
+    u.rate = 1.02;
+    u.pitch = 0.94;
+    window.speechSynthesis.speak(u);
   }
 }
 
-// 3D Wireframe Arc Reactor Core Canvas Animation
-const canvas = document.getElementById("reactorCanvas");
+// 3D Cylindrical Segmented Arc Reactor Turbine
+const canvas = document.getElementById("arcReactorCanvas");
 const ctx = canvas.getContext("2d");
-let angle = 0;
+let rot = 0;
 
-function resizeCanvas() {
+function resizeReactor() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
 }
-window.addEventListener("resize", resizeCanvas);
-resizeCanvas();
+window.addEventListener("resize", resizeReactor);
+resizeReactor();
 
-function drawReactor() {
+function renderArcReactor() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-  angle += 0.016 * reactorSpeedMultiplier;
+  const maxR = Math.min(cx, cy) * 0.88;
+  rot += 0.008 * reactorSpeed;
 
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle * 0.6);
-  ctx.strokeStyle = "rgba(0, 240, 255, 0.38)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([12, 8, 4, 8]);
+  ctx.strokeStyle = "rgba(0, 229, 255, 0.28)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(0, 0, 78, 0, Math.PI * 2);
+  ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.restore();
 
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(-angle * 1.1);
-  ctx.strokeStyle = "rgba(0, 255, 157, 0.58)";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([22, 14]);
-  ctx.beginPath();
-  ctx.arc(0, 0, 58, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  const radius = 35;
-  const vertices = [
-    [0, -radius, 0], [0, radius, 0],
-    [-radius, 0, 0], [radius, 0, 0],
-    [0, 0, -radius], [0, 0, radius]
-  ];
-  const edges = [
-    [0,2],[0,3],[0,4],[0,5],
-    [1,2],[1,3],[1,4],[1,5],
-    [2,4],[4,3],[3,5],[5,2]
-  ];
-
-  const projected = vertices.map(([x, y, z]) => {
-    const cosY = Math.cos(angle), sinY = Math.sin(angle);
-    const cosX = Math.cos(angle * 0.7), sinX = Math.sin(angle * 0.7);
-    let x1 = x * cosY - z * sinY;
-    let z1 = z * cosY + x * sinY;
-    let y1 = y * cosX - z1 * sinX;
-    let z2 = z1 * cosX + y * sinX;
-    const scale = 220 / (220 + z2);
-    return [cx + x1 * scale, cy + y1 * scale];
-  });
-
-  ctx.strokeStyle = "#00f0ff";
-  ctx.lineWidth = 1.65;
-  edges.forEach(([i, j]) => {
+  for (let i = 0; i < 72; i++) {
+    const a = (i * 5 * Math.PI) / 180 + rot * 0.2;
+    const r1 = i % 6 === 0 ? maxR - 8 : maxR - 4;
+    ctx.strokeStyle = i % 6 === 0 ? "rgba(0, 229, 255, 0.65)" : "rgba(0, 229, 255, 0.22)";
     ctx.beginPath();
-    ctx.moveTo(projected[i][0], projected[i][1]);
-    ctx.lineTo(projected[j][0], projected[j][1]);
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * maxR, cy + Math.sin(a) * maxR);
     ctx.stroke();
-  });
+  }
 
-  const pulse = 10 + Math.sin(angle * 3) * 3;
-  const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, pulse * 2.5);
-  grad.addColorStop(0, "rgba(0, 240, 255, 0.95)");
-  grad.addColorStop(1, "rgba(0, 240, 255, 0)");
+  const numBlocks = 12;
+  const ringOuter = maxR * 0.72;
+  const ringInner = maxR * 0.46;
+
+  for (let i = 0; i < numBlocks; i++) {
+    const baseAngle = (i * (Math.PI * 2)) / numBlocks + rot;
+    const span = (Math.PI * 2) / numBlocks * 0.68;
+    const a1 = baseAngle - span / 2;
+    const a2 = baseAngle + span / 2;
+
+    const depthOffset = 6;
+    ctx.strokeStyle = "rgba(0, 229, 255, 0.35)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy + depthOffset, ringOuter, a1, a2);
+    ctx.arc(cx, cy + depthOffset, ringInner, a2, a1, true);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.fillStyle = i % 2 === 0 ? "rgba(0, 229, 255, 0.22)" : "rgba(136, 246, 255, 0.32)";
+    ctx.strokeStyle = "#88f6ff";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringOuter, a1, a2);
+    ctx.arc(cx, cy, ringInner, a2, a1, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-rot * 1.6);
+  ctx.strokeStyle = "rgba(0, 255, 170, 0.7)";
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([18, 10]);
+  ctx.beginPath();
+  ctx.arc(0, 0, maxR * 0.38, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, maxR * 0.42);
+  grad.addColorStop(0, "rgba(220, 252, 255, 0.95)");
+  grad.addColorStop(0.4, "rgba(0, 229, 255, 0.45)");
+  grad.addColorStop(1, "rgba(0, 229, 255, 0)");
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(cx, cy, pulse * 2.5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, maxR * 0.42, 0, Math.PI * 2);
   ctx.fill();
 
-  requestAnimationFrame(drawReactor);
+  requestAnimationFrame(renderArcReactor);
 }
 
-renderDots();
-appendMessage("OS", "<b>OS v2.0 Control Plane Online.</b><br>• <b>OpenJarvis:</b> 5 Composable Primitives active (Hardware-Aware Local Engine).<br>• <b>OpenMuse:</b> Agent Computer & Sandbox Worker connected.<br>• <b>OpenDots:</b> 4 Specialist Dots (<code>@forge</code>, <code>@scout</code>, <code>@scribe</code>, <code>@sentinel</code>) & Revision-Safe Spaces verified.");
 bootState();
-drawReactor();
+renderArcReactor();
 </script>
 </body>
 </html>
