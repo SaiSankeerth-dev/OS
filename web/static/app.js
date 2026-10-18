@@ -462,7 +462,7 @@ function renderTasks() {
   list.querySelectorAll("[data-task-toggle]").forEach((b) => b.addEventListener("click", async () => {
     const t = allTasks.find((x) => String(x.id) === b.dataset.taskToggle);
     await api(`/api/tasks/${b.dataset.taskToggle}`, {
-      method: "PUT", body: JSON.stringify({ status: t && taskDone(t) ? "PENDING" : "DONE" }),
+      method: "PATCH", body: JSON.stringify({ status: t && taskDone(t) ? "PENDING" : "DONE" }),
     }).catch((e) => toast("Update failed: " + e.message));
     loadTasks(); refreshBadges();
   }));
@@ -702,7 +702,8 @@ async function loadWatchers() {
     </div>`;
   }).join("") : `<div class="empty">No suggestions right now — watchers will nudge you here when something needs attention.</div>`;
   wrap.querySelectorAll("[data-dismiss]").forEach((b) => b.addEventListener("click", async () => {
-    await api(`/api/watchers/${b.dataset.dismiss}`, { method: "DELETE" }).catch(() => {});
+    await api(`/api/watchers/${b.dataset.dismiss}/seen`, { method: "POST" })
+      .catch((e) => toast("Dismiss failed: " + e.message));
     loadWatchers(); refreshBadges();
   }));
 }
@@ -837,10 +838,20 @@ $("#revoke-all").addEventListener("click", async () => {
   if (!confirm("Disconnect every connector and delete all stored credentials?")) return;
   try {
     const { connectors } = await api("/api/connectors");
-    for (const c of connectors.filter((c) => c.state !== "available")) {
-      await api(`/api/connectors/${c.id}/revoke`, { method: "DELETE" }).catch(() => {});
+    const targets = connectors.filter((c) => c.state !== "available");
+    const failed = [];
+    for (const c of targets) {
+      try {
+        await api(`/api/connectors/${c.id}/revoke`, { method: "POST" });
+      } catch (e) {
+        failed.push(c.name || c.id);
+      }
     }
-    toast("Everything revoked");
+    if (failed.length === 0) {
+      toast(targets.length ? "Everything revoked" : "Nothing to revoke");
+    } else {
+      toast(`Revoke failed for: ${failed.join(", ")}`);
+    }
   } catch (e) { toast("Revoke failed: " + e.message); }
   loadConnectors($("#conn-search").value);
 });

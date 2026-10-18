@@ -49,6 +49,11 @@ class _PlaywrightDriver:
         self._pages: dict[str, object] = {}
         self._console: dict[str, list[dict]] = {}
         self._ok: bool | None = None
+        # Session ids with a real page opened in THIS process. After a
+        # dashboard restart this is empty even though SQLite rows persist;
+        # is_live() lets callers detect that instead of silently
+        # substituting a blank page.
+        self._live: set[str] = set()
 
     def available(self) -> bool:
         if self._ok is not None:
@@ -106,8 +111,15 @@ class _PlaywrightDriver:
     def pdf(self, sid: str) -> bytes:
         return self._page(sid).pdf()
 
+    def is_live(self, sid: str) -> bool:
+        """True only if this process opened a real page for sid."""
+        with self._lock:
+            return sid in self._live
+
     def open(self, sid: str, url: str) -> None:
         self._page(sid).goto(url, wait_until="domcontentloaded", timeout=30000)
+        with self._lock:
+            self._live.add(sid)
 
     def read(self, sid: str) -> tuple[str, str, str]:
         page = self._page(sid)
@@ -121,6 +133,7 @@ class _PlaywrightDriver:
     def close(self, sid: str) -> None:
         with self._lock:
             page = self._pages.pop(sid, None)
+            self._live.discard(sid)
         if page is not None:
             try:
                 page.context.close()
@@ -232,11 +245,27 @@ class BrowserService:
     def navigate(self, sid: str, url: str) -> dict:
         return self.open(sid, url)
 
+    def _ensure_live_page(self, sid: str) -> None:
+        """Refuse to operate on a session whose live page was lost.
+
+        After a dashboard restart the driver's in-memory pages are gone
+        while SQLite rows persist. Without this guard the driver would
+        silently substitute a blank page and callers would persist
+        ``about:blank`` over the real URL, reporting ``"active"``.
+        """
+        if self._pw.available() and not self._pw.is_live(sid):
+            self.store.update("browser_sessions", sid,
+                              {"status": "stale", "updated_at": now()})
+            raise BrowserError(
+                "Browser session went stale (the dashboard restarted and the "
+                "live page was lost). Re-open the page to continue.", 410)
+
     def read(self, sid: str) -> dict:
         row = self.store.get("browser_sessions", sid)
         if not row:
             raise BrowserError("Browser session not found", 404)
         with self._lock_for(sid):
+            self._ensure_live_page(sid)
             try:
                 if self._pw.available():
                     url_now, title, text = self._pw.read(sid)
@@ -258,6 +287,7 @@ class BrowserService:
             raise BrowserError(
                 "Screenshots need Playwright/Chromium installed", 503)
         with self._lock_for(sid):
+            self._ensure_live_page(sid)
             png = self._pw.screenshot(sid)
         return f"browser-{sid}.png", png
 
@@ -268,6 +298,7 @@ class BrowserService:
             raise BrowserError(
                 "Console logs need Playwright/Chromium installed", 503)
         with self._lock_for(sid):
+            self._ensure_live_page(sid)
             try:
                 logs = self._pw.console_logs(sid)
             except Exception as e:
@@ -281,6 +312,7 @@ class BrowserService:
             raise BrowserError(
                 "PDF export needs Playwright/Chromium installed", 503)
         with self._lock_for(sid):
+            self._ensure_live_page(sid)
             try:
                 raw = self._pw.pdf(sid)
             except Exception as e:

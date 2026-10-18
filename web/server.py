@@ -297,12 +297,17 @@ async def approve(pid: int) -> dict:
     p = _find_pending(mgr, pid)
     if p is None:
         raise HTTPException(404, "approval not found (maybe it expired)")
-    mgr._pending.remove(p)
+    # Dequeue only AFTER successful execution. On failure the item stays
+    # queued (and the API reports failure) so user-authorized work is never
+    # silently dropped while the UI claims success.
     try:
         text = await mgr._approve_one(p)
     except Exception as e:
         log.exception("approve failed")
-        text = f"Approval failed: {type(e).__name__}."
+        raise HTTPException(
+            500, f"Approval failed: {type(e).__name__}. The item is still queued."
+        )
+    mgr._pending.remove(p)
     return {"ok": True, "text": text}
 
 
@@ -312,8 +317,14 @@ async def reject(pid: int) -> dict:
     p = _find_pending(mgr, pid)
     if p is None:
         raise HTTPException(404, "approval not found (maybe it expired)")
+    try:
+        text = mgr._reject_one(p)
+    except Exception as e:
+        log.exception("reject failed")
+        raise HTTPException(
+            500, f"Reject failed: {type(e).__name__}. The item is still queued."
+        )
     mgr._pending.remove(p)
-    text = mgr._reject_one(p)
     return {"ok": True, "text": text}
 
 

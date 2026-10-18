@@ -2,10 +2,29 @@
 
 from __future__ import annotations
 
+import ast
 import sqlite3
 import time
 from pathlib import Path
 from .base import MemoryManager, MemoryRecord, MemoryType
+
+
+def _safe_metadata(raw: object) -> dict:
+    """Parse the stored metadata column without eval().
+
+    Rows were historically written with ``str(dict)``; ``ast.literal_eval``
+    reads those back safely. Anything unparseable becomes {} rather than
+    executing.
+    """
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    try:
+        parsed = ast.literal_eval(str(raw))
+    except (ValueError, SyntaxError, MemoryError, RecursionError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 class SQLiteMemoryManager(MemoryManager):
@@ -75,7 +94,7 @@ class SQLiteMemoryManager(MemoryManager):
                     created_at=row[4],
                     updated_at=row[5],
                     expires_at=row[6],
-                    metadata=eval(row[7]) if row[7] else {},
+                    metadata=_safe_metadata(row[7]),
                 )
             )
         return records
