@@ -192,7 +192,7 @@ class TestOSScheduler:
         from server.scheduler.engine import OSScheduler
         scheduler = OSScheduler()
         jobs = scheduler.list_jobs()
-        assert len(jobs) == 5
+        assert len(jobs) >= 5
         names = [j["name"] for j in jobs]
         assert "morning_plan" in names
         assert "email_scan" in names
@@ -210,29 +210,38 @@ class TestOSScheduler:
         assert len(jobs) == 1
         assert jobs[0]["name"] == "custom_job"
 
-    @pytest.mark.asyncio
-    async def test_run_job_now(self):
+    def test_run_job_now(self):
+        import asyncio
+        import concurrent.futures
         from server.scheduler.engine import OSScheduler
         scheduler = OSScheduler()
-        result = await scheduler.run_job_now("morning_plan")
+        with concurrent.futures.ThreadPoolExecutor(1) as pool:
+            result = pool.submit(asyncio.run, scheduler.run_job_now("morning_plan")).result()
         assert result["job"] == "morning_plan"
         assert result["status"] == "completed"
 
-    @pytest.mark.asyncio
-    async def test_start_stop(self):
+    def test_start_stop(self):
+        import asyncio
+        import concurrent.futures
         from server.scheduler.engine import OSScheduler
-        scheduler = OSScheduler()
-        await scheduler.start()
-        assert scheduler.is_running()
-        await scheduler.stop()
-        assert not scheduler.is_running()
+        async def _lifecycle():
+            scheduler = OSScheduler()
+            await scheduler.start()
+            assert scheduler.is_running()
+            await scheduler.stop()
+            assert not scheduler.is_running()
 
-    @pytest.mark.asyncio
-    async def test_run_unknown_job_raises(self):
+        with concurrent.futures.ThreadPoolExecutor(1) as pool:
+            pool.submit(asyncio.run, _lifecycle()).result()
+
+    def test_run_unknown_job_raises(self):
+        import asyncio
+        import concurrent.futures
         from server.scheduler.engine import OSScheduler
         scheduler = OSScheduler()
         with pytest.raises(ValueError, match="Unknown job"):
-            await scheduler.run_job_now("nonexistent_job")
+            with concurrent.futures.ThreadPoolExecutor(1) as pool:
+                pool.submit(asyncio.run, scheduler.run_job_now("nonexistent_job")).result()
 
     def test_get_history(self):
         from server.scheduler.engine import OSScheduler

@@ -142,7 +142,7 @@ export const CommandPalette: React.FC = () => {
       {/* Palette Modal */}
       <div className="relative w-full max-w-xl z-10 glass-panel rounded-glass-xl border border-os-border-glass shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Search Bar Input */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-os-border bg-white/5">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-os-border bg-os-input focus-within:ring-2 focus-within:ring-inset focus-within:ring-os-focus">
           <Search className="w-5 h-5 text-os-muted flex-shrink-0" />
           <input
             ref={inputRef}
@@ -154,11 +154,11 @@ export const CommandPalette: React.FC = () => {
             }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command, search tasks, or ask OS..."
-            className="w-full bg-transparent text-sm text-os-primary placeholder:text-os-muted focus:outline-none"
+            className="w-full bg-transparent text-sm text-os-primary caret-os-accent placeholder:text-os-placeholder focus:outline-none"
           />
           <button
             onClick={() => setIsCommandPaletteOpen(false)}
-            className="p-1 text-os-muted hover:text-os-primary rounded-lg hover:bg-white/5"
+            className="p-1 text-os-muted hover:text-os-primary rounded-lg hover:bg-os-surface-active"
           >
             <X className="w-4 h-4" />
           </button>
@@ -182,19 +182,19 @@ export const CommandPalette: React.FC = () => {
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-glass-md text-xs cursor-pointer transition-colors ${
                     isSelected
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                      : 'text-os-secondary hover:text-os-primary hover:bg-white/5 border border-transparent'
+                      ? 'bg-os-surface-active text-os-accent border border-os-accent'
+                      : 'text-os-secondary hover:text-os-primary hover:bg-os-surface-active border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Icon
                       className={`w-4 h-4 flex-shrink-0 ${
-                        isSelected ? 'text-emerald-400' : 'text-os-muted'
+                        isSelected ? 'text-os-accent' : 'text-os-muted'
                       }`}
                     />
                     <span className="truncate">{item.title}</span>
                   </div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-os-muted px-2 py-0.5 rounded bg-white/5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-os-muted px-2 py-0.5 rounded bg-os-surface-active">
                     {item.category}
                   </span>
                 </div>
@@ -204,7 +204,7 @@ export const CommandPalette: React.FC = () => {
         </div>
 
         {/* Footer shortcuts */}
-        <div className="flex items-center justify-between px-4 py-2 bg-black/20 border-t border-os-border text-[11px] text-os-muted font-mono">
+        <div className="flex items-center justify-between px-4 py-2 bg-os-surface-active border-t border-os-border text-[11px] text-os-muted font-mono">
           <div className="flex items-center gap-3">
             <span>↑↓ Navigate</span>
             <span>↵ Select</span>

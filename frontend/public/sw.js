@@ -2,7 +2,7 @@
  * Static assets are cached for fast loads and basic offline shell;
  * API calls and navigations always go to the network (live data only).
  */
-const CACHE = "os-static-v2";
+const CACHE = "os-static-v3";
 const PRECACHE = [
   "/",
   "/static/logo.png",
@@ -46,7 +46,23 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Static assets: Cache-first with background revalidation
+  // Bundles must prefer the network.  Their names are normally content-hashed,
+  // but network-first avoids a stale worker serving an old lazy route after a
+  // local rebuild.  The cached copy remains an offline fallback.
+  if (url.pathname.startsWith("/assets/")) {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        if (res.ok && url.origin === self.location.origin) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Static images and metadata remain cache-first with background revalidation.
   e.respondWith(
     caches.match(e.request).then((hit) => {
       const net = fetch(e.request).then((res) => {

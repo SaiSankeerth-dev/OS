@@ -126,6 +126,20 @@ def test_screenshot_and_frame_retrieval():
         client.delete(f"/api/computer/sessions/browser_harness/{sid}")
 
 
+def test_closed_or_unknown_session_frame_is_not_a_server_error():
+    """The frontend can recover from 404, but must not poll a dead session as 500."""
+    missing = client.get("/api/computer/sessions/browser_harness/not-a-real-session/frame")
+    assert missing.status_code == 404
+
+    start_resp = client.post("/api/computer/sessions", json={"backend": "browser_harness", "headless": True})
+    sid = start_resp.json()["session_id"]
+    assert client.delete(f"/api/computer/sessions/browser_harness/{sid}").status_code == 200
+
+    closed = client.get(f"/api/computer/sessions/browser_harness/{sid}/frame")
+    assert closed.status_code == 404
+    assert "not found or closed" in closed.json()["detail"]
+
+
 # -----------------------------------------------------------------------------
 # 5. Mouse and keyboard input forwarding
 # -----------------------------------------------------------------------------

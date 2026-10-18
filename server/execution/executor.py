@@ -377,9 +377,29 @@ class SafeExecutor:
                 execution_result = {"ok": True, "result": raw_result}
 
             # Verify postconditions
-            vr = self.verifier.verify_action(
-                action_id, tool_name, execution_result, user_id, arguments=arguments
-            )
+            if tool_def and getattr(tool_def, "verify", None):
+                custom_vr = tool_def.verify(arguments, execution_result)
+                is_v = False
+                v_details = {}
+                if isinstance(custom_vr, dict):
+                    is_v = custom_vr.get("verified", False) is True
+                    v_details = custom_vr
+                elif isinstance(custom_vr, bool):
+                    is_v = custom_vr
+                    v_details = {"verified": is_v}
+                from server.domain.enums import VerificationStatus
+                from server.domain.entities import VerificationResult
+                vr_status = VerificationStatus.VERIFIED if is_v else VerificationStatus.FAILED
+                vr = VerificationResult(
+                    action_id=action_id,
+                    verification_type="tool_defined_verifier",
+                    status=vr_status,
+                    details=v_details,
+                )
+            else:
+                vr = self.verifier.verify_action(
+                    action_id, tool_name, execution_result, user_id, arguments=arguments
+                )
 
             # Update action status
             final_status = (

@@ -110,12 +110,19 @@ class PlannerEngine:
         ordered_tasks: list[Task] = []
         visited: set[str] = set()
         temp_mark: set[str] = set()
+        call_path: list[str] = []
+        detected_cycle: list[str] = []
 
-        def visit(task_id: str):
+        def visit(task_id: str) -> bool:
+            nonlocal detected_cycle
             if task_id in temp_mark:
-                return  # Break dependency cycles gracefully
+                cycle_start_idx = call_path.index(task_id) if task_id in call_path else 0
+                detected_cycle = call_path[cycle_start_idx:] + [task_id]
+                log.warning("Planner dependency cycle detected: %s", " -> ".join(detected_cycle))
+                return False
             if task_id not in visited:
                 temp_mark.add(task_id)
+                call_path.append(task_id)
                 # Visit dependencies first
                 for dep_id in sorted(
                     dep_map.get(task_id, set()),
@@ -127,11 +134,14 @@ class PlannerEngine:
                     ),
                 ):
                     if dep_id in task_by_id:
-                        visit(dep_id)
+                        if not visit(dep_id):
+                            return False
+                call_path.pop()
                 temp_mark.remove(task_id)
                 visited.add(task_id)
                 if task_id in task_by_id:
                     ordered_tasks.append(task_by_id[task_id])
+            return True
 
         # Base sorting by deadline proximity and priority
         base_sorted = sorted(
@@ -143,7 +153,28 @@ class PlannerEngine:
         )
         for t in base_sorted:
             if t.id not in visited:
-                visit(t.id)
+                if not visit(t.id):
+                    # Cyclic plan detected: return explicit invalid-plan result
+                    cycle_str = " -> ".join(detected_cycle)
+                    invalid_plan = Plan(
+                        user_id=user_id,
+                        plan_date=date_str,
+                        status=PlanStatus.INVALID,
+                        reason=f"Dependency cycle detected: {cycle_str}",
+                        planner_version="1.0.0",
+                    )
+                    self.activity_repo.log(
+                        Activity(
+                            user_id=user_id,
+                            actor_type=ActorType.OS,
+                            event_type="plan.invalid_cycle",
+                            entity_type="plan",
+                            entity_id=invalid_plan.id,
+                            summary=f"Plan rejected: Dependency cycle detected ({cycle_str})",
+                            metadata={"cycle": detected_cycle, "plan_date": date_str},
+                        )
+                    )
+                    return invalid_plan, []
 
         schedulable_tasks = ordered_tasks
 

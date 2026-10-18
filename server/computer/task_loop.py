@@ -231,6 +231,12 @@ class BoundedTaskExecutor:
             self._running_tasks[task_id] = plan
 
         # Guard checks
+        if plan.status in ("cancelled", "completed", "failed"):
+            raise ComputerControlError(
+                f"Cannot execute step on task '{task_id}' with terminal status '{plan.status}'",
+                backend="task_loop",
+            )
+
         if self.safety.is_emergency_stopped():
             plan.status = "paused"
             plan.error_summary = "Emergency stop active"
@@ -426,14 +432,18 @@ class BoundedTaskExecutor:
                 step.status = "completed"
                 plan.current_step_index += 1
             else:
-                if step.retries < 2:
+                # Prevent duplicate side-effects for uncertain or non-idempotent actions
+                risk = self.safety.classify_action_risk(step.action, step.target, step.payload)
+                is_idempotent = (risk == ActionRiskLevel.READ_ONLY)
+                if is_idempotent and step.retries < 2:
                     step.retries += 1
                     step.status = "pending"
                     log.warning(f"Step '{step.step_id}' failed: {res.error}. Retrying ({step.retries}/2)...")
                 else:
                     step.status = "failed"
                     plan.status = "failed"
-                    plan.error_summary = f"Step '{step.step_id}' failed after {step.retries} retries: {res.error}"
+                    reason_suffix = " (non-idempotent action will not be auto-retried to avoid duplicate effects)" if not is_idempotent else f" after {step.retries} retries"
+                    plan.error_summary = f"Step '{step.step_id}' failed{reason_suffix}: {res.error}"
 
         except Exception as e:
             step.duration_ms = (time.time() - t0) * 1000
@@ -474,6 +484,21 @@ class BoundedTaskExecutor:
             self._emit_event("human_takeover_ended", plan)
             log.info(f"Task '{task_id}' returned to agent control.")
             return plan
+
+    def cancel_task(self, task_id: str, reason: str = "User cancelled task") -> TaskPlan:
+        """Safely cancel task execution. Never marks task as completed."""
+        with self._lock:
+            plan = self._running_tasks.get(task_id) or self.checkpoints.load(task_id)
+            if not plan:
+                raise ComputerControlError(f"Task '{task_id}' not found", backend="task_loop")
+            plan.status = "cancelled"
+            plan.error_summary = reason
+            plan.updated_at = time.time()
+            self.checkpoints.save(plan)
+            self._emit_event("task_cancelled", plan, {"reason": reason})
+            log.info(f"Task '{task_id}' cancelled: {reason}")
+            return plan
+
 
 
 _GLOBAL_EXECUTOR: Optional[BoundedTaskExecutor] = None

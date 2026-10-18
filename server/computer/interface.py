@@ -125,6 +125,33 @@ class SessionState:
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    runtime_identity: Dict[str, Any] = field(default_factory=dict)
+    desktop_service_health: Dict[str, Any] = field(default_factory=dict)
+    frame: Dict[str, Any] = field(default_factory=dict)
+    input_availability: Dict[str, Any] = field(default_factory=dict)
+    browser_session_id: Optional[str] = None
+    terminal_workspace: Dict[str, Any] = field(default_factory=dict)
+    interruption: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "backend_name": self.backend_name,
+            "status": self.status,
+            "current_url": self.current_url,
+            "active_tab_id": self.active_tab_id,
+            "active_window_id": self.active_window_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "metadata": self.metadata,
+            "runtime_identity": self.runtime_identity,
+            "desktop_service_health": self.desktop_service_health,
+            "frame": self.frame,
+            "input_availability": self.input_availability,
+            "browser_session_id": self.browser_session_id or self.session_id,
+            "terminal_workspace": self.terminal_workspace,
+            "interruption": self.interruption,
+        }
 
 
 # -----------------------------------------------------------------------------
@@ -189,11 +216,25 @@ class ComputerControlInterface(abc.ABC):
 
     def key_down(self, session_id: str, key: str) -> ActionResult:
         """Hold a key down."""
-        return ActionResult(success=True, action="key_down", session_id=session_id, backend=self.name)
+        return ActionResult(
+            success=False,
+            action="key_down",
+            session_id=session_id,
+            backend=self.name,
+            verified=False,
+            error=f"key_down is not implemented by backend '{self.name}'",
+        )
 
     def key_up(self, session_id: str, key: str) -> ActionResult:
         """Release a key."""
-        return ActionResult(success=True, action="key_up", session_id=session_id, backend=self.name)
+        return ActionResult(
+            success=False,
+            action="key_up",
+            session_id=session_id,
+            backend=self.name,
+            verified=False,
+            error=f"key_up is not implemented by backend '{self.name}'",
+        )
 
     def release_all_keys(self, session_id: str) -> ActionResult:
         """Release all held keys to prevent stuck keys."""

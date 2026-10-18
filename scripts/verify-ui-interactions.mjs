@@ -72,7 +72,7 @@ try {
     await page.getByRole('navigation').getByRole('button', { name: 'Connections', exact: true }).click();
     // Connections is lazy loaded and then fetches the real connector list.  Waiting for
     // a rendered action avoids treating its initial loading state as a dialog failure.
-    const configure = page.getByRole('button', { name: 'Configure', exact: true }).first();
+    const configure = page.getByRole('button', { name: /^(?:Connect|Configure)$/ }).first();
     await configure.waitFor({ state: 'visible', timeout: 10000 });
     await configure.click();
     const dialog = page.getByRole('dialog');

@@ -204,6 +204,40 @@ class BrowserHarnessBackend(BaseComputerBackend):
                         "profile_path": str(user_data_dir),
                         "cdp_connected": bool(cdp_url),
                     },
+                    runtime_identity={
+                        "backend": self.name,
+                        "type": "process",
+                        "engine": "playwright_chromium",
+                        "headless": headless,
+                    },
+                    desktop_service_health={
+                        "ok": True,
+                        "status": "ready",
+                        "engine": "playwright_chromium",
+                    },
+                    frame={
+                        "timestamp": time.time(),
+                        "valid": True,
+                        "width": 1280,
+                        "height": 800,
+                    },
+                    input_availability={
+                        "keyboard": True,
+                        "mouse": True,
+                        "active": True,
+                    },
+                    browser_session_id=session_id,
+                    terminal_workspace={
+                        "workspace_dir": str(Path("data/om-workspace").resolve()),
+                        "isolated": False,
+                    },
+                    interruption={
+                        "state": "AI_IDLE",
+                        "emergency_stopped": False,
+                        "human_takeover": False,
+                        "can_interrupt": True,
+                        "can_resume": True,
+                    },
                 )
                 with self._registry_lock:
                     self._sessions[session_id] = state
@@ -995,3 +1029,17 @@ class BrowserHarnessBackend(BaseComputerBackend):
                     pass
                 self._pw = None
             return super().close_session(session_id)
+
+
+_browser_harness_singleton: Optional[BrowserHarnessBackend] = None
+_browser_harness_lock = threading.Lock()
+
+
+def get_browser_harness_backend(profile_root: Optional[str] = None) -> BrowserHarnessBackend:
+    """Singleton getter for the primary BrowserHarnessBackend."""
+    global _browser_harness_singleton
+    with _browser_harness_lock:
+        if _browser_harness_singleton is None:
+            _browser_harness_singleton = BrowserHarnessBackend(profile_root=profile_root)
+        return _browser_harness_singleton
+

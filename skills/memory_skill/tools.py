@@ -39,6 +39,10 @@ _MEMORY_STOPWORDS = frozenset(
     "it its this that these those i you we they he she me my your "
     "what when where which who how do does did".split()
 )
+_SENSITIVE_MEMORY_MARKERS = (
+    "api key", "api_key", "access token", "access_token", "refresh token",
+    "refresh_token", "password", "private key", "private_key", "secret",
+)
 
 
 def make_tools(state_store: StateStore | None = None):
@@ -51,6 +55,12 @@ def make_tools(state_store: StateStore | None = None):
                 status="failure",
                 mode=ExecutionMode.DIRECT,
                 error="nothing to save",
+            )
+        if any(marker in note.lower() for marker in _SENSITIVE_MEMORY_MARKERS):
+            return ToolResult(
+                status="failure",
+                mode=ExecutionMode.DIRECT,
+                error="sensitive credentials are not stored in memory",
             )
         store.log_event(
             "memory", "memory_skill", json.dumps({"note": note})

@@ -87,7 +87,20 @@ VALID_STATUSES = {
     "REJECTED",
     "DONE",
     "FAILED",
+    "CANCELLED",
     "ROLLED_BACK",
+}
+
+VALID_TASK_TRANSITIONS: dict[str, set[str]] = {
+    "PENDING": {"PENDING", "RUNNING", "WAITING_APPROVAL", "FAILED", "CANCELLED", "ROLLED_BACK"},
+    "RUNNING": {"RUNNING", "WAITING_APPROVAL", "DONE", "FAILED", "CANCELLED", "ROLLED_BACK"},
+    "WAITING_APPROVAL": {"WAITING_APPROVAL", "APPROVED", "REJECTED", "FAILED", "CANCELLED", "RUNNING", "ROLLED_BACK"},
+    "APPROVED": {"APPROVED", "RUNNING", "DONE", "FAILED", "CANCELLED", "ROLLED_BACK"},
+    "REJECTED": {"REJECTED", "PENDING", "FAILED", "CANCELLED", "ROLLED_BACK"},
+    "DONE": {"DONE", "PENDING", "ROLLED_BACK"},
+    "FAILED": {"FAILED", "PENDING", "ROLLED_BACK"},
+    "CANCELLED": {"CANCELLED", "PENDING", "ROLLED_BACK"},
+    "ROLLED_BACK": {"PENDING", "RUNNING", "WAITING_APPROVAL", "APPROVED", "REJECTED", "DONE", "FAILED", "CANCELLED", "ROLLED_BACK"},
 }
 
 
@@ -183,13 +196,19 @@ class StateStore:
             conn.close()
 
     def set_task_status(
-        self, task_id: int, new_status: str, note: str = ""
+        self, task_id: int, new_status: str, note: str = "", reason: str = ""
     ) -> Task:
+        effective_note = reason or note or ""
         if new_status not in VALID_STATUSES:
             raise ValueError(f"unknown task status: {new_status!r}")
         task = self.get_task(task_id)
         if task is None:
             raise KeyError(f"no such task: {task_id}")
+        allowed = VALID_TASK_TRANSITIONS.get(task.status, set())
+        if new_status not in allowed:
+            raise ValueError(
+                f"Contradictory/illegal task transition: cannot transition from '{task.status}' directly to '{new_status}'"
+            )
         now = _now()
         conn = self._connect()
         try:
@@ -200,7 +219,7 @@ class StateStore:
             conn.execute(
                 "INSERT INTO task_events (task_id, ts, old_status, new_status, note)"
                 " VALUES (?,?,?,?,?)",
-                (task_id, now, task.status, new_status, note),
+                (task_id, now, task.status, new_status, effective_note),
             )
             conn.commit()
             return self.get_task(task_id)

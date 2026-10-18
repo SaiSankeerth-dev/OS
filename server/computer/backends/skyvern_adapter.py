@@ -303,34 +303,34 @@ class SkyvernBackend(BaseComputerBackend):
     def press_key(self, session_id: str, key: str) -> ActionResult:
         self._require_session(session_id)
         return ActionResult(
-            success=True,
+            success=False,
             action="press_key",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Pressed key {key}",
-            verified=True,
+            error=f"Action 'press_key' is not supported by {self.name} backend",
+            verified=False,
         )
 
     def scroll(self, session_id: str, direction: str = "down", amount: int = 300) -> ActionResult:
         self._require_session(session_id)
         return ActionResult(
-            success=True,
+            success=False,
             action="scroll",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Scrolled {direction} by {amount}px",
-            verified=True,
+            error=f"Action 'scroll' is not supported by {self.name} backend",
+            verified=False,
         )
 
     def switch_tab(self, session_id: str, tab_id: str) -> ActionResult:
         self._require_session(session_id)
         return ActionResult(
-            success=True,
+            success=False,
             action="switch_tab",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Switched to tab {tab_id}",
-            verified=True,
+            error=f"Action 'switch_tab' is not supported by {self.name} backend",
+            verified=False,
         )
 
     def take_screenshot(self, session_id: str) -> bytes:

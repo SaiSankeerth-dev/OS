@@ -1,0 +1,74 @@
+{
+  "phase": "final-light",
+  "baseUrl": "http://127.0.0.1:3000",
+  "viewport": {
+    "width": 1536,
+    "height": 1024
+  },
+  "theme": "light",
+  "title": "OS — Your Personal AI Assistant",
+  "runtimeErrors": [],
+  "failedRequests": [],
+  "routes": [
+    {
+      "name": "overview",
+      "label": "Overview",
+      "status": "captured"
+    },
+    {
+      "name": "ask-os",
+      "label": "Ask OS",
+      "status": "captured",
+      "durationMs": 768
+    },
+    {
+      "name": "discovery",
+      "label": "Discovery",
+      "status": "captured",
+      "durationMs": 756
+    },
+    {
+      "name": "tasks",
+      "label": "Tasks",
+      "status": "captured",
+      "durationMs": 746
+    },
+    {
+      "name": "computer-browser",
+      "label": "Computer",
+      "status": "captured",
+      "durationMs": 879
+    },
+    {
+      "name": "computer-desktop",
+      "label": "Computer / Linux Desktop",
+      "status": "failed",
+      "error": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Linux Virtual Computer/ })\u001b[22m\n"
+    },
+    {
+      "name": "computer-terminal",
+      "label": "Computer / Terminal",
+      "status": "failed",
+      "error": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Sandbox Lab/ })\u001b[22m\n"
+    },
+    {
+      "name": "connections",
+      "label": "Connections",
+      "status": "captured",
+      "durationMs": 621
+    },
+    {
+      "name": "activity",
+      "label": "Activity",
+      "status": "captured",
+      "durationMs": 622
+    },
+    {
+      "name": "settings",
+      "label": "Settings",
+      "status": "captured",
+      "durationMs": 609
+    }
+  ],
+  "generatedAt": "2026-10-18T08:07:30.896Z"
+}

@@ -199,3 +199,32 @@ export interface AnalyticsData {
   tasks_done: number;
   events: number;
 }
+
+export type DiagnosticOperationalState =
+  | 'NOT_CONFIGURED'
+  | 'CONFIGURED'
+  | 'REACHABLE'
+  | 'AUTHENTICATED'
+  | 'EXECUTING'
+  | 'INDEPENDENTLY_VERIFIED'
+  | 'ERROR';
+
+export interface DiagnosticSubsystem {
+  state: DiagnosticOperationalState | string;
+  badge: string;
+  badge_color: 'green' | 'amber' | 'gray' | 'red' | string;
+  configured: boolean;
+  reachable: boolean;
+  authenticated: boolean;
+  executing: boolean;
+  verified: boolean;
+  evidence: string;
+  metrics?: Record<string, any>;
+}
+
+export interface DiagnosticsResponse {
+  ok: boolean;
+  timestamp: string;
+  subsystems: Record<string, DiagnosticSubsystem>;
+}
+

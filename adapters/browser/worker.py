@@ -254,10 +254,9 @@ class BrowserWorker:
         try:
             pw = self._get_playwright()
             return pw.extract_text(session_id)
-        except Exception:
-            sess = self._sessions.get(session_id, {})
-            url = sess.get("current_url", "about:blank")
-            return f"[fallback] Content extracted from {url}."
+        except Exception as exc:
+            log.warning("Browser text extraction failed for session %s: %s", session_id, exc)
+            return ""
 
     def click(self, session_id: str, ref: str) -> BrowserReceipt:
         """Click an element by reference (agent-browser @ref or CSS selector)."""

@@ -54,17 +54,36 @@ def _safe_eval_math(expr: str) -> float | int:
 
 
 from .hybrid_router import ASTRepoMapper, HybridModelRouter
+from .ollama_registry import OllamaModelRegistry
 
 
 class InferenceEngine:
-    """OS local inference engine with energy, latency telemetry, and hybrid grammar routing."""
+    """OS local inference engine with energy, latency telemetry, dynamic Ollama registry, and hybrid grammar routing."""
 
-    def __init__(self, default_model: str = "llama3.2:8b", cloud_fallback: bool = False, base_url: str = "http://localhost:11434") -> None:
-        self.default_model = default_model
+    def __init__(
+        self,
+        default_model: str = "llama3.2:8b",
+        cloud_fallback: bool = False,
+        base_url: str = "http://localhost:11434",
+        registry: Optional[OllamaModelRegistry] = None,
+    ) -> None:
+        self.registry = registry or OllamaModelRegistry(base_url=base_url)
+        if default_model and not self.registry.installed_models:
+            self.registry.active_model = default_model
         self.cloud_fallback = cloud_fallback
         self.base_url = base_url.rstrip("/")
-        self.router = HybridModelRouter(local_model=default_model, allow_hybrid=cloud_fallback)
+        self.router = HybridModelRouter(local_model=self.registry.active_model, allow_hybrid=cloud_fallback)
         self.telemetry_history: List[Dict[str, Any]] = []
+
+    @property
+    def default_model(self) -> str:
+        return self.registry.active_model
+
+    @default_model.setter
+    def default_model(self, value: str) -> None:
+        self.registry.select_model(value)
+        if hasattr(self, "router"):
+            self.router.local_model = value
 
     def _call_ollama(
         self,
@@ -72,17 +91,19 @@ class InferenceEngine:
         dot_role: str,
         context: str,
         tool_json_schema: Optional[Dict[str, Any]] = None,
+        dot_id: Optional[str] = None,
     ) -> Optional[str]:
         """Attempt real local inference with Ollama; returns None if offline/error."""
         import urllib.request
         import json
 
+        chosen_model = self.registry.get_model_for_dot(dot_id or dot_role)
         system_prompt = f"You are {dot_role}, an expert AI coworker in the OS personal operating system."
         if context:
             system_prompt += f" Relevant workspace context:\n{context}"
 
         payload: Dict[str, Any] = {
-            "model": self.default_model,
+            "model": chosen_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
@@ -117,8 +138,11 @@ class InferenceEngine:
         context: str = "",
         files_dict: Optional[Dict[str, str]] = None,
         tool_json_schema: Optional[Dict[str, Any]] = None,
+        dot_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         start_t = time.perf_counter()
+        target_dot = (dot_id or dot_role).lower().lstrip("@")
+        chosen_model = self.registry.get_model_for_dot(target_dot)
 
         # If multi-file context provided, compress using ASTRepoMapper
         if files_dict:
@@ -138,16 +162,16 @@ class InferenceEngine:
 
         # Check deterministic fast path first (0 latency overhead)
         fast_response = self._deterministic_fast_path(prompt, prompt_lower, dot_role, context)
-        provider_used = f"local/{self.default_model}"
+        provider_used = f"local/{chosen_model}"
 
         if fast_response is not None:
             response_text = fast_response
         else:
             # Try live Ollama LLM with grammar constraints
-            llm_res = self._call_ollama(prompt, dot_role, context, tool_json_schema=tool_json_schema)
+            llm_res = self._call_ollama(prompt, dot_role, context, tool_json_schema=tool_json_schema, dot_id=target_dot)
             if llm_res is not None:
                 response_text = llm_res
-                provider_used = f"ollama/{self.default_model}"
+                provider_used = f"ollama/{chosen_model}"
             else:
                 response_text = self._deterministic_fallback(prompt, dot_role, context)
 
@@ -159,7 +183,7 @@ class InferenceEngine:
 
         record = {
             "content": response_text,
-            "model": self.default_model,
+            "model": chosen_model,
             "provider": provider_used,
             "latency_ms": elapsed_ms,
             "tokens": tokens,

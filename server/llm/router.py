@@ -29,5 +29,17 @@ class ModelRouter:
     def client_for(self, task: TaskKind = "conversation") -> LLMClient:
         return self._routes.get(task, self._default)
 
+    def set_model(self, model_name: str) -> None:
+        if hasattr(self._default, "model"):
+            self._default.model = model_name
+        for client in self._routes.values():
+            if hasattr(client, "model"):
+                client.model = model_name
+
+    def get_model(self) -> str:
+        if hasattr(self._default, "model"):
+            return getattr(self._default, "model", "")
+        return ""
+
     async def health(self) -> bool:
         return await self._default.health()

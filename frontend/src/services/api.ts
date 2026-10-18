@@ -13,6 +13,8 @@ import {
   MemoryItem,
   WatcherSuggestion,
   AnalyticsData,
+  DiagnosticsResponse,
+  DiagnosticSubsystem,
 } from '../types/api';
 
 const BASE_URL = '';
@@ -206,8 +208,9 @@ export const api = {
     });
   },
 
-  async startConnectorOAuth(cid: string): Promise<{ url: string }> {
-    return request<{ url: string }>(`/api/connectors/${cid}/oauth/start`);
+  async startConnectorOAuth(cid: string, scopes?: string[]): Promise<{ url: string; scopes?: string[] }> {
+    const query = scopes && scopes.length ? `?scopes=${encodeURIComponent(JSON.stringify(scopes))}` : '';
+    return request<{ url: string; scopes?: string[] }>(`/api/connectors/${cid}/oauth/start${query}`);
   },
 
   async testConnector(cid: string): Promise<{ ok: boolean; status: any }> {
@@ -366,5 +369,245 @@ export const api = {
   async getOctopPresets(): Promise<any> {
     return request<any>('/api/hud/octop/presets');
   },
+
+  // Dynamic Ollama Multi-Model Registry
+  async getOllamaModels(refresh = false): Promise<any> {
+    const q = refresh ? '?refresh=true' : '';
+    return request<any>(`/api/models${q}`);
+  },
+
+  async refreshOllamaModels(): Promise<any> {
+    return request<any>('/api/models/refresh', {
+      method: 'POST',
+    });
+  },
+
+  async selectOllamaModel(model: string, dot?: string): Promise<any> {
+    return request<any>('/api/models/select', {
+      method: 'POST',
+      body: JSON.stringify({ model, dot }),
+    });
+  },
+
+  // Skills Management & Execution
+  async getSkills(): Promise<{ skills: any[] }> {
+    return request<{ skills: any[] }>('/api/skills');
+  },
+
+  async importSkill(payload: {
+    source_type: 'github' | 'file' | 'zip' | 'local_dir';
+    github_url?: string;
+    name?: string;
+    content?: string;
+    file_type?: string;
+    category?: string;
+    description?: string;
+    prompt?: string;
+    local_path?: string;
+  }): Promise<any> {
+    return request<any>('/api/skills/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getSkillDetails(skillId: string): Promise<any> {
+    return request<any>(`/api/skills/${encodeURIComponent(skillId)}/details`);
+  },
+
+  async toggleSkill(skillId: string, enabled?: boolean): Promise<any> {
+    return request<any>(`/api/skills/${encodeURIComponent(skillId)}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
+  async runSkill(skillId: string, input: string, model?: string): Promise<any> {
+    return request<any>(`/api/skills/${encodeURIComponent(skillId)}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ input, model }),
+    });
+  },
+
+  async getSkillRuns(skillId?: string): Promise<{ runs: any[] }> {
+    const url = skillId
+      ? `/api/skills/${encodeURIComponent(skillId)}/runs`
+      : '/api/skills/runs';
+    return request<{ runs: any[] }>(url);
+  },
+
+  async clearSkillRuns(): Promise<any> {
+    return request<any>('/api/skills/runs', { method: 'DELETE' });
+  },
+
+  async deleteSkill(skillId: string): Promise<any> {
+    return request<any>(`/api/skills/${encodeURIComponent(skillId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Operational Diagnostics & Health
+  async getDiagnostics(): Promise<DiagnosticsResponse> {
+    return request<DiagnosticsResponse>('/api/diagnostics');
+  },
+
+  async getHealth(): Promise<{
+    status: string;
+    local_first: boolean;
+    paid_services_blocked: boolean;
+    subsystems: Record<string, any>;
+  }> {
+    return request('/api/health');
+  },
+
+  // Computer & Virtual Desktop Runtime
+  async getComputerBackends(): Promise<{ ok: boolean; backends: Record<string, any> }> {
+    return request('/api/computer/backends');
+  },
+
+  async checkComputerBackendHealth(backendName: string): Promise<any> {
+    return request(`/api/computer/backends/${encodeURIComponent(backendName)}/health`, {
+      method: 'POST',
+    });
+  },
+
+  async getComputerDesktopStatus(): Promise<any> {
+    return request('/api/computer/desktop/status');
+  },
+
+  async startComputerDesktop(): Promise<any> {
+    return request('/api/computer/desktop/start', { method: 'POST' });
+  },
+
+  async stopComputerDesktop(): Promise<any> {
+    return request('/api/computer/desktop/stop', { method: 'POST' });
+  },
+
+  async restartComputerDesktop(): Promise<any> {
+    return request('/api/computer/desktop/restart', { method: 'POST' });
+  },
+
+  async getComputerRateLimits(): Promise<any> {
+    return request('/api/computer/rate_limits');
+  },
+
+  async getComputerApprovals(): Promise<{ approvals: any[] }> {
+    return request('/api/computer/approvals');
+  },
+
+  async resolveComputerApproval(ticketId: string, decision: 'allow_once' | 'always_allow' | 'deny'): Promise<any> {
+    return request(`/api/computer/approvals/${encodeURIComponent(ticketId)}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    });
+  },
+
+  async getComputerSessions(): Promise<{ sessions: any[] }> {
+    return request('/api/computer/sessions');
+  },
+
+  async createComputerSession(backend = 'browser_harness', goal = 'Interactive session'): Promise<any> {
+    return request('/api/computer/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ backend, goal }),
+    });
+  },
+
+  async deleteComputerSession(backend: string, sessionId: string): Promise<any> {
+    return request(`/api/computer/sessions/${encodeURIComponent(backend)}/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getComputerArbiter(backend: string, sessionId: string): Promise<any> {
+    return request(`/api/computer/sessions/${encodeURIComponent(backend)}/${encodeURIComponent(sessionId)}/arbiter`);
+  },
+
+  async controlComputer(backend: string, sessionId: string, action: string): Promise<any> {
+    return request(`/api/computer/sessions/${encodeURIComponent(backend)}/${encodeURIComponent(sessionId)}/control`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  async navigateComputer(backend: string, sessionId: string, url: string): Promise<any> {
+    return request(`/api/computer/sessions/${encodeURIComponent(backend)}/${encodeURIComponent(sessionId)}/navigate`, {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  async emergencyStopComputer(): Promise<any> {
+    return request('/api/computer/emergency_stop', { method: 'POST' });
+  },
+
+  async getComputerFiles(path = '/workspace'): Promise<any> {
+    return request(`/api/om/computer/files?path=${encodeURIComponent(path)}`);
+  },
+
+  async writeComputerFile(path: string, content: string): Promise<any> {
+    return request('/api/om/computer/files/write', {
+      method: 'POST',
+      body: JSON.stringify({ path, content }),
+    });
+  },
+
+  async execComputerCommand(command: string, timeout = 30): Promise<any> {
+    return request('/api/om/computer/commands', {
+      method: 'POST',
+      body: JSON.stringify({ command, timeout }),
+    });
+  },
 };
+
+export function getModelType(modelName?: string, type?: string): string {
+  if (type && type.trim()) return type.trim();
+  if (!modelName) return 'General';
+  const low = modelName.toLowerCase();
+  if (low.includes('r1') || low.includes('qwq') || low.includes('reason') || low.includes('think') || low.includes('deepseek-r1')) {
+    return 'Reasoning';
+  }
+  if (low.includes('coder') || low.includes('codestral') || low.includes('starcoder') || low.includes('deepseek-coder') || low.includes('code') || low.includes('devstral')) {
+    return 'Coding';
+  }
+  if (low.includes('vision') || low.includes('llava') || low.includes('vl') || low.includes('pixtral') || low.includes('moondream')) {
+    return 'Vision';
+  }
+  if (low.includes('dolphin') || low.includes('wizard')) {
+    return 'Creative';
+  }
+  if (low.includes('mythos') || low.includes('claude') || low.includes('qwythos')) {
+    return 'Creative';
+  }
+  if (low.includes('instruct') || low.includes('chat')) {
+    return 'Instruction';
+  }
+  if (low.includes('ornith')) {
+    return 'Agentic';
+  }
+  return 'General';
+}
+
+export function getModelTypeBadgeClass(type: string): string {
+  const norm = (type || '').toLowerCase();
+  if (norm.includes('reason')) {
+    return 'bg-purple-500/15 text-purple-400 dark:text-purple-300 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.15)]';
+  }
+  if (norm.includes('code') || norm.includes('coding')) {
+    return 'bg-cyan-500/15 text-cyan-400 dark:text-cyan-300 border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]';
+  }
+  if (norm.includes('vision')) {
+    return 'bg-emerald-500/15 text-emerald-400 dark:text-emerald-300 border-emerald-500/30';
+  }
+  if (norm.includes('creative') || norm.includes('uncensored')) {
+    return 'bg-pink-500/15 text-pink-400 dark:text-pink-300 border-pink-500/30';
+  }
+  if (norm.includes('instruct')) {
+    return 'bg-amber-500/15 text-amber-400 dark:text-amber-300 border-amber-500/30';
+  }
+  if (norm.includes('agentic')) {
+    return 'bg-teal-500/15 text-teal-400 dark:text-teal-300 border-teal-500/30';
+  }
+  return 'bg-indigo-500/15 text-indigo-400 dark:text-indigo-300 border-indigo-500/30';
+}
 

@@ -21,10 +21,16 @@ from web.connectors import adapters as A  # noqa: E402
 
 @pytest.fixture(scope="module")
 def client():
-    Path("data/dashboard.db").unlink(missing_ok=True)
+    try:
+        Path("data/dashboard.db").unlink(missing_ok=True)
+    except PermissionError:
+        pass
     with TestClient(app) as c:
         yield c
-    Path("data/dashboard.db").unlink(missing_ok=True)
+    try:
+        Path("data/dashboard.db").unlink(missing_ok=True)
+    except PermissionError:
+        pass
 
 
 @pytest.fixture()
@@ -120,23 +126,41 @@ def test_failed_health_check_is_setup_error(client, failing):
 
 
 def test_google_group_shares_one_signin(client, healthy):
+    """Google connectors share OAuth client app keys, but maintain independent tokens and status."""
     _grant(client, "gmail", None)
     _grant(client, "google_calendar", None)
-    r = client.post("/api/connectors/gmail/credentials",
-                    json={"fields": {"client_id": "x", "client_secret": "y",
-                                     "refresh_token": "fake-refresh-token"}})
-    assert r.json()["status"]["state"] in ("granted", "connected", "setup_error")
-    # calendar sees the shared credential and can verify itself
-    r = client.post("/api/connectors/google_calendar/test")
-    assert r.json()["status"]["state"] == "connected"
-    # revoking gmail keeps the shared sign-in while calendar still uses it
-    client.post("/api/connectors/gmail/revoke")
-    from web.server import get_dash
+    try:
+        r = client.post("/api/connectors/gmail/credentials",
+                        json={"fields": {"client_id": "x", "client_secret": "y",
+                                         "refresh_token": "fake-refresh-token"}})
+        assert r.json()["status"]["state"] in ("granted", "connected", "setup_error")
 
-    assert get_dash().has_credentials("google") is True
-    # revoking the last google user removes the shared credential
-    client.post("/api/connectors/google_calendar/revoke")
-    assert get_dash().has_credentials("google") is False
+        # Calendar sees the shared client credentials (client_id, client_secret)
+        cal_creds = client.get("/api/connectors/google_calendar/credentials").json()
+        assert cal_creds["configured"] is True
+        assert cal_creds["fields"]["client_id"] == "x"
+        # But Calendar does NOT inherit Gmail's token (independent status)
+        assert cal_creds["has_refresh_token"] is False
+        assert client.get("/api/connectors/google_calendar").json()["needs_oauth"] is True
+
+        # Now configure Calendar with its own token
+        r = client.post("/api/connectors/google_calendar/credentials",
+                        json={"fields": {"refresh_token": "cal-refresh-token"}})
+        assert r.json()["status"]["state"] == "connected"
+
+        # revoking gmail keeps the shared client keys while calendar still uses it
+        client.post("/api/connectors/gmail/revoke")
+        from web.server import get_dash
+
+        assert get_dash().has_credentials("google") is True
+        assert client.get("/api/connectors/google_calendar").json()["state"] == "connected"
+
+        # revoking the last google user removes the shared credential
+        client.post("/api/connectors/google_calendar/revoke")
+        assert get_dash().has_credentials("google") is False
+    finally:
+        client.post("/api/connectors/gmail/revoke")
+        client.post("/api/connectors/google_calendar/revoke")
 
 
 def test_revoke_clears_grant_and_creds(client, healthy):

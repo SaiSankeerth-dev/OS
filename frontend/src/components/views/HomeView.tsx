@@ -18,13 +18,15 @@ import {
   Compass,
   Activity,
   Layers,
+  Database,
+  Globe,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { api } from '../../services/api';
+import { api, getModelType } from '../../services/api';
 import { GlassCard } from '../common/GlassCard';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
-import { HomeViewData, PlanItem, Connector, Task } from '../../types/api';
+import { HomeViewData, PlanItem, Connector, Task, DiagnosticsResponse } from '../../types/api';
 
 export const HomeView: React.FC = () => {
   const { me, setCurrentView, pendingApprovalsCount, activeAgentsCount } = useApp();
@@ -35,19 +37,18 @@ export const HomeView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [quickQuery, setQuickQuery] = useState('');
   const [desktopRuntime, setDesktopRuntime] = useState<{ status?: string; message?: string } | null>(null);
+  const [diagData, setDiagData] = useState<DiagnosticsResponse | null>(null);
 
   const fetchHome = async () => {
     setIsLoading(true);
     try {
-      const [hRes, tRes, pRes, cRes, desktopRes] = await Promise.allSettled([
+      const [hRes, tRes, pRes, cRes, desktopRes, diagRes] = await Promise.allSettled([
         api.getHomeView(),
         api.getTasks(),
         api.getPlan(),
         api.getConnectors(),
-        fetch('/api/computer/desktop/status').then(async (response) => {
-          if (!response.ok) throw new Error(`Desktop status returned HTTP ${response.status}`);
-          return response.json();
-        }),
+        api.getComputerDesktopStatus(),
+        api.getDiagnostics(),
       ]);
 
       if (hRes.status === 'fulfilled') {
@@ -66,6 +67,9 @@ export const HomeView: React.FC = () => {
         setDesktopRuntime(desktopRes.value.health || null);
       } else {
         setDesktopRuntime(null);
+      }
+      if (diagRes.status === 'fulfilled') {
+        setDiagData(diagRes.value);
       }
     } catch (err) {
       console.error('Failed to load home view data:', err);
@@ -125,12 +129,20 @@ export const HomeView: React.FC = () => {
 
   const connectedCount = connectors.filter((c) => c.state === 'connected').length;
   const desktopStatus = desktopRuntime?.status?.toUpperCase() || 'UNKNOWN';
-  const desktopStatusClass =
-    desktopStatus === 'READY'
-      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 dark:text-emerald-300'
-      : desktopStatus === 'DEGRADED' || desktopStatus === 'STARTING'
-      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-300'
-      : 'bg-slate-500/10 border-slate-500/30 text-slate-600 dark:text-slate-300';
+
+  // Invariant: Never make a green readiness badge from configuration alone!
+  const getBadgeStyle = (badgeColor?: string, verified?: boolean) => {
+    if (badgeColor === 'green' && verified) {
+      return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 dark:text-emerald-300';
+    }
+    if (badgeColor === 'amber' || badgeColor === 'yellow') {
+      return 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-300';
+    }
+    if (badgeColor === 'red') {
+      return 'bg-red-500/10 border-red-500/30 text-red-500 dark:text-red-300';
+    }
+    return 'bg-slate-500/10 border-slate-500/30 text-slate-600 dark:text-slate-300';
+  };
 
   return (
     <div className="max-w-6xl mx-auto w-full px-4 md:px-8 py-8 space-y-8 animate-in fade-in duration-200">
@@ -387,19 +399,21 @@ export const HomeView: React.FC = () => {
           </div>
 
           <div className="rounded-xl bg-os-surface/80 border border-os-border p-4 space-y-3 shadow-sm text-xs">
-            {/* Status Item 1: Docker Desktop */}
+            {/* Status Item 1: Virtual Desktop */}
             <div className="flex items-center justify-between pb-2.5 border-b border-os-border/40">
               <div className="flex items-center gap-2.5">
                 <Monitor className="w-4 h-4 text-cyan-400" />
                 <div>
                   <div className="font-semibold text-os-primary">Virtual Desktop</div>
-                  <div className="text-[10px] text-os-muted font-mono" title={desktopRuntime?.message}>
-                    {desktopRuntime?.message || 'Runtime status unavailable'}
+                  <div className="text-[10px] text-os-muted font-mono" title={diagData?.subsystems?.virtual_desktop?.evidence || desktopRuntime?.message}>
+                    {diagData?.subsystems?.virtual_desktop?.evidence || desktopRuntime?.message || 'Runtime status unavailable'}
                   </div>
                 </div>
               </div>
-              <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold ${desktopStatusClass}`}>
-                {desktopStatus}
+              <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold ${
+                getBadgeStyle(diagData?.subsystems?.virtual_desktop?.badge_color, diagData?.subsystems?.virtual_desktop?.verified)
+              }`}>
+                {(diagData?.subsystems?.virtual_desktop?.badge || desktopStatus).toUpperCase()}
               </span>
             </div>
 
@@ -408,23 +422,66 @@ export const HomeView: React.FC = () => {
               <div className="flex items-center gap-2.5">
                 <Sparkles className="w-4 h-4 text-indigo-400" />
                 <div>
-                  <div className="font-semibold text-os-primary">AI Model</div>
-                  <div className="text-[10px] text-os-muted font-mono">{me?.model || 'No model configured'}</div>
+                  <div className="font-semibold text-os-primary flex items-center gap-1.5">
+                    <span>AI Model</span>
+                    {me?.model && (
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 uppercase">
+                        ({getModelType(me.model)})
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-os-muted font-mono" title={diagData?.subsystems?.local_llm?.evidence}>
+                    {diagData?.subsystems?.local_llm?.evidence || me?.model || 'No model configured'}
+                  </div>
                 </div>
               </div>
               <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold ${
-                me?.model_ok
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 dark:text-emerald-300'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-300'
+                getBadgeStyle(diagData?.subsystems?.local_llm?.badge_color, diagData?.subsystems?.local_llm?.verified)
               }`}>
-                {me?.model_ok ? 'ACTIVE' : 'UNAVAILABLE'}
+                {(diagData?.subsystems?.local_llm?.badge || (me?.model_ok ? 'ACTIVE' : 'UNAVAILABLE')).toUpperCase()}
               </span>
             </div>
 
-            {/* Status Item 3: Approvals Policy */}
+            {/* Status Item 3: Browser Runtime */}
             <div className="flex items-center justify-between pb-2.5 border-b border-os-border/40">
               <div className="flex items-center gap-2.5">
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <Globe className="w-4 h-4 text-emerald-400" />
+                <div>
+                  <div className="font-semibold text-os-primary">Browser Runtime</div>
+                  <div className="text-[10px] text-os-muted font-mono" title={diagData?.subsystems?.browser_runtime?.evidence}>
+                    {diagData?.subsystems?.browser_runtime?.evidence || 'Playwright Chromium runtime'}
+                  </div>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold ${
+                getBadgeStyle(diagData?.subsystems?.browser_runtime?.badge_color, diagData?.subsystems?.browser_runtime?.verified)
+              }`}>
+                {(diagData?.subsystems?.browser_runtime?.badge || 'STANDBY').toUpperCase()}
+              </span>
+            </div>
+
+            {/* Status Item 4: Persistence Store */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-os-border/40">
+              <div className="flex items-center gap-2.5">
+                <Database className="w-4 h-4 text-amber-400" />
+                <div>
+                  <div className="font-semibold text-os-primary">State Persistence</div>
+                  <div className="text-[10px] text-os-muted font-mono" title={diagData?.subsystems?.persistence?.evidence}>
+                    {diagData?.subsystems?.persistence?.evidence || 'SQLite WAL storage'}
+                  </div>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold ${
+                getBadgeStyle(diagData?.subsystems?.persistence?.badge_color, diagData?.subsystems?.persistence?.verified)
+              }`}>
+                {(diagData?.subsystems?.persistence?.badge || 'VERIFIED').toUpperCase()}
+              </span>
+            </div>
+
+            {/* Status Item 5: Approvals Policy */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-os-border/40">
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="w-4 h-4 text-blue-400" />
                 <div>
                   <div className="font-semibold text-os-primary">Approvals Policy</div>
                   <div className="text-[10px] text-os-muted font-mono">SafeExecutor SHA-256</div>
@@ -435,7 +492,7 @@ export const HomeView: React.FC = () => {
               </span>
             </div>
 
-            {/* Status Item 4: Connectors */}
+            {/* Status Item 6: Connectors */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Link2 className="w-4 h-4 text-purple-400" />

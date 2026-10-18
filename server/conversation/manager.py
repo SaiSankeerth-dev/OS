@@ -213,7 +213,22 @@ class ConversationManager:
 
     def reset(self) -> None:
         self.history.clear()
-        self.state = ConversationState.IDLE
+    def set_model(self, model_name: str) -> None:
+        if hasattr(self.cfg, "llm"):
+            self.cfg.llm.model = model_name
+        if hasattr(self.router, "set_model"):
+            self.router.set_model(model_name)
+        elif hasattr(self.router, "_default") and hasattr(self.router._default, "model"):
+            self.router._default.model = model_name
+
+    def get_model(self) -> str:
+        if hasattr(self.router, "get_model"):
+            m = self.router.get_model()
+            if m:
+                return m
+        if hasattr(self.cfg, "llm"):
+            return getattr(self.cfg.llm, "model", "")
+        return ""
 
     async def health(self) -> bool:
         return await self.router.health()
@@ -426,6 +441,22 @@ class ConversationManager:
             yield ChatChunk(delta=fr.text, done=True)
             return
 
+        # Explicitly saved notes become typed local context only after the
+        # existing tool pipeline has succeeded.  We never infer or persist an
+        # entire conversation turn here, and a rejected sensitive note cannot
+        # reach this backend because the tool failed closed above.
+        if tool_name == "memory_save" and result.status == "success" and self.memory is not None:
+            note = str((result.data or {}).get("note", ""))
+            remember = getattr(self.memory, "remember_explicit", None)
+            if callable(remember):
+                write_result = remember(note, source="memory_save")
+                if not write_result.accepted:
+                    log.warning("typed memory not stored: %s", write_result.reason)
+        elif tool_name == "memory_forget" and result.status == "success" and self.memory is not None:
+            forget = getattr(self.memory, "forget", None)
+            if callable(forget):
+                forget(str((result.data or {}).get("query", "")))
+
         if spec.execution_mode == ExecutionMode.DIRECT and formatter is not None:
             fr = self.response_policy.apply_direct(tool_name, result, formatter)
         else:
@@ -593,7 +624,12 @@ class ConversationManager:
     async def _handle_team(self, user_text: str, perf: PerfTrace):
         """Phase 5: run a dynamic agent team for a multi-step request."""
         self.set_state(ConversationState.THINKING)
-        team_result = await self._supervisor.run_team(user_text)
+        memories: list[str] = []
+        if self.memory_retriever is not None:
+            memories = self.memory_retriever.retrieve_relevant(user_text)
+        team_result = await self._supervisor.run_team(
+            user_text, memory_context=memories
+        )
         perf.mark("team_done")
         text = team_result.text or "I couldn't complete that task."
         if team_result.status == "partial":

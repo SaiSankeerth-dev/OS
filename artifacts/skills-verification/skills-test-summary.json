@@ -1,0 +1,22 @@
+[
+  {
+    "name": "navigate to Discovery view",
+    "status": "PASS",
+    "detail": "Navigated to Discovery view."
+  },
+  {
+    "name": "verify skills catalog and import button",
+    "status": "PASS",
+    "detail": "Skills catalog rendered with + Import Skill button."
+  },
+  {
+    "name": "open import skill modal",
+    "status": "PASS",
+    "detail": "Import modal verified with GitHub and File tabs."
+  },
+  {
+    "name": "open run modal and execute calc_skill",
+    "status": "PASS",
+    "detail": "calc_skill executed. Output verified on page: true."
+  }
+]

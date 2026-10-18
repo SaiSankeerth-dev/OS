@@ -11,6 +11,7 @@ Exposes REST endpoints for:
 from __future__ import annotations
 
 import asyncio
+import anyio
 import base64
 import logging
 import time
@@ -23,6 +24,7 @@ from server.computer.arbiter import ControlState, get_arbiter_registry
 from server.computer.interface import (
     ComputerControlError,
     SafetyGateTriggeredError,
+    SessionNotFoundError,
 )
 from server.computer.rate_limits import get_rate_limits_tracker
 from server.computer.registry import get_computer_registry
@@ -146,13 +148,14 @@ async def check_backend_health(backend_name: str) -> Dict[str, Any]:
     registry = get_computer_registry()
     try:
         backend = registry.get_backend(backend_name)
-        if hasattr(backend, "health_check"):
-            try:
-                health = backend.health_check(force_refresh=True)
-            except TypeError:
-                health = backend.health_check()
-        else:
-            health = backend.health_check()
+        def _do_check():
+            if hasattr(backend, "health_check"):
+                try:
+                    return backend.health_check(force_refresh=True)
+                except TypeError:
+                    return backend.health_check()
+            return backend.health_check()
+        health = await anyio.to_thread.run_sync(_do_check)
         with registry._lock:
             registry._health_cache[backend_name] = health
         return {
@@ -188,13 +191,15 @@ async def start_session(inp: StartSessionIn) -> Dict[str, Any]:
             "cdp_url": inp.cdp_url,
             "initial_url": inp.initial_url,
         })
-        return {
+        resp = state.to_dict() if hasattr(state, "to_dict") else {}
+        resp.update({
             "ok": True,
             "session_id": state.session_id,
             "backend": backend.name,
             "status": state.status,
             "current_url": state.current_url,
-        }
+        })
+        return resp
     except Exception as e:
         log.error(f"Failed to start session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -202,7 +207,7 @@ async def start_session(inp: StartSessionIn) -> Dict[str, Any]:
 
 @router.get("/sessions")
 async def list_sessions() -> Dict[str, Any]:
-    """List all currently active computer control sessions across backends."""
+    """List all currently active computer control sessions across backends with full session contracts."""
     registry = get_computer_registry()
     sessions = []
     for b_name in ["browser_harness", "docker_desktop"]:
@@ -211,7 +216,14 @@ async def list_sessions() -> Dict[str, Any]:
             if hasattr(backend, "_sessions"):
                 with backend._registry_lock:
                     for sid, s in backend._sessions.items():
-                        sessions.append({
+                        s_data = s.to_dict() if hasattr(s, "to_dict") else {}
+                        arbiter = get_arbiter_registry().get(sid)
+                        if arbiter and "interruption" in s_data:
+                            s_data["interruption"]["state"] = arbiter.state.value
+                            s_data["interruption"]["human_takeover"] = bool(
+                                arbiter.state in (ControlState.HUMAN_CONTROL, ControlState.AI_PAUSED)
+                            )
+                        s_data.update({
                             "session_id": sid,
                             "backend": backend.name,
                             "status": s.status,
@@ -219,18 +231,19 @@ async def list_sessions() -> Dict[str, Any]:
                             "headless": s.metadata.get("headless", True) if s.metadata else True,
                             "stream_url": s.metadata.get("stream_url"),
                         })
+                        sessions.append(s_data)
         except Exception as e:
             log.debug(f"Failed to list sessions for {b_name}: {e}")
     return {"ok": True, "sessions": sessions}
 
 
 @router.get("/desktop/status")
-async def get_desktop_status() -> Dict[str, Any]:
+async def get_desktop_status(force: bool = False) -> Dict[str, Any]:
     """Retrieve Docker Virtual Desktop runtime health and streaming coordinates."""
     registry = get_computer_registry()
     try:
         backend = registry.get_backend("docker_desktop")
-        health = backend.health_check(force_refresh=True)
+        health = await anyio.to_thread.run_sync(backend.health_check, force)
         details = health.details or {}
 
         # Precise, truthful status categorization
@@ -272,8 +285,8 @@ async def start_desktop_container() -> Dict[str, Any]:
     registry = get_computer_registry()
     try:
         backend = registry.get_backend("docker_desktop")
-        ready = backend.ensure_container_running(timeout_sec=20)
-        health = backend.health_check(force_refresh=True)
+        ready = await anyio.to_thread.run_sync(backend.ensure_container_running, 20)
+        health = await anyio.to_thread.run_sync(backend.health_check, True)
         return {"ok": ready, "health": health.dict() if hasattr(health, "dict") else health.__dict__}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start desktop container: {e}")
@@ -285,8 +298,8 @@ async def stop_desktop_container() -> Dict[str, Any]:
     registry = get_computer_registry()
     try:
         backend = registry.get_backend("docker_desktop")
-        stopped = backend.stop_container()
-        health = backend.health_check(force_refresh=True)
+        stopped = await anyio.to_thread.run_sync(backend.stop_container)
+        health = await anyio.to_thread.run_sync(backend.health_check, True)
         return {"ok": stopped, "health": health.dict() if hasattr(health, "dict") else health.__dict__}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to stop desktop container: {e}")
@@ -298,24 +311,269 @@ async def restart_desktop_container() -> Dict[str, Any]:
     registry = get_computer_registry()
     try:
         backend = registry.get_backend("docker_desktop")
-        restarted = backend.restart_container(timeout_sec=20)
-        health = backend.health_check(force_refresh=True)
+        restarted = await anyio.to_thread.run_sync(backend.restart_container, 20)
+        health = await anyio.to_thread.run_sync(backend.health_check, True)
         return {"ok": restarted, "health": health.dict() if hasattr(health, "dict") else health.__dict__}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to restart desktop container: {e}")
 
 
+CURATED_WALLPAPERS = [
+    {
+        "id": "cinematic-mountain",
+        "name": "Cinematic Mountains",
+        "description": "Twilight night sky with sapphire atmospheric haze and distant peaks",
+        "preview_url": "/static/wallpapers/cinematic-mountain.png",
+        "accent_color": "#38bdf8",
+        "catppuccin": "Sapphire",
+    },
+    {
+        "id": "aurora-borealis",
+        "name": "Aurora Borealis",
+        "description": "Ethereal emerald and cyan curtains over midnight northern waters",
+        "preview_url": "/static/wallpapers/aurora-borealis.png",
+        "accent_color": "#34d399",
+        "catppuccin": "Green",
+    },
+    {
+        "id": "abstract-gradient",
+        "name": "Abstract Gradient",
+        "description": "Apple-inspired dynamic mesh gradient with deep sapphire and violet",
+        "preview_url": "/static/wallpapers/abstract-gradient.png",
+        "accent_color": "#818cf8",
+        "catppuccin": "Mauve",
+    },
+    {
+        "id": "minimalist-desert",
+        "name": "Minimalist Desert",
+        "description": "Sculptural midnight dunes with delicate crest highlights",
+        "preview_url": "/static/wallpapers/minimalist-desert.png",
+        "accent_color": "#a78bfa",
+        "catppuccin": "Lavender",
+    },
+    {
+        "id": "warm-sunset",
+        "name": "Warm Sunset",
+        "description": "Rich amber, rosewater, and mauve twilight sinking into navy horizons",
+        "preview_url": "/static/wallpapers/warm-sunset.png",
+        "accent_color": "#fbbf24",
+        "catppuccin": "Peach",
+    },
+]
+
+# This is a confirmed in-process observation, not a persisted desktop preference.
+# It is deliberately unknown until an application has passed the native postcondition.
+_CURRENT_WALLPAPER: Optional[str] = None
+_WALLPAPER_LOCK = asyncio.Lock()
+_WALLPAPER_CONTAINER = "os-virtual-desktop"
+_WALLPAPER_DIRECTORY = "/usr/share/backgrounds"
+_SUPPORTED_WALLPAPER_SCOPES = {"desktop"}
+
+
+class SetWallpaperIn(BaseModel):
+    wallpaper_id: str
+    apply_to: str = "desktop"
+
+
+def _docker_exec(command: List[str], timeout: float = 10.0):
+    """Run a fixed docker command and preserve its real process result."""
+    import subprocess
+
+    return subprocess.run(
+        ["docker", "exec", "-e", "DISPLAY=:1", _WALLPAPER_CONTAINER, *command],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def _root_pixmap_id() -> Dict[str, Any]:
+    """Read the X11 root-pixmap ID, which feh changes after setting a background."""
+    try:
+        result = _docker_exec(["xprop", "-root", "_XROOTPMAP_ID"], timeout=5)
+    except Exception as exc:
+        return {"ok": False, "reason": "desktop_unavailable", "message": str(exc)}
+
+    output = (result.stdout or "").strip()
+    if result.returncode != 0 or "#" not in output:
+        return {
+            "ok": False,
+            "reason": "root_pixmap_unavailable",
+            "message": (result.stderr or output or "Could not read the X11 root-pixmap state.").strip(),
+            "exit_code": result.returncode,
+        }
+    return {"ok": True, "pixmap_id": output.rsplit("#", 1)[-1].strip()}
+
+
+def _frame_fingerprint() -> Dict[str, Any]:
+    """Capture a new framebuffer and return a content fingerprint as supporting evidence."""
+    # The shell program is fixed; the only dynamic filename is the shell PID.
+    probe = (
+        "frame=/tmp/os-wallpaper-verify-$$.png; "
+        "trap 'rm -f \"$frame\"' EXIT; "
+        "scrot -z -q 80 \"$frame\" 2>/dev/null && sha256sum \"$frame\""
+    )
+    try:
+        result = _docker_exec(["sh", "-c", probe], timeout=8)
+    except Exception as exc:
+        return {"ok": False, "reason": "frame_capture_failed", "message": str(exc)}
+
+    fields = (result.stdout or "").strip().split()
+    if result.returncode != 0 or not fields:
+        return {
+            "ok": False,
+            "reason": "frame_capture_failed",
+            "message": (result.stderr or result.stdout or "Could not capture a desktop frame.").strip(),
+            "exit_code": result.returncode,
+        }
+    return {"ok": True, "sha256": fields[0]}
+
+
+def _apply_and_verify_desktop_wallpaper(wallpaper_id: str) -> Dict[str, Any]:
+    """Apply an allowlisted wallpaper and prove the X11 background changed."""
+    asset_path = f"{_WALLPAPER_DIRECTORY}/{wallpaper_id}.png"
+    try:
+        asset_check = _docker_exec(["test", "-r", asset_path], timeout=5)
+    except Exception as exc:
+        return {"ok": False, "reason": "desktop_unavailable", "message": str(exc)}
+    if asset_check.returncode != 0:
+        return {
+            "ok": False,
+            "reason": "asset_missing",
+            "message": f"Wallpaper asset is unavailable in the desktop container: {asset_path}",
+            "exit_code": asset_check.returncode,
+        }
+
+    before_root = _root_pixmap_id()
+    before_frame = _frame_fingerprint()
+    if not before_root["ok"] or not before_frame["ok"]:
+        failed = before_root if not before_root["ok"] else before_frame
+        return {"ok": False, **failed}
+
+    try:
+        applied = _docker_exec(["feh", "--bg-fill", asset_path], timeout=10)
+    except Exception as exc:
+        return {"ok": False, "reason": "command_timeout", "message": str(exc)}
+    if applied.returncode != 0:
+        return {
+            "ok": False,
+            "reason": "native_command_failed",
+            "message": (applied.stderr or applied.stdout or "feh failed to set the wallpaper.").strip(),
+            "exit_code": applied.returncode,
+        }
+
+    after_root = _root_pixmap_id()
+    after_frame = _frame_fingerprint()
+    if not after_root["ok"] or not after_frame["ok"]:
+        failed = after_root if not after_root["ok"] else after_frame
+        return {"ok": False, **failed}
+    if after_root["pixmap_id"] == before_root["pixmap_id"]:
+        return {
+            "ok": False,
+            "reason": "postcondition_unverified",
+            "message": "The wallpaper command exited successfully, but the X11 root-pixmap did not change.",
+            "evidence": {"before_root_pixmap": before_root["pixmap_id"], "after_root_pixmap": after_root["pixmap_id"]},
+        }
+
+    return {
+        "ok": True,
+        "evidence": {
+            "asset_path": asset_path,
+            "before_root_pixmap": before_root["pixmap_id"],
+            "after_root_pixmap": after_root["pixmap_id"],
+            "before_frame_sha256": before_frame["sha256"],
+            "after_frame_sha256": after_frame["sha256"],
+        },
+    }
+
+
+@router.get("/desktop/wallpapers")
+async def list_desktop_wallpapers() -> Dict[str, Any]:
+    """List curated landscape wallpapers with metadata, preview URLs, and current active selection."""
+    global _CURRENT_WALLPAPER
+    return {
+        "ok": True,
+        "wallpapers": CURATED_WALLPAPERS,
+        "current": _CURRENT_WALLPAPER,
+        "current_status": "confirmed" if _CURRENT_WALLPAPER else "unknown",
+        "persistence": "container-session-only",
+    }
+
+
+@router.post("/desktop/wallpaper")
+async def set_desktop_wallpaper(inp: SetWallpaperIn) -> Dict[str, Any]:
+    """Change virtual desktop and/or workspace wallpaper in real time."""
+    global _CURRENT_WALLPAPER
+    valid_ids = {w["id"] for w in CURATED_WALLPAPERS}
+    if inp.wallpaper_id not in valid_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid wallpaper '{inp.wallpaper_id}'. Valid: {sorted(list(valid_ids))}",
+        )
+
+    if inp.apply_to not in _SUPPORTED_WALLPAPER_SCOPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported wallpaper scope '{inp.apply_to}'. Supported scopes: {sorted(_SUPPORTED_WALLPAPER_SCOPES)}",
+        )
+
+    async with _WALLPAPER_LOCK:
+        outcome = await anyio.to_thread.run_sync(_apply_and_verify_desktop_wallpaper, inp.wallpaper_id)
+        if not outcome["ok"]:
+            status_by_reason = {
+                "asset_missing": 404,
+                "command_timeout": 504,
+                "desktop_unavailable": 503,
+                "root_pixmap_unavailable": 503,
+                "frame_capture_failed": 503,
+                "native_command_failed": 502,
+                "postcondition_unverified": 424,
+            }
+            raise HTTPException(
+                status_code=status_by_reason.get(outcome.get("reason"), 502),
+                detail={"wallpaper_id": inp.wallpaper_id, **outcome, "current": _CURRENT_WALLPAPER},
+            )
+        _CURRENT_WALLPAPER = inp.wallpaper_id
+
+    return {
+        "ok": True,
+        "wallpaper_id": inp.wallpaper_id,
+        "apply_to": "desktop",
+        "applied_desktop": True,
+        "verified": True,
+        "current": _CURRENT_WALLPAPER,
+        "persistence": "container-session-only",
+        "evidence": outcome["evidence"],
+        "message": f"Applied and verified wallpaper '{inp.wallpaper_id}' on the Linux desktop.",
+    }
+
+
 
 @router.get("/sessions/{backend_name}/{session_id}")
 async def get_session_state(backend_name: str, session_id: str) -> Dict[str, Any]:
-    """Inspect current session state, active tabs, and windows."""
+    """Inspect current session state, active tabs, windows, and full canonical contract."""
     registry = get_computer_registry()
     try:
         backend = registry.get_backend(backend_name)
         state = backend.get_session_state(session_id)
         tabs = backend.list_tabs(session_id)
         windows = backend.list_windows()
-        return {
+
+        arbiter = get_arbiter_registry().get(session_id)
+        safety = get_computer_safety_guard()
+        interruption = {
+            "state": arbiter.state.value if arbiter else "AI_IDLE",
+            "emergency_stopped": bool(safety.is_emergency_stopped()),
+            "human_takeover": bool(
+                arbiter.state in (ControlState.HUMAN_CONTROL, ControlState.AI_PAUSED)
+            ) if arbiter else False,
+            "can_interrupt": True,
+            "can_resume": True,
+        }
+        state.interruption = interruption
+
+        res_dict = state.to_dict() if hasattr(state, "to_dict") else {}
+        res_dict.update({
             "ok": True,
             "session_id": session_id,
             "backend": backend_name,
@@ -323,7 +581,8 @@ async def get_session_state(backend_name: str, session_id: str) -> Dict[str, Any
             "current_url": state.current_url,
             "tabs": [{"tab_id": t.tab_id, "title": t.title, "url": t.url, "active": t.is_active} for t in tabs],
             "windows": [{"window_id": w.window_id, "title": w.title, "active": w.is_active} for w in windows],
-        }
+        })
+        return res_dict
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -417,6 +676,8 @@ async def get_screenshot(backend_name: str, session_id: str, format: str = "png"
             b64 = base64.b64encode(img_bytes).decode("ascii")
             return {"ok": True, "screenshot_base64": b64}
         return Response(content=img_bytes, media_type="image/png")
+    except SessionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -660,11 +921,16 @@ async def get_live_frame(backend_name: str, session_id: str, quality: int = 70) 
         backend = registry.get_backend(backend_name)
         if hasattr(backend, "capture_frame_jpeg"):
             jpeg_bytes = backend.capture_frame_jpeg(session_id, quality=quality)
-            return Response(content=jpeg_bytes, media_type="image/jpeg")
+            if jpeg_bytes:
+                return Response(content=jpeg_bytes, media_type="image/jpeg")
         png = backend.take_screenshot(session_id)
-        return Response(content=png, media_type="image/png")
+        if png:
+            return Response(content=png, media_type="image/png")
+        raise HTTPException(status_code=404, detail="No frame captured")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=404, detail=f"Frame unavailable: {e}")
 
 
 @router.get("/sessions/{backend_name}/{session_id}/arbiter")
@@ -954,6 +1220,10 @@ def execute_task_step(task_id: str) -> Dict[str, Any]:
             "message": str(gate_err),
             "details": getattr(gate_err, "details", {}),
         }
+    except SessionNotFoundError as e:
+        # A closed session is an expected client-recoverable condition.  The
+        # viewport relies on 404 to stop polling and ask the user to restart.
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

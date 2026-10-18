@@ -199,7 +199,12 @@ class DockerDesktopBackend(BaseComputerBackend):
             res = subprocess.run(
                 [
                     "docker", "exec", self.CONTAINER_NAME, "bash", "-c",
-                    "DISPLAY=:1 scrot -z -q 80 /tmp/.frame_check.png 2>/dev/null && stat -c %s /tmp/.frame_check.png 2>/dev/null",
+                    # scrot refuses to overwrite an existing output name and
+                    # keeps trying suffixed alternatives.  A fixed hidden path
+                    # therefore eventually reports a false black frame even
+                    # while X11 is rendering normally.  The exec shell PID is
+                    # unique per probe, and the trap keeps the container clean.
+                    "frame=/tmp/os-frame-check-$$.png; trap 'rm -f \"$frame\"' EXIT; DISPLAY=:1 scrot -z -q 80 \"$frame\" 2>/dev/null && stat -c %s \"$frame\" 2>/dev/null",
                 ],
                 capture_output=True,
                 text=True,
@@ -485,6 +490,39 @@ class DockerDesktopBackend(BaseComputerBackend):
                     "container_name": self.CONTAINER_NAME,
                     "shared_single_browser": True,
                 },
+                runtime_identity={
+                    "backend": self.name,
+                    "type": "container",
+                    "container_name": self.CONTAINER_NAME,
+                    "display": ":1",
+                    "stream_url": stream_url,
+                    "cdp_url": self.CDP_URL,
+                },
+                desktop_service_health=health.details or {},
+                frame={
+                    "timestamp": time.time(),
+                    "valid": bool(health.details.get("frame_variance_ok", True)),
+                    "width": 1280,
+                    "height": 800,
+                },
+                input_availability={
+                    "keyboard": True,
+                    "mouse": True,
+                    "active": True,
+                },
+                browser_session_id=session_id,
+                terminal_workspace={
+                    "workspace_dir": str(Path("data/om-workspace").resolve()),
+                    "container_mount": "/workspace",
+                    "isolated": True,
+                },
+                interruption={
+                    "state": "AI_IDLE",
+                    "emergency_stopped": False,
+                    "human_takeover": False,
+                    "can_interrupt": True,
+                    "can_resume": True,
+                },
             )
             self._sessions[session_id] = state
             return state
@@ -591,7 +629,14 @@ class DockerDesktopBackend(BaseComputerBackend):
             res = self._browser_harness.key_down(session_id, key)
             res.backend = self.name
             return res
-        return ActionResult(success=True, action="key_down", session_id=session_id, backend=self.name)
+        return ActionResult(
+            success=False,
+            action="key_down",
+            session_id=session_id,
+            backend=self.name,
+            verified=False,
+            error=f"key_down is not implemented on {self.name} without browser harness key_down",
+        )
 
     def key_up(self, session_id: str, key: str) -> ActionResult:
         self._require_session(session_id)
@@ -599,7 +644,14 @@ class DockerDesktopBackend(BaseComputerBackend):
             res = self._browser_harness.key_up(session_id, key)
             res.backend = self.name
             return res
-        return ActionResult(success=True, action="key_up", session_id=session_id, backend=self.name)
+        return ActionResult(
+            success=False,
+            action="key_up",
+            session_id=session_id,
+            backend=self.name,
+            verified=False,
+            error=f"key_up is not implemented on {self.name} without browser harness key_up",
+        )
 
     def release_all_keys(self, session_id: str) -> ActionResult:
         self._require_session(session_id)

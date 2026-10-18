@@ -447,3 +447,57 @@ async def serve_hud_page() -> HTMLResponse:
     if root_hud.exists():
         return HTMLResponse(root_hud.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>OS Cyber-HUD</h1>")
+
+
+# -----------------------------------------------------------------------------
+# Dynamic Ollama Multi-Model Discovery & Switching Endpoints
+# -----------------------------------------------------------------------------
+class ModelSelectRequest(BaseModel):
+    model: str
+    dot: str | None = None  # None or 'all' = Global; 'forge'|'scout'|'scribe'|'sentinel' = Per-Dot
+
+
+@router.get("/api/hud/models")
+async def list_ollama_models(refresh: bool = False) -> Dict[str, Any]:
+    kernel = get_kernel()
+    reg = kernel.engine.registry
+    if refresh:
+        reg.refresh_models()
+    return reg.status()
+
+
+@router.post("/api/hud/models/refresh")
+async def refresh_ollama_models() -> Dict[str, Any]:
+    kernel = get_kernel()
+    reg = kernel.engine.registry
+    reg.refresh_models()
+    st = reg.status()
+    notify_event("OLLAMA_MODELS_REFRESHED", st)
+    return st
+
+
+@router.post("/api/hud/models/select")
+async def select_ollama_model(req: ModelSelectRequest) -> Dict[str, Any]:
+    kernel = get_kernel()
+    reg = kernel.engine.registry
+    st = reg.select_model(req.model, dot_id=req.dot)
+    # Sync with main dashboard ConversationManager if loaded in web.server
+    try:
+        from web.server import _engine
+        if not req.dot or req.dot in ("all", "global", "*"):
+            _engine["model"] = req.model
+            _engine["model_ok"] = reg.daemon_online
+            if "cfg" in _engine and hasattr(_engine["cfg"], "llm"):
+                _engine["cfg"].llm.model = req.model
+            mgr = _engine.get("mgr")
+            if mgr:
+                if hasattr(mgr, "set_model"):
+                    mgr.set_model(req.model)
+                elif hasattr(mgr, "router") and hasattr(mgr.router, "set_model"):
+                    mgr.router.set_model(req.model)
+                elif hasattr(mgr, "router") and hasattr(mgr.router, "_default"):
+                    mgr.router._default.model = req.model
+    except Exception as ex:
+        log.warning("Syncing engine model failed: %s", ex)
+    notify_event("OLLAMA_MODEL_SELECTED", {"model": req.model, "dot": req.dot, "status": st})
+    return st

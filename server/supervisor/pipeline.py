@@ -215,6 +215,7 @@ class Supervisor:
         user_text: str,
         max_workers: int = 4,
         worker_model=None,
+        memory_context: list[str] | None = None,
     ):
         """NOTICE -> SUGGEST(plan) -> EXECUTE(workers) -> VERIFY ->
         REMEMBER. Workers are isolated (no tools); every result is
@@ -223,13 +224,14 @@ class Supervisor:
 
         run_id = self.tracker.new_run()
         t = lambda s, d="": self.tracker.transition(run_id, s, d)  # noqa: E731
-        t(LifecycleStage.NOTICE, f"team task: {user_text[:80]}")
+        context = "\n".join(item for item in (memory_context or []) if item)
+        t(LifecycleStage.NOTICE, f"team task: {user_text[:80]}; memory_facts={bool(context)}")
         team = Team(
             agent=self.agent,
             max_workers=max_workers,
             worker_model=worker_model,
         )
-        subtasks = await team.plan(user_text)
+        subtasks = await team.plan(user_text, context=context)
         t(LifecycleStage.SUGGEST, f"plan: {len(subtasks)} subtasks")
         outputs = await team.execute(subtasks)
         t(LifecycleStage.EXECUTE, f"{len(outputs)} worker outputs")
@@ -242,7 +244,7 @@ class Supervisor:
                 dropped += 1
         t(LifecycleStage.VERIFY,
           f"verified={len(verified)} dropped={dropped}")
-        text = await team.synthesize(user_text, verified)
+        text = await team.synthesize(user_text, verified, context=context)
         t(LifecycleStage.REMEMBER,
           f"status={'ok' if dropped == 0 else 'partial'}")
         from ..teams import TeamResult

@@ -92,14 +92,19 @@ def web_search(query: str = "", count: str | int = 5, **kwargs) -> ToolResult:
         return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
                           error=f"Search failed: {type(e).__name__}")
     if not results:
-        return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
-                          error="No results found.")
+        return ToolResult(
+            status="success",
+            mode=ExecutionMode.DIRECT,
+            data={"query": query, "results": [], "empty": True},
+        )
     return ToolResult(status="success", mode=ExecutionMode.DIRECT,
                       data={"query": query, "results": results})
 
 
 def format_web_search(result: ToolResult) -> str:
-    d = result.data
+    d = result.data or {}
+    if not d.get("results"):
+        return f"No web results found for \"{d.get('query', '')}\"."
     lines = [f"Web results for \"{d['query']}\":"]
     for i, r in enumerate(d["results"], 1):
         lines.append(f"{i}. {r['title']}\n   {r['url']}")

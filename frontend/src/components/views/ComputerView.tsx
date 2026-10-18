@@ -31,9 +31,12 @@ import {
   Sparkles,
   Search,
   Keyboard,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { GlassCard } from '../common/GlassCard';
 import { Button } from '../common/Button';
+import { WallpaperGallery } from '../common/WallpaperGallery';
+import { api } from '../../services/api';
 
 interface BackendItem {
   name: string;
@@ -97,6 +100,7 @@ export const ComputerView: React.FC = () => {
     details?: any;
   } | null>(null);
   const [desktopStarting, setDesktopStarting] = useState<boolean>(false);
+  const [isWallpaperPickerOpen, setIsWallpaperPickerOpen] = useState<boolean>(false);
 
   // Active Session & Viewport
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -142,26 +146,23 @@ export const ComputerView: React.FC = () => {
 
   const fetchDesktopStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/computer/desktop/status');
-      if (res.ok) {
-        const data = await res.json();
-        let streamUrl = data.stream_url;
-        if (streamUrl && typeof window !== 'undefined') {
-          try {
-            const parsed = new URL(streamUrl);
-            parsed.hostname = window.location.hostname;
-            streamUrl = parsed.toString();
-          } catch (_) {}
-        }
-        setDesktopStatus({
-          ok: data.health?.ok ?? false,
-          status: data.health?.status ?? 'offline',
-          message: data.health?.message ?? 'Docker desktop unavailable',
-          stream_url: streamUrl,
-          cdp_url: data.cdp_url,
-          details: data.health?.details,
-        });
+      const data = await api.getComputerDesktopStatus();
+      let streamUrl = data.stream_url;
+      if (streamUrl && typeof window !== 'undefined') {
+        try {
+          const parsed = new URL(streamUrl);
+          parsed.hostname = window.location.hostname;
+          streamUrl = parsed.toString();
+        } catch (_) {}
       }
+      setDesktopStatus({
+        ok: data.health?.ok ?? false,
+        status: data.health?.status ?? 'offline',
+        message: data.health?.message ?? 'Docker desktop unavailable',
+        stream_url: streamUrl,
+        cdp_url: data.cdp_url,
+        details: data.health?.details,
+      });
     } catch (e: any) {
       setDesktopStatus({
         ok: false,
@@ -175,8 +176,7 @@ export const ComputerView: React.FC = () => {
     setDesktopStarting(true);
     setStatusMsg('Starting Linux Virtual Desktop container (Debian + Openbox + noVNC)...');
     try {
-      const res = await fetch('/api/computer/desktop/start', { method: 'POST' });
-      const data = await res.json();
+      const data = await api.startComputerDesktop();
       if (data.ok) {
         setStatusMsg('Virtual desktop started and verified ready.');
       } else {
@@ -194,7 +194,7 @@ export const ComputerView: React.FC = () => {
     setDesktopStarting(true);
     setStatusMsg('Stopping virtual desktop container...');
     try {
-      await fetch('/api/computer/desktop/stop', { method: 'POST' });
+      await api.stopComputerDesktop();
       setStatusMsg('Desktop container stopped.');
       fetchDesktopStatus();
     } catch (e: any) {
@@ -208,7 +208,7 @@ export const ComputerView: React.FC = () => {
     setDesktopStarting(true);
     setStatusMsg('Restarting virtual desktop services...');
     try {
-      await fetch('/api/computer/desktop/restart', { method: 'POST' });
+      await api.restartComputerDesktop();
       setStatusMsg('Desktop container restarted and verified ready.');
       fetchDesktopStatus();
     } catch (e: any) {
@@ -222,41 +222,37 @@ export const ComputerView: React.FC = () => {
   const fetchStatus = async () => {
     try {
       fetchDesktopStatus();
-      const bRes = await fetch('/api/computer/backends');
-      if (bRes.ok) {
-        const bData = await bRes.json();
-        if (bData.backends) {
-          setBackends(bData.backends);
-          setBackendError(null);
-        }
-      } else {
-        setBackendError(`Backend returned HTTP ${bRes.status}`);
+      const bData = await api.getComputerBackends();
+      if (bData && bData.backends) {
+        setBackends(bData.backends);
+        setBackendError(null);
       }
 
-      const rRes = await fetch('/api/computer/rate_limits');
-      if (rRes.ok) {
-        const rData = await rRes.json();
+      const rData = await api.getComputerRateLimits();
+      if (rData) {
         setRateLimits(rData);
       }
 
-      const aRes = await fetch('/api/computer/approvals');
-      if (aRes.ok) {
-        const aData = await aRes.json();
-        if (aData.pending) setApprovals(aData.pending);
+      const aData = await api.getComputerApprovals();
+      if (aData && aData.approvals) {
+        setApprovals(aData.approvals);
       }
 
       // If active session, also poll arbiter status if websocket is disconnected
       if (sessionId && !wsConnected) {
-        const arbRes = await fetch(`/api/computer/sessions/browser_harness/${sessionId}/arbiter`);
-        if (arbRes.ok) {
-          const arbData = await arbRes.json();
-          if (arbData.state) setControlState(arbData.state);
-          if (arbData.ai_cursor) setAiCursor(arbData.ai_cursor);
-          if (arbData.active_task) setActiveTask(arbData.active_task);
-        } else if (arbRes.status === 404) {
-          setSessionId(null);
-          setLiveFrame(null);
-          setViewportError('Previous browser session has ended. Click "Start Browser" to begin a new session.');
+        try {
+          const arbData = await api.getComputerArbiter('browser_harness', sessionId);
+          if (arbData) {
+            if (arbData.state) setControlState(arbData.state);
+            if (arbData.ai_cursor) setAiCursor(arbData.ai_cursor);
+            if (arbData.active_task) setActiveTask(arbData.active_task);
+          }
+        } catch (arbErr: any) {
+          if (arbErr.message && arbErr.message.includes('404')) {
+            setSessionId(null);
+            setLiveFrame(null);
+            setViewportError('Previous browser session has ended. Click "Start Browser" to begin a new session.');
+          }
         }
       }
     } catch (e: any) {
@@ -267,13 +263,10 @@ export const ComputerView: React.FC = () => {
 
   const fetchWorkspaceFiles = useCallback(async (path: string = '/workspace') => {
     try {
-      const res = await fetch(`/api/om/computer/files?path=${encodeURIComponent(path)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.entries)) {
-          setWorkspaceFiles(data.entries);
-          setWorkspacePath(data.path || path);
-        }
+      const data = await api.getComputerFiles(path);
+      if (data && data.ok && Array.isArray(data.entries)) {
+        setWorkspaceFiles(data.entries);
+        setWorkspacePath(data.path || path);
       }
     } catch (e) {
       console.error('Failed to load workspace files:', e);
@@ -286,12 +279,7 @@ export const ComputerView: React.FC = () => {
     setIsExecutingCmd(true);
     setStatusMsg(`Executing sandbox command: ${targetCmd}...`);
     try {
-      const res = await fetch('/api/om/computer/commands', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: targetCmd, cwd: workspacePath }),
-      });
-      const data = await res.json();
+      const data = await api.execComputerCommand(targetCmd);
       setCmdOutput(data);
       setStatusMsg(`Command completed (exit code ${data.exit_code ?? 0})`);
       fetchWorkspaceFiles(workspacePath);
@@ -309,20 +297,12 @@ export const ComputerView: React.FC = () => {
       const timestamp = new Date().toISOString();
       const content = `# OS Virtual Lab Workspace\n\nInitialized: ${timestamp}\nEnvironment: Isolated Local Sandbox\nStatus: Active\n\nThis workspace is jailed to /workspace. You can create files, run Python scripts, and test AI agent automations safely.\n`;
 
-      const res = await fetch('/api/om/computer/files/write', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: '/workspace/welcome.txt',
-          text: content,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+      const data = await api.writeComputerFile('/workspace/welcome.txt', content);
+      if (data && data.ok) {
         setStatusMsg('Created /workspace/welcome.txt successfully!');
         fetchWorkspaceFiles(workspacePath);
       } else {
-        setStatusMsg(`Failed to create file: ${data.detail || data.error || 'Unknown error'}`);
+        setStatusMsg(`Failed to create file: ${data?.detail || data?.error || 'Unknown error'}`);
       }
     } catch (err: any) {
       setStatusMsg(`File write error: ${err.message}`);
@@ -871,9 +851,8 @@ export const ComputerView: React.FC = () => {
   const handleCheckBackendHealth = async (backendName: string) => {
     setHealthChecking((prev) => ({ ...prev, [backendName]: true }));
     try {
-      const res = await fetch(`/api/computer/backends/${backendName}/health`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.health) {
+      const data = await api.checkComputerBackendHealth(backendName);
+      if (data && data.health) {
         setBackends((prev) => ({
           ...prev,
           [backendName]: {
@@ -911,19 +890,14 @@ export const ComputerView: React.FC = () => {
         setCurrentUrl(target);
         setStatusMsg(`Navigating to ${target}`);
       } else {
-        const res = await fetch(`/api/computer/sessions/browser_harness/${sessionId}/navigate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: target }),
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
+        const data = await api.navigateComputer('browser_harness', sessionId, target);
+        if (data && data.ok) {
           setCurrentUrl(target);
           setStatusMsg(`Navigated to ${target}`);
           setViewportError(null);
         } else {
-          const errMsg = data.detail || data.error || data.observed_outcome || 'Unknown navigation failure';
-          if (res.status === 404) {
+          const errMsg = data?.detail || data?.error || data?.observed_outcome || 'Unknown navigation failure';
+          if (errMsg.includes('404') || errMsg.includes('not found')) {
             setSessionId(null);
             setLiveFrame(null);
             setViewportError('Browser session expired or closed. Click "Start Browser" to launch a new session.');
@@ -948,11 +922,7 @@ export const ComputerView: React.FC = () => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'control', action }));
       } else {
-        await fetch(`/api/computer/sessions/browser_harness/${sessionId}/control`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action }),
-        });
+        await api.controlComputer('browser_harness', sessionId, action);
       }
 
       if (action === 'take_control') setControlState('HUMAN_CONTROL');
@@ -1054,7 +1024,7 @@ export const ComputerView: React.FC = () => {
   const handleCloseSession = async () => {
     if (!sessionId) return;
     try {
-      await fetch(`/api/computer/sessions/browser_harness/${sessionId}`, { method: 'DELETE' });
+      await api.deleteComputerSession('browser_harness', sessionId);
       setSessionId(null);
       setLiveFrame(null);
       setViewportError(null);
@@ -1069,13 +1039,8 @@ export const ComputerView: React.FC = () => {
   const toggleEmergencyStop = async () => {
     const nextState = !emergencyStopped;
     try {
-      const res = await fetch('/api/computer/emergency_stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: nextState }),
-      });
-      const data = await res.json();
-      setEmergencyStopped(data.emergency_stopped);
+      const data = await api.emergencyStopComputer();
+      setEmergencyStopped(data?.emergency_stopped ?? nextState);
       setStatusMsg(
         nextState
           ? 'EMERGENCY KILL SWITCH TRIPPED: All computer actions halted immediately.'
@@ -1088,13 +1053,8 @@ export const ComputerView: React.FC = () => {
 
   const handleResolveApproval = async (ticketId: string, decision: 'approve' | 'reject') => {
     try {
-      const res = await fetch(`/api/computer/approvals/${ticketId}/resolve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, user: 'dashboard_user' }),
-      });
-      const data = await res.json();
-      if (data.ok) {
+      const data = await api.resolveComputerApproval(ticketId, decision === 'approve' ? 'allow_once' : 'deny');
+      if (data && data.ok) {
         setStatusMsg(`Ticket ${ticketId} resolved: ${decision}`);
         fetchStatus();
       }
@@ -1315,6 +1275,15 @@ export const ComputerView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
+                      variant={isWallpaperPickerOpen ? "primary" : "glass"}
+                      onClick={() => setIsWallpaperPickerOpen(!isWallpaperPickerOpen)}
+                      className="text-xs h-7 px-2.5"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 mr-1" />
+                      Wallpapers
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="glass"
                       onClick={fetchDesktopStatus}
                       className="text-xs h-7 px-2.5"
@@ -1335,6 +1304,11 @@ export const ComputerView: React.FC = () => {
                 </div>
 
                 <div className="p-4 space-y-4 flex-1 flex flex-col min-h-0">
+                {isWallpaperPickerOpen && (
+                  <div className="p-3.5 bg-slate-900/95 backdrop-blur-md rounded-xl border border-white/10 shadow-xl animate-in fade-in duration-200">
+                    <WallpaperGallery compact={true} />
+                  </div>
+                )}
                 {desktopStatus?.status === 'ready' && desktopStatus?.details?.stream_ready ? (
                   <div className="space-y-3 flex-1 flex flex-col min-h-0">
                     <div className="relative aspect-[16/10] bg-slate-950 rounded-lg overflow-hidden border border-os-border/60 flex-1">

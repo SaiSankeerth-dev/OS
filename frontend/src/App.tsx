@@ -52,7 +52,7 @@ const MainShell: React.FC = () => {
       case 'approvals':
         return <ActivityView initialTab="approvals" />;
       case 'settings':
-        return <SettingsView initialTab="memory" />;
+        return <SettingsView initialTab="appearance" />;
       case 'memory':
         return <SettingsView initialTab="memory" />;
       case 'agents':

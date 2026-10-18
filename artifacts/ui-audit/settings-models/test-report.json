@@ -1,0 +1,12 @@
+[
+  {
+    "name": "settings inference engine model select visible",
+    "status": "PASS",
+    "detail": "Inference Engine dropdown has 8 model option(s): deepseek-r1:32b (Reasoning) • 18.49 GB • 32B, qwen3-coder:30b (Coding) • 17.28 GB • 30B, qwen3:14b (General) • 8.64 GB • 14B, hf.co/empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF:Q4_K_M (Creative) • 6.34 GB • Q4_K_M, ornith:latest (Agentic) • 5.24 GB • latest, qwen3:8b (General) • 4.87 GB • 8B, qcwind/qwen3-8b-instruct-Q4-K-M:latest (Instruction) • 4.87 GB • 8B, dolphin-llama3:8b (Creative) • 4.34 GB • 8B"
+  },
+  {
+    "name": "settings available models cards rendered",
+    "status": "PASS",
+    "detail": "Rendered 10 available model card(s)."
+  }
+]

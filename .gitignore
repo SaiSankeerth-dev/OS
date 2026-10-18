@@ -34,3 +34,7 @@ artifacts/ui-audit/interactions/*.png
 .agents/
 UPGRADE_PROMPT.md
 docker/desktop/scrot_*.png
+.gravitas/
+temp_skills/
+test_agent_skill.zip
+artifacts/**/*.log

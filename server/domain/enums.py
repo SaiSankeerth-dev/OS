@@ -50,6 +50,7 @@ class PlanStatus(str, Enum):
     ACTIVE = "ACTIVE"
     SUPERSEDED = "SUPERSEDED"
     COMPLETED = "COMPLETED"
+    INVALID = "INVALID"
 
 
 class PlanItemStatus(str, Enum):
@@ -89,6 +90,7 @@ class VerificationStatus(str, Enum):
     VERIFIED = "VERIFIED"
     FAILED = "FAILED"
     UNKNOWN = "UNKNOWN"
+    UNVERIFIED = "UNVERIFIED"
     PARTIAL = "PARTIAL"
 
 

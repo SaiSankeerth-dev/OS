@@ -156,15 +156,17 @@ class ResearchWorker:
         user_id: str = "default_user",
     ) -> ResearchReport:
         """Quick search via DuckDuckGo."""
-        sources = sources_data or _quick_search(query, count=5)
+        sources = sources_data if sources_data is not None else _quick_search(query, count=5)
 
         if not sources:
-            sources = [{
-                "title": f"No results for '{query}'",
-                "url": "",
-                "snippet": "Search returned no results.",
-                "confidence": 0.0,
-            }]
+            summary = f"Quick search completed: 0 results found for query '{query}'."
+            return ResearchReport(
+                query=query,
+                summary=summary,
+                findings=[],
+                sources_consulted=0,
+                report_type="quick",
+            )
 
         findings: list[ResearchFinding] = []
         for s in sources:

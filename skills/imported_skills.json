@@ -1,0 +1,38 @@
+{
+  "autonomous_researcher": {
+    "id": "autonomous_researcher",
+    "title": "Gpt Researcher",
+    "description": "Autonomous deep research from Codex via MCP",
+    "category": "Research",
+    "source": "github",
+    "repo_url": "https://github.com/assafelovic/gpt-researcher",
+    "can_delete": true,
+    "imported_at": "2026-10-18 15:33:52",
+    "prompt": "Execute gpt-researcher skill with request: "
+  },
+  "rea_skill": {
+    "id": "rea_skill",
+    "title": "Rea",
+    "description": "Open-source skill imported from GitHub morluto/rea",
+    "category": "Integrations",
+    "source": "github",
+    "repo_url": "https://github.com/morluto/rea",
+    "can_delete": true,
+    "imported_at": "2026-10-18 15:36:01",
+    "prompt": "Execute rea skill with request: "
+  },
+  "test_agent_skill": {
+    "id": "test_agent_skill",
+    "title": "test_agent_skill",
+    "description": "Audits Docker virtual desktop container environment, verifies disk write postconditions, and collects kernel telemetry.",
+    "category": "Integrations",
+    "source": "zip",
+    "repo_url": "",
+    "can_delete": true,
+    "enabled": true,
+    "review_status": "ready",
+    "content_hash": "2014911d370e1c5f",
+    "imported_at": "2026-10-18 16:15:10",
+    "prompt": "Execute test_agent_skill in OS Virtual Computer: "
+  }
+}

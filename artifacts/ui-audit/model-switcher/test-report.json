@@ -1,0 +1,17 @@
+[
+  {
+    "name": "topbar model selector rendered",
+    "status": "PASS",
+    "detail": "Model selector rendered with 8 model(s): deepseek-r1:32b (Reasoning) • 18.49 GB, qwen3-coder:30b (Coding) • 17.28 GB, qwen3:14b (General) • 8.64 GB, hf.co/empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF:Q4_K_M (Creative) • 6.34 GB, ornith:latest (Agentic) • 5.24 GB, qwen3:8b (General) • 4.87 GB, qcwind/qwen3-8b-instruct-Q4-K-M:latest (Instruction) • 4.87 GB, dolphin-llama3:8b (Creative) • 4.34 GB"
+  },
+  {
+    "name": "topbar rescan button works",
+    "status": "PASS",
+    "detail": "Rescan button clicked and response received cleanly."
+  },
+  {
+    "name": "select model dynamically",
+    "status": "PASS",
+    "detail": "Selected model 'deepseek-r1:32b' successfully in topbar."
+  }
+]

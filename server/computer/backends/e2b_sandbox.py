@@ -243,12 +243,12 @@ class E2BDesktopSandboxBackend(BaseComputerBackend):
                 )
 
         return ActionResult(
-            success=True,
+            success=False,
             action="click_element",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Virtual click recorded at {target}",
-            verified=True,
+            error=f"Action 'click_element' is not supported by {self.name} backend without active sandbox",
+            verified=False,
         )
 
     def type_text(self, session_id: str, text: str, target: Optional[Any] = None) -> ActionResult:
@@ -276,34 +276,76 @@ class E2BDesktopSandboxBackend(BaseComputerBackend):
                 )
 
         return ActionResult(
-            success=True,
+            success=False,
             action="type_text",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Typed {len(text)} chars",
-            verified=True,
+            error=f"Action 'type_text' is not supported by {self.name} backend without active sandbox",
+            verified=False,
         )
 
     def press_key(self, session_id: str, key: str) -> ActionResult:
         self._require_session(session_id)
+        sb = self._sandboxes.get(session_id)
+        if sb and hasattr(sb, "press"):
+            try:
+                sb.press(key)
+                return ActionResult(
+                    success=True,
+                    action="press_key",
+                    session_id=session_id,
+                    backend=self.name,
+                    observed_outcome=f"Sent key '{key}' to virtual sandbox",
+                    verified=True,
+                )
+            except Exception as e:
+                return ActionResult(
+                    success=False,
+                    action="press_key",
+                    session_id=session_id,
+                    backend=self.name,
+                    error=str(e),
+                    verified=False,
+                )
         return ActionResult(
-            success=True,
+            success=False,
             action="press_key",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Sent key '{key}' to virtual sandbox",
-            verified=True,
+            error=f"Action 'press_key' is not supported by {self.name} backend without active sandbox keyboard support",
+            verified=False,
         )
 
     def scroll(self, session_id: str, direction: str = "down", amount: int = 300) -> ActionResult:
         self._require_session(session_id)
+        sb = self._sandboxes.get(session_id)
+        if sb and hasattr(sb, "scroll"):
+            try:
+                sb.scroll(direction, amount)
+                return ActionResult(
+                    success=True,
+                    action="scroll",
+                    session_id=session_id,
+                    backend=self.name,
+                    observed_outcome=f"Scrolled virtual screen {direction}",
+                    verified=True,
+                )
+            except Exception as e:
+                return ActionResult(
+                    success=False,
+                    action="scroll",
+                    session_id=session_id,
+                    backend=self.name,
+                    error=str(e),
+                    verified=False,
+                )
         return ActionResult(
-            success=True,
+            success=False,
             action="scroll",
             session_id=session_id,
             backend=self.name,
-            observed_outcome=f"Scrolled virtual screen {direction}",
-            verified=True,
+            error=f"Action 'scroll' is not supported by {self.name} backend",
+            verified=False,
         )
 
     def switch_tab(self, session_id: str, tab_id: str) -> ActionResult:

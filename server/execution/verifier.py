@@ -142,6 +142,10 @@ class GmailVerifier(BaseVerifierStrategy):
                     None,
                 )
 
+        if not read_back_data:
+            details["note"] = "Email message_id confirmed by provider, but external read-back not performed"
+            return VerificationStatus.UNKNOWN, details, None
+
         ev = Evidence(
             user_id=user_id,
             evidence_type="email_sent",
@@ -221,6 +225,10 @@ class CalendarVerifier(BaseVerifierStrategy):
                     },
                     None,
                 )
+
+        if not read_back_data:
+            details["note"] = "Calendar event_id confirmed by provider, but external read-back not performed"
+            return VerificationStatus.UNKNOWN, details, None
 
         ev = Evidence(
             user_id=user_id,
@@ -317,6 +325,11 @@ class BrowserVerifier(BaseVerifierStrategy):
         if screenshot and Path(screenshot).exists():
             details["screenshot_verified"] = True
 
+        # Require tangible postcondition verification: screenshot on disk or confirmed read-back
+        if not details.get("screenshot_verified") and not execution_result.get("read_back"):
+            details["note"] = "Browser action completed, but neither screenshot on disk nor destination read-back was verified"
+            return VerificationStatus.UNKNOWN, details, None
+
         ev = Evidence(
             user_id=user_id,
             evidence_type="browser_receipt",
@@ -387,9 +400,16 @@ class GenericApiVerifier(BaseVerifierStrategy):
         arguments: dict[str, Any],
         user_id: str,
     ) -> tuple[VerificationStatus, dict[str, Any], Optional[Evidence]]:
-        if execution_result.get("ok", True) and len(execution_result) > 0:
-            return VerificationStatus.VERIFIED, {"receipt": "Execution receipt confirmed"}, None
-        return VerificationStatus.UNKNOWN, {"note": "No domain verifier registered; result marked UNKNOWN"}, None
+        # Eliminate generic success-to-VERIFIED shortcuts.
+        # A generic non-empty API response cannot establish VERIFIED without external postcondition/read-back.
+        return (
+            VerificationStatus.UNKNOWN,
+            {
+                "note": f"No domain postcondition verifier registered for '{tool_name}'; result marked UNKNOWN",
+                "execution_ok": execution_result.get("ok", True),
+            },
+            None,
+        )
 
 
 # ---------------------------------------------------------------------------

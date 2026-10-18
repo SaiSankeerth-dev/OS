@@ -16,7 +16,7 @@ def _google_setup(service: str) -> list[str]:
         "Enable the " + service + " in API Library.",
         "Credentials → Create Credentials → OAuth client ID → Desktop app.",
         "Paste the Client ID and Client Secret below, save, then press “Connect with Google”.",
-        "Sign in with your Google account and allow access — done, no token copy-paste.",
+        "Sign in with your Google account — each connector uses isolated, service-specific permissions.",
     ]
 
 
@@ -35,7 +35,7 @@ MANIFESTS: list[ConnectorManifest] = [
         ],
         scopes=["Read your calendars", "Create and edit events (asks you first)"],
         setup_steps=_google_setup("Google Calendar API"),
-        note="Free with any Google account. One OAuth setup covers Calendar, Gmail, Drive, Sheets and YouTube together.",
+        note="Free with any Google account. Requests only calendar access in an isolated OAuth flow. Client ID/Secret are shared across Google services for quick setup.",
         docs_url="https://developers.google.com/calendar/api/quickstart/python",
         actions=[
             ActionSpec("list_events", "List events", "Events for a day (default: today).", False,
@@ -63,7 +63,7 @@ MANIFESTS: list[ConnectorManifest] = [
         ],
         scopes=["Read your emails", "Send email (always asks first)"],
         setup_steps=_google_setup("Gmail API"),
-        note="Free with any Google account. Shares the Google sign-in with Calendar/Drive/Sheets/YouTube.",
+        note="Free with any Google account. Requests isolated Gmail read and send permissions. Sensitive sending always pauses for approval.",
         docs_url="https://developers.google.com/gmail/api/quickstart/python",
         actions=[
             ActionSpec("search_emails", "Search emails", "Search your inbox.", False,
@@ -89,7 +89,7 @@ MANIFESTS: list[ConnectorManifest] = [
         ],
         scopes=["Read your spreadsheets", "Add rows (asks you first)"],
         setup_steps=_google_setup("Google Sheets API"),
-        note="Free with any Google account. Shares the Google sign-in.",
+        note="Free with any Google account. Requests isolated Google Sheets permissions.",
         docs_url="https://developers.google.com/sheets/api/quickstart/python",
         actions=[
             ActionSpec("read_range", "Read range", "Read cells from a spreadsheet.", False,
@@ -115,7 +115,7 @@ MANIFESTS: list[ConnectorManifest] = [
         ],
         scopes=["See files it creates", "Upload text files (asks you first)"],
         setup_steps=_google_setup("Google Drive API"),
-        note="Free with any Google account. Uses the restricted drive.file scope — OS only sees files it created.",
+        note="Free with any Google account. Uses restricted drive.file scope (OS only accesses files it creates). Kept strictly isolated from YouTube scopes to prevent OAuth 400 conflicts.",
         docs_url="https://developers.google.com/drive/api/quickstart/python",
         actions=[
             ActionSpec("list_files", "List files", "List files OS can see.", False,
@@ -138,7 +138,7 @@ MANIFESTS: list[ConnectorManifest] = [
         ],
         scopes=["Search YouTube", "Read your channel"],
         setup_steps=_google_setup("YouTube Data API v3"),
-        note="Free with any Google account (API quota applies, plenty for personal use). Shares the Google sign-in.",
+        note="Free with any Google account. Requests isolated YouTube read-only scope, kept separate from Google Drive to ensure OAuth compatibility.",
         docs_url="https://developers.google.com/youtube/v3/quickstart/python",
         actions=[
             ActionSpec("search", "Search videos", "Search YouTube.", False,

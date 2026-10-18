@@ -8,10 +8,12 @@ import {
   ShieldAlert,
   Cpu,
   Sparkles,
+  RotateCw,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useVoice } from '../../context/VoiceContext';
 import { AmbientOrb } from '../orb/AmbientOrb';
+import { api, getModelType } from '../../services/api';
 
 export const Topbar: React.FC = () => {
   const {
@@ -24,9 +26,62 @@ export const Topbar: React.FC = () => {
     activeAgentsCount,
     setCurrentView,
     setIsCommandPaletteOpen,
+    refreshData,
   } = useApp();
 
   const { isVoiceActive, toggleVoice } = useVoice();
+
+  // Dynamic Ollama Model State
+  const [models, setModels] = React.useState<Array<{ name: string; size_gb?: any; model_type?: string; type?: string }>>([]);
+  const [selectedModel, setSelectedModel] = React.useState<string>(me?.model || '');
+  const [isRefreshingModels, setIsRefreshingModels] = React.useState(false);
+  const [isDaemonOnline, setIsDaemonOnline] = React.useState(false);
+
+  const loadModels = React.useCallback(async (refresh = false) => {
+    try {
+      if (refresh) setIsRefreshingModels(true);
+      const data = await api.getOllamaModels(refresh);
+      if (data?.installed_models?.length) {
+        setModels(data.installed_models);
+      }
+      if (data?.active_model) {
+        setSelectedModel(data.active_model);
+      }
+      setIsDaemonOnline(Boolean(data?.daemon_online));
+    } catch {
+      // Fallback silently
+    } finally {
+      setIsRefreshingModels(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadModels();
+  }, [loadModels]);
+
+  React.useEffect(() => {
+    if (me?.model && !selectedModel) {
+      setSelectedModel(me.model);
+    }
+  }, [me?.model, selectedModel]);
+
+  const handleModelChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newModel = e.target.value;
+    setSelectedModel(newModel);
+    try {
+      await api.selectOllamaModel(newModel);
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to select model', err);
+    }
+  };
+
+  const handleRefreshClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await loadModels(true);
+    await refreshData();
+  };
+
   const getViewBreadcrumb = () => {
     switch (currentView) {
       case 'home':
@@ -88,15 +143,50 @@ export const Topbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Model status is informational: routing is configured in Settings. */}
-        <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-os-border/60 text-xs" title={me?.model_ok ? 'Configured model is responding' : 'No responding model is currently available'}>
-          <span className={`h-2 w-2 rounded-full ${me?.model_ok ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden="true" />
-          <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-300" aria-hidden="true" />
-          <span className="max-w-36 truncate font-semibold text-[11px] text-os-primary">
-            {me?.model || 'No model configured'}
-          </span>
+        {/* Dynamic Interactive Ollama Model Selector */}
+        <div className="hidden sm:flex items-center gap-1 pl-2 border-l border-os-border/60 text-xs">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              isDaemonOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : me?.model_ok ? 'bg-emerald-500' : 'bg-cyan-500'
+            }`}
+            title={isDaemonOnline ? 'Ollama daemon online (live local inference)' : 'Local model active (deterministic fallback)'}
+            aria-hidden="true"
+          />
+          <Sparkles className="w-3 h-3 text-indigo-500 dark:text-cyan-400 shrink-0" aria-hidden="true" />
+          <div className="relative flex items-center">
+            <select
+              value={selectedModel}
+              onChange={handleModelChange}
+              title="Switch Ollama model dynamically"
+              className="bg-transparent hover:bg-white/5 dark:hover:bg-white/5 border border-os-border/50 hover:border-os-border rounded px-2 py-0.5 text-[11px] font-semibold text-os-primary cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 max-w-[220px] truncate"
+            >
+              {models.length > 0 ? (
+                models.map((m) => {
+                  const mType = getModelType(m.name, m.model_type || m.type);
+                  return (
+                    <option key={m.name} value={m.name} className="bg-slate-900 text-white font-mono">
+                      {m.name} ({mType}) {m.size_gb ? `• ${m.size_gb} GB` : ''}
+                    </option>
+                  );
+                })
+              ) : (
+                <option value={selectedModel || 'deepseek-r1:32b'} className="bg-slate-900 text-white font-mono">
+                  {selectedModel || 'deepseek-r1:32b'} ({getModelType(selectedModel || 'deepseek-r1:32b')})
+                </option>
+              )}
+            </select>
+            <button
+              onClick={handleRefreshClick}
+              disabled={isRefreshingModels}
+              title="Rescan Ollama models"
+              className="ml-1 p-1 rounded hover:bg-white/10 text-os-muted hover:text-os-primary transition-colors disabled:opacity-50"
+            >
+              <RotateCw className={`w-3 h-3 ${isRefreshingModels ? 'animate-spin text-cyan-400' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
+
 
       {/* Center: Command Palette Trigger */}
       <div className="flex-1 max-w-md mx-4 hidden sm:block">

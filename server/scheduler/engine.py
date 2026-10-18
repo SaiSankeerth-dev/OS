@@ -549,7 +549,10 @@ class OSScheduler:
     async def stop(self) -> None:
         """Stop the scheduler gracefully."""
         if self._scheduler and not isinstance(self._scheduler, _MinimalScheduler):
-            self._scheduler.shutdown(wait=False)
+            try:
+                self._scheduler.shutdown(wait=False)
+            except Exception as e:
+                log.warning("Scheduler shutdown notice: %s", e)
         self._running = False
         log.info("OSScheduler stopped")
 

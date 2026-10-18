@@ -295,6 +295,10 @@ class GlobalArbiterRegistry:
         self._arbiters: Dict[str, SessionArbiter] = {}
         self._lock = threading.Lock()
 
+    def get(self, session_id: str) -> Optional[SessionArbiter]:
+        with self._lock:
+            return self._arbiters.get(session_id)
+
     def get_or_create(self, session_id: str) -> SessionArbiter:
         with self._lock:
             if session_id not in self._arbiters:

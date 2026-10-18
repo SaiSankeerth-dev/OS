@@ -13,6 +13,9 @@ class MemoryType(Enum):
     USER_PROFILE = "user_profile"
     PROJECT = "project"
     PREFERENCE = "preference"
+    PERSON = "person"
+    GOAL = "goal"
+    COMMITMENT = "commitment"
 
 
 @dataclass

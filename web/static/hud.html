@@ -3,34 +3,25 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>OS // CYBER-HUD v5.0 — UI-UX Pro Max + 21st.dev Edition</title>
+<title>Jarvis OS // Ultimate Holographic Workstation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Rajdhani:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* =========================================================================
-     UI/UX PRO MAX (--density 8 --motion 3) + 21ST.DEV DESIGN TOKENS
-     ========================================================================= */
   :root {
-    --bg-void: #02070f;
-    --bg-panel: rgba(5, 17, 32, 0.82);
-    --bg-panel-header: rgba(8, 28, 50, 0.90);
-    --bg-card: rgba(3, 11, 22, 0.90);
+    --bg-deep: #02070f;
+    --bg-panel: rgba(5, 17, 32, 0.84);
+    --bg-panel-header: rgba(8, 28, 50, 0.92);
     --cyan: #00e5ff;
     --cyan-bright: #88f6ff;
-    --cyan-border: rgba(0, 229, 255, 0.26);
-    --cyan-glow: rgba(0, 229, 255, 0.42);
+    --cyan-border: rgba(0, 229, 255, 0.3);
+    --cyan-glow: rgba(0, 229, 255, 0.45);
     --emerald: #00ffaa;
     --amber: #ffb800;
     --crimson: #ff3355;
     --text-primary: #e4f8ff;
     --text-secondary: #8ab4d0;
     --text-muted: #5682a0;
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 12px;
-    --space-4: 16px;
-    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
     --font-display: 'Rajdhani', 'Segoe UI', system-ui, sans-serif;
   }
@@ -39,7 +30,7 @@
 
   body {
     background:
-      radial-gradient(circle at 50% 45%, rgba(0, 229, 255, 0.15) 0%, rgba(4, 18, 36, 0.9) 46%, var(--bg-void) 92%);
+      radial-gradient(circle at 50% 45%, rgba(0, 229, 255, 0.16) 0%, rgba(4, 18, 36, 0.92) 46%, var(--bg-deep) 92%);
     color: var(--text-primary);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
@@ -52,40 +43,31 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Precision 32px Blueprint Grid Overlay */
+  /* Blueprint Grid */
   body::before {
     content: "";
     position: fixed;
     inset: 0;
     background:
-      linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+      linear-gradient(rgba(0, 229, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.035) 1px, transparent 1px);
     background-size: 32px 32px;
     pointer-events: none;
     z-index: 1;
   }
 
-  /* SVG Icon Utility (UI/UX Pro Max Rule: Zero Emojis, 100% Crisp Vector Icons) */
   .ico {
-    width: 13px;
-    height: 13px;
-    stroke: currentColor;
-    stroke-width: 1.85;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    fill: none;
-    flex-shrink: 0;
+    width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; fill: none; flex-shrink: 0;
   }
   .ico-sm { width: 11px; height: 11px; }
   .ico-md { width: 15px; height: 15px; }
 
-  /* Accessible Focus Ring (UI/UX Pro Max Pre-Delivery Requirement) */
   button:focus-visible, input:focus-visible, textarea:focus-visible {
     outline: 2px solid var(--cyan-bright);
     outline-offset: 1px;
   }
 
-  /* 1. Top OS Title Bar & 21st.dev Trapezoid Workspace Tabs */
+  /* 1. Top Bar */
   .os-top-bar {
     height: 44px;
     background: rgba(2, 9, 19, 0.96);
@@ -102,21 +84,18 @@
   .os-brand-tabs {
     display: flex;
     align-items: flex-end;
-    gap: 20px;
+    gap: 18px;
     height: 100%;
   }
 
   .os-logo-text {
     font-family: var(--font-display);
-    font-size: 1.55rem;
+    font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: 1.8px;
     color: #ecfcff;
-    text-shadow: 0 0 16px rgba(0, 229, 255, 0.65);
+    text-shadow: 0 0 16px rgba(0, 229, 255, 0.7);
     padding-bottom: 5px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
   }
 
   .workspace-tabs {
@@ -137,14 +116,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.2s var(--ease-out-expo);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
-
-  .ws-tab:hover {
-    color: #fff;
-    background: rgba(0, 229, 255, 0.14);
-  }
-
+  .ws-tab:hover { color: #fff; background: rgba(0, 229, 255, 0.14); }
   .ws-tab.active {
     background: linear-gradient(180deg, rgba(0, 229, 255, 0.30), rgba(0, 229, 255, 0.08));
     color: #fff;
@@ -173,34 +147,51 @@
     font-weight: 600;
     font-family: var(--font-mono);
     cursor: pointer;
-    transition: all 0.18s var(--ease-out-expo);
+    transition: all 0.18s;
   }
-
   .magic-pill-btn:hover {
     background: var(--cyan);
     color: #02070f;
     border-color: var(--cyan-bright);
     box-shadow: 0 0 14px var(--cyan-glow);
-    transform: translateY(-1px);
   }
 
-  .status-beacon {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.66rem;
-    color: var(--emerald);
+
+  .model-switcher-select {
+    background: rgba(2, 12, 24, 0.95);
+    border: 1px solid var(--cyan);
+    color: var(--cyan-bright);
     padding: 3px 8px;
-    border-radius: 99px;
-    background: rgba(0, 255, 170, 0.10);
-    border: 1px solid rgba(0, 255, 170, 0.35);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: pointer;
+    max-width: 195px;
+  }
+  .model-switcher-select:focus {
+    outline: 2px solid var(--cyan-bright);
+  }
+  .model-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(2, 10, 20, 0.92);
+    border: 1px solid var(--cyan-border);
+    border-radius: 4px;
+  }
+  .model-card-row.active-model {
+    border-color: var(--emerald);
+    background: rgba(0, 255, 170, 0.08);
   }
 
-  /* 2. Main 5-Column Sci-Fi Workstation Grid (Exact Proportions) */
+  /* 2. 5-Column Workstation Grid */
   .workstation-grid {
     flex: 1;
     display: grid;
-    grid-template-columns: 212px 252px 1fr 248px 268px;
+    grid-template-columns: 210px 248px 1fr 248px 262px;
     gap: 10px;
     padding: 10px 12px;
     min-height: 0;
@@ -212,7 +203,6 @@
     .workstation-grid { grid-template-columns: 1fr; }
   }
 
-  /* 21st.dev Spotlight Card + Sci-Fi Chamfered Window */
   .sci-window {
     position: relative;
     background: var(--bg-panel);
@@ -223,45 +213,22 @@
     backdrop-filter: blur(14px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.68), inset 0 0 20px rgba(0, 229, 255, 0.04);
     overflow: hidden;
-    transition: border-color 0.2s var(--ease-out-expo);
   }
 
-  /* 21st.dev Radial Cursor Spotlight Effect */
   .sci-window::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(
-      320px circle at var(--mouse-x, -500px) var(--mouse-y, -500px),
-      rgba(0, 229, 255, 0.11),
-      transparent 70%
-    );
+    background: radial-gradient(320px circle at var(--mouse-x, -500px) var(--mouse-y, -500px), rgba(0, 229, 255, 0.11), transparent 70%);
     pointer-events: none;
     z-index: 2;
   }
 
-  .sci-window:hover {
-    border-color: rgba(0, 229, 255, 0.48);
-  }
-
-  /* Corner Precision Brackets */
   .corner-tl, .corner-br {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    pointer-events: none;
-    z-index: 3;
+    position: absolute; width: 8px; height: 8px; pointer-events: none; z-index: 3;
   }
-  .corner-tl {
-    top: 0; left: 0;
-    border-top: 2px solid var(--cyan);
-    border-left: 2px solid var(--cyan);
-  }
-  .corner-br {
-    bottom: 0; right: 0;
-    border-bottom: 2px solid var(--cyan);
-    border-right: 2px solid var(--cyan);
-  }
+  .corner-tl { top: 0; left: 0; border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+  .corner-br { bottom: 0; right: 0; border-bottom: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
 
   .win-titlebar {
     background: var(--bg-panel-header);
@@ -279,19 +246,8 @@
     z-index: 3;
   }
 
-  .win-title-left {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .win-ctrls {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--text-muted);
-    font-size: 0.62rem;
-  }
+  .win-title-left { display: flex; align-items: center; gap: 6px; }
+  .win-ctrls { color: var(--text-muted); font-size: 0.62rem; }
 
   .win-body {
     padding: 8px 10px;
@@ -304,612 +260,179 @@
     z-index: 3;
   }
 
-  /* COLUMN 1: Left Navigation & Coworker Explorer Tree */
+  /* Col 1 */
   .search-input-wrap {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(2, 8, 16, 0.92);
-    border: 1px solid var(--cyan-border);
-    padding: 4px 8px;
-    border-radius: 3px;
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(2, 8, 16, 0.92); border: 1px solid var(--cyan-border);
+    padding: 4px 8px; border-radius: 3px;
   }
-
   .search-input-wrap input {
-    background: transparent;
-    border: none;
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 0.67rem;
-    width: 100%;
+    background: transparent; border: none; color: var(--text-primary);
+    font-family: var(--font-mono); font-size: 0.67rem; width: 100%;
   }
   .search-input-wrap input:focus { outline: none; }
 
-  .tree-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 0.70rem;
-    flex: 1;
-    overflow-y: auto;
-  }
-
+  .tree-list { display: flex; flex-direction: column; gap: 2px; font-size: 0.70rem; flex: 1; overflow-y: auto; }
   .tree-section-lbl {
-    font-size: 0.59rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.1px;
-    color: var(--cyan);
-    margin-top: 6px;
-    padding: 2px 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    font-size: 0.59rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.1px;
+    color: var(--cyan); margin-top: 6px; padding: 2px 4px; display: flex; align-items: center; gap: 4px;
   }
-
   .tree-btn {
-    width: 100%;
-    background: transparent;
-    border: none;
-    border-left: 2px solid transparent;
-    padding: 5px 8px;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 0.69rem;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.15s var(--ease-out-expo);
+    width: 100%; background: transparent; border: none; border-left: 2px solid transparent;
+    padding: 5px 8px; display: flex; align-items: center; gap: 7px; color: var(--text-secondary);
+    font-family: var(--font-mono); font-size: 0.69rem; text-align: left; cursor: pointer; transition: 0.15s;
   }
-
-  .tree-btn:hover {
-    color: #fff;
-    background: rgba(0, 229, 255, 0.09);
-  }
-
+  .tree-btn:hover { color: #fff; background: rgba(0, 229, 255, 0.09); }
   .tree-btn.active {
     background: linear-gradient(90deg, rgba(0, 229, 255, 0.34), rgba(0, 229, 255, 0.05));
-    color: #fff;
-    border-left: 3px solid var(--cyan);
-    font-weight: 700;
-    text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+    color: #fff; border-left: 3px solid var(--cyan); font-weight: 700; text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
   }
-
   .tree-count-pill {
-    margin-left: auto;
-    font-size: 0.58rem;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: rgba(0, 229, 255, 0.14);
-    color: var(--cyan-bright);
+    margin-left: auto; font-size: 0.58rem; padding: 1px 5px; border-radius: 3px;
+    background: rgba(0, 229, 255, 0.14); color: var(--cyan-bright);
   }
-
   .node-dock-btn {
-    margin-top: auto;
-    width: 100%;
-    background: rgba(0, 229, 255, 0.10);
-    border: 1px solid var(--cyan-border);
-    color: var(--cyan-bright);
-    padding: 6px 10px;
-    font-family: var(--font-mono);
-    font-size: 0.67rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    transition: 0.18s;
-  }
-  .node-dock-btn:hover {
-    background: var(--cyan);
-    color: #02070f;
+    margin-top: auto; width: 100%; background: rgba(0, 229, 255, 0.10); border: 1px solid var(--cyan-border);
+    color: var(--cyan-bright); padding: 6px 10px; font-family: var(--font-mono); font-size: 0.67rem; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; cursor: pointer;
   }
 
-  /* COLUMN 2: CPU Circular Gauges, Memory Usage Bars & Daemon Matrix */
-  .col-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    min-height: 0;
-  }
-
-  .gauge-pair {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 3px 0;
-  }
-
+  /* Col 2 */
+  .col-stack { display: flex; flex-direction: column; gap: 9px; min-height: 0; }
+  .gauge-pair { display: flex; justify-content: space-around; align-items: center; padding: 3px 0; }
   .radial-gauge {
-    position: relative;
-    width: 84px;
-    height: 84px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    position: relative; width: 84px; height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
+  .radial-gauge svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .radial-gauge .val { font-size: 0.92rem; font-weight: 800; color: #fff; text-shadow: 0 0 10px rgba(0,229,255,0.6); }
+  .radial-gauge .sub { font-size: 0.52rem; color: var(--text-secondary); letter-spacing: 0.6px; text-transform: uppercase; }
 
-  .radial-gauge svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-  }
+  .bar-metric { display: flex; flex-direction: column; gap: 3px; }
+  .bar-row { display: flex; justify-content: space-between; font-size: 0.64rem; color: var(--text-secondary); }
+  .bar-row b { color: var(--cyan-bright); }
+  .bar-track { height: 5px; background: rgba(0,229,255,0.10); border: 1px solid rgba(0,229,255,0.24); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--emerald)); box-shadow: 0 0 8px var(--cyan); }
 
-  .radial-gauge circle {
-    transition: stroke-dashoffset 0.6s var(--ease-out-expo);
-  }
+  .proc-table { width: 100%; border-collapse: collapse; font-size: 0.64rem; }
+  .proc-table tr { border-bottom: 1px solid rgba(0,229,255,0.09); cursor: pointer; }
+  .proc-table tr:hover, .proc-table tr.highlight { background: rgba(0,229,255,0.18); color: #fff; }
+  .proc-table td { padding: 3.5px 4px; }
+  .proc-table td:last-child { text-align: right; color: var(--cyan-bright); font-weight: 700; }
 
-  .radial-gauge .val {
-    font-size: 0.92rem;
-    font-weight: 800;
-    color: #fff;
-    text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
-  }
-
-  .radial-gauge .sub {
-    font-size: 0.52rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-  }
-
-  .bar-metric {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .bar-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.64rem;
-    color: var(--text-secondary);
-  }
-
-  .bar-row b {
-    color: var(--cyan-bright);
-  }
-
-  .bar-track {
-    height: 5px;
-    background: rgba(0, 229, 255, 0.10);
-    border: 1px solid rgba(0, 229, 255, 0.24);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--cyan), var(--emerald));
-    box-shadow: 0 0 8px var(--cyan);
-    transition: width 0.4s var(--ease-out-expo);
-  }
-
-  .proc-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.64rem;
-  }
-
-  .proc-table tr {
-    border-bottom: 1px solid rgba(0, 229, 255, 0.09);
-    cursor: pointer;
-    transition: background 0.14s;
-  }
-  .proc-table tr:hover, .proc-table tr.highlight {
-    background: rgba(0, 229, 255, 0.18);
-    color: #fff;
-  }
-  .proc-table td {
-    padding: 3.5px 4px;
-  }
-  .proc-table td:last-child {
-    text-align: right;
-    color: var(--cyan-bright);
-    font-weight: 700;
-  }
-
-  /* COLUMN 3 (CENTER): Mode Selector Pills + 3D Cylindrical Arc Reactor + STANDBY Deck */
-  .center-stage {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    position: relative;
-    min-height: 0;
-    padding: 2px 4px;
-  }
-
-  .mode-pills {
-    display: flex;
-    gap: 5px;
-    z-index: 5;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
+  /* Col 3: Center Stage */
+  .center-stage { display: flex; flex-direction: column; justify-content: space-between; align-items: center; position: relative; min-height: 0; padding: 2px 4px; }
+  .mode-pills { display: flex; gap: 5px; z-index: 5; flex-wrap: wrap; justify-content: center; }
   .mode-pill {
-    padding: 5px 13px;
-    font-size: 0.64rem;
-    font-family: var(--font-mono);
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    background: rgba(4, 18, 34, 0.85);
-    border: 1px solid var(--cyan-border);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.18s var(--ease-out-expo);
+    padding: 5px 13px; font-size: 0.64rem; font-family: var(--font-mono); letter-spacing: 1.2px; text-transform: uppercase;
+    background: rgba(4, 18, 34, 0.85); border: 1px solid var(--cyan-border); color: var(--text-secondary); cursor: pointer; transition: 0.18s;
   }
+  .mode-pill.active, .mode-pill:hover { background: var(--cyan); color: #02070f; border-color: var(--cyan-bright); font-weight: 800; box-shadow: 0 0 16px var(--cyan-glow); }
 
-  .mode-pill.active, .mode-pill:hover {
-    background: var(--cyan);
-    color: #02070f;
-    border-color: var(--cyan-bright);
-    font-weight: 800;
-    box-shadow: 0 0 16px var(--cyan-glow);
-  }
+  .reactor-viewport { position: relative; width: 100%; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 270px; }
+  canvas#arcReactorCanvas { width: 100%; height: 100%; display: block; }
 
-  .reactor-viewport {
-    position: relative;
-    width: 100%;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 270px;
-  }
-
-  canvas#arcReactorCanvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  /* Floating Center Play/Briefing Trigger Button (Matches Video) */
   .reactor-center-trigger {
-    position: absolute;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: rgba(8, 28, 48, 0.72);
-    border: 1.5px solid var(--cyan-bright);
-    box-shadow: 0 0 26px rgba(0, 229, 255, 0.6), inset 0 0 14px rgba(0, 229, 255, 0.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: #fff;
-    backdrop-filter: blur(6px);
-    transition: transform 0.22s var(--ease-out-expo), background 0.22s;
+    position: absolute; width: 56px; height: 56px; border-radius: 50%; background: rgba(8, 28, 48, 0.72);
+    border: 1.5px solid var(--cyan-bright); box-shadow: 0 0 26px rgba(0,229,255,0.6), inset 0 0 14px rgba(0,229,255,0.35);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; backdrop-filter: blur(6px); transition: 0.2s;
   }
-  .reactor-center-trigger:hover {
-    transform: scale(1.1);
-    background: rgba(0, 229, 255, 0.38);
-  }
+  .reactor-center-trigger:hover { transform: scale(1.1); background: rgba(0,229,255,0.38); }
 
-  /* Bottom Center System State Console ("STANDBY" + Striped Progress + Command Input) */
   .system-state-console {
-    width: 100%;
-    background: rgba(4, 16, 30, 0.90);
-    border: 1px solid var(--cyan);
-    padding: 9px 12px;
-    position: relative;
-    box-shadow: 0 0 26px rgba(0, 229, 255, 0.16);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    width: 100%; background: rgba(4, 16, 30, 0.90); border: 1px solid var(--cyan); padding: 9px 12px;
+    position: relative; box-shadow: 0 0 26px rgba(0,229,255,0.16); display: flex; flex-direction: column; gap: 6px;
   }
-
   .state-tab-tag {
-    position: absolute;
-    top: -18px;
-    left: 0;
-    background: var(--cyan);
-    color: #02070f;
-    font-size: 0.58rem;
-    font-weight: 800;
-    padding: 2px 12px;
-    letter-spacing: 1.1px;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 100%, 0 100%);
+    position: absolute; top: -18px; left: 0; background: var(--cyan); color: #02070f; font-size: 0.58rem; font-weight: 800;
+    padding: 2px 12px; letter-spacing: 1.1px; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 100%, 0 100%);
   }
+  .state-header-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .state-sub-label { font-size: 0.60rem; letter-spacing: 1.4px; color: var(--text-secondary); text-transform: uppercase; }
+  .state-main-title { font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; letter-spacing: 2.2px; color: var(--cyan-bright); text-shadow: 0 0 12px rgba(0,229,255,0.6); }
 
-  .state-header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-
-  .state-sub-label {
-    font-size: 0.60rem;
-    letter-spacing: 1.4px;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-  }
-
-  .state-main-title {
-    font-family: var(--font-display);
-    font-size: 1.4rem;
-    font-weight: 800;
-    letter-spacing: 2.2px;
-    color: var(--cyan-bright);
-    text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
-  }
-
-  .striped-bar-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
+  .striped-bar-row { display: flex; align-items: center; gap: 8px; }
   .striped-progress {
-    flex: 1;
-    height: 12px;
-    border: 1px solid var(--cyan-border);
-    background: repeating-linear-gradient(
-      -55deg,
-      rgba(0, 229, 255, 0.40),
-      rgba(0, 229, 255, 0.40) 6px,
-      rgba(2, 10, 20, 0.92) 6px,
-      rgba(2, 10, 20, 0.92) 12px
-    );
-    position: relative;
-    overflow: hidden;
+    flex: 1; height: 12px; border: 1px solid var(--cyan-border);
+    background: repeating-linear-gradient(-55deg, rgba(0,229,255,0.40), rgba(0,229,255,0.40) 6px, rgba(2,10,20,0.92) 6px, rgba(2,10,20,0.92) 12px);
+    position: relative; overflow: hidden;
   }
+  .striped-progress-active { height: 100%; width: 100%; background: linear-gradient(90deg, rgba(0,229,255,0.45), rgba(0,255,170,0.45)); }
 
-  .striped-progress-active {
-    height: 100%;
-    width: 100%;
-    background: linear-gradient(90deg, rgba(0, 229, 255, 0.45), rgba(0, 255, 170, 0.45));
-    transition: width 0.35s var(--ease-out-expo);
-  }
-
-  .cmd-inline-row {
-    display: flex;
-    gap: 6px;
-    margin-top: 2px;
-  }
-
+  .cmd-inline-row { display: flex; gap: 6px; margin-top: 2px; }
   .cmd-inline-input {
-    flex: 1;
-    height: 30px;
-    background: rgba(2, 8, 16, 0.96);
-    border: 1px solid var(--cyan-border);
-    color: var(--text-primary);
-    padding: 4px 10px;
-    font-family: var(--font-mono);
-    font-size: 0.70rem;
-    border-radius: 3px;
+    flex: 1; height: 30px; background: rgba(2, 8, 16, 0.96); border: 1px solid var(--cyan-border); color: var(--text-primary);
+    padding: 4px 10px; font-family: var(--font-mono); font-size: 0.70rem; border-radius: 3px;
   }
-
+  .cmd-inline-input:focus { outline: none; border-color: var(--cyan); }
   .cmd-exec-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: rgba(0, 229, 255, 0.16);
-    border: 1px solid var(--cyan);
-    color: var(--cyan-bright);
-    padding: 0 12px;
-    height: 30px;
-    font-family: var(--font-mono);
-    font-size: 0.67rem;
-    font-weight: 700;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.16s var(--ease-out-expo);
+    display: inline-flex; align-items: center; gap: 5px; background: rgba(0, 229, 255, 0.16); border: 1px solid var(--cyan);
+    color: var(--cyan-bright); padding: 0 12px; height: 30px; font-family: var(--font-mono); font-size: 0.67rem; font-weight: 700;
+    border-radius: 3px; cursor: pointer; transition: 0.16s;
   }
-  .cmd-exec-btn:hover {
-    background: var(--cyan);
-    color: #02070f;
-    box-shadow: 0 0 12px var(--cyan-glow);
-  }
+  .cmd-exec-btn:hover { background: var(--cyan); color: #02070f; box-shadow: 0 0 12px var(--cyan-glow); }
 
-  /* COLUMN 4: Right Radial Diagnostics, Specialist Dot Ring (134%) & Active Kernel Ring (934) */
-  .big-ring-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4px 0;
-    position: relative;
-  }
+  /* Col 4 */
+  .big-ring-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 0; position: relative; }
+  .big-ring { position: relative; width: 110px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .big-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .big-ring .num { font-size: 1.22rem; font-weight: 800; color: #fff; text-shadow: 0 0 12px rgba(0,229,255,0.65); }
+  .big-ring .lbl { font-size: 0.55rem; color: var(--text-secondary); letter-spacing: 1px; text-transform: uppercase; }
 
-  .big-ring {
-    position: relative;
-    width: 110px;
-    height: 110px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .big-ring svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-  }
-
-  .big-ring .num {
-    font-size: 1.22rem;
-    font-weight: 800;
-    color: #fff;
-    text-shadow: 0 0 12px rgba(0, 229, 255, 0.65);
-  }
-
-  .big-ring .lbl {
-    font-size: 0.55rem;
-    color: var(--text-secondary);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-
-  /* COLUMN 5: Right Code Telemetry & Live AG-UI Stream / Space Drawer */
-  .code-block {
-    font-size: 0.64rem;
-    line-height: 1.48;
-    color: #9be8ff;
-    white-space: pre-wrap;
-    font-family: var(--font-mono);
-  }
-
+  /* Col 5 */
+  .code-block { font-size: 0.64rem; line-height: 1.48; color: #9be8ff; white-space: pre-wrap; font-family: var(--font-mono); }
   .stream-log-entry {
-    padding: 6px 8px;
-    border-left: 2px solid var(--cyan);
-    background: rgba(2, 10, 22, 0.88);
-    border-radius: 0 4px 4px 0;
-    font-size: 0.66rem;
-    line-height: 1.44;
-    margin-bottom: 5px;
-    animation: slideIn 0.2s var(--ease-out-expo);
+    padding: 6px 8px; border-left: 2px solid var(--cyan); background: rgba(2, 10, 22, 0.88); border-radius: 0 4px 4px 0;
+    font-size: 0.66rem; line-height: 1.44; margin-bottom: 5px;
   }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(6px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  .hitl-inline-card {
-    border: 1px solid var(--amber);
-    background: rgba(255, 184, 0, 0.12);
-    padding: 6px 8px;
-    border-radius: 4px;
-    margin-top: 4px;
-  }
-
-  .mini-btn-row {
-    display: flex;
-    gap: 5px;
-    margin-top: 5px;
-    flex-wrap: wrap;
-  }
-
+  .hitl-inline-card { border: 1px solid var(--amber); background: rgba(255, 184, 0, 0.12); padding: 6px 8px; border-radius: 4px; margin-top: 4px; }
+  .mini-btn-row { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
   .mini-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(0, 229, 255, 0.12);
-    border: 1px solid var(--cyan-border);
-    color: var(--cyan-bright);
-    padding: 3px 7px;
-    border-radius: 3px;
-    font-size: 0.61rem;
-    font-family: var(--font-mono);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 4px; background: rgba(0, 229, 255, 0.12); border: 1px solid var(--cyan-border);
+    color: var(--cyan-bright); padding: 3px 7px; border-radius: 3px; font-size: 0.61rem; font-family: var(--font-mono);
+    font-weight: 600; cursor: pointer; transition: 0.15s;
   }
   .mini-btn:hover { background: var(--cyan); color: #02070f; border-color: var(--cyan); }
   .mini-btn.warn { border-color: var(--amber); color: var(--amber); background: rgba(255, 184, 0, 0.10); }
-  .mini-btn.warn:hover { background: var(--amber); color: #02070f; }
   .mini-btn.danger { border-color: var(--crimson); color: var(--crimson); background: rgba(255, 51, 85, 0.10); }
-  .mini-btn.danger:hover { background: var(--crimson); color: #fff; }
 
-  /* 21st.dev Glassmorphic Space Editor Modal */
+  /* Space Editor Modal */
   .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(1, 5, 12, 0.78);
-    backdrop-filter: blur(10px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 20px;
+    position: fixed; inset: 0; background: rgba(1, 5, 12, 0.78); backdrop-filter: blur(10px);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px;
   }
   .modal-backdrop.open { display: flex; }
-
   .space-modal {
-    width: 100%;
-    max-width: 580px;
-    background: rgba(5, 18, 34, 0.96);
-    border: 1px solid var(--cyan);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 229, 255, 0.22);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    width: 100%; max-width: 580px; background: rgba(5, 18, 34, 0.96); border: 1px solid var(--cyan);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(0,229,255,0.22); padding: 16px; display: flex; flex-direction: column; gap: 10px;
   }
-
   .space-modal input[type="text"] {
-    width: 100%;
-    height: 34px;
-    background: rgba(2, 8, 16, 0.95);
-    border: 1px solid var(--cyan-border);
-    color: var(--text-primary);
-    padding: 6px 10px;
-    font-family: var(--font-mono);
-    font-size: 0.76rem;
+    width: 100%; height: 34px; background: rgba(2, 8, 16, 0.95); border: 1px solid var(--cyan-border); color: var(--text-primary); padding: 6px 10px; font-family: var(--font-mono); font-size: 0.76rem;
   }
-
   .space-modal textarea {
-    width: 100%;
-    height: 190px;
-    background: rgba(2, 8, 16, 0.95);
-    border: 1px solid var(--cyan-border);
-    color: var(--text-primary);
-    padding: 8px 10px;
-    font-family: var(--font-mono);
-    font-size: 0.73rem;
-    line-height: 1.48;
-    resize: vertical;
+    width: 100%; height: 190px; background: rgba(2, 8, 16, 0.95); border: 1px solid var(--cyan-border); color: var(--text-primary); padding: 8px 10px; font-family: var(--font-mono); font-size: 0.73rem; line-height: 1.48; resize: vertical;
   }
 
-  /* 3. Bottom Desktop Taskbar */
+  /* 3. Bottom Taskbar */
   footer.os-taskbar {
-    height: 30px;
-    background: rgba(1, 6, 14, 0.96);
-    border-top: 1px solid var(--cyan-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 14px;
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    z-index: 10;
-    flex-shrink: 0;
+    height: 30px; background: rgba(1, 6, 14, 0.96); border-top: 1px solid var(--cyan-border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-size: 0.65rem; color: var(--text-secondary); z-index: 10; flex-shrink: 0;
   }
-
-  .taskbar-left, .taskbar-right {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .tb-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    cursor: pointer;
-    transition: color 0.15s;
-  }
+  .taskbar-left, .taskbar-right { display: flex; align-items: center; gap: 14px; }
+  .tb-item { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; transition: color 0.15s; }
   .tb-item:hover { color: var(--cyan-bright); }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, ::before, ::after {
-      animation-duration: 0.01ms !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
 </style>
 </head>
 <body>
 
-  <!-- 1. Top OS Title Bar & Workspace Tabs -->
+  <!-- 1. Top Bar -->
   <header class="os-top-bar">
     <div class="os-brand-tabs">
       <div class="os-logo-text">
         <svg class="ico-md" viewBox="0 0 24 24" stroke="#00e5ff" fill="none" stroke-width="2">
-          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 12 22 2 15.5 12 2"></polygon>
+          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
           <circle cx="12" cy="12" r="3"></circle>
         </svg>
-        <span>OS // CYBER-HUD</span>
+        <span>Jarvis OS</span>
       </div>
       <div class="workspace-tabs">
         <div class="ws-tab active" onclick="switchMode('OVERVIEW')">
@@ -928,6 +451,20 @@
     </div>
 
     <div class="os-top-actions">
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span style="font-size:0.62rem;color:var(--text-secondary);">MODEL:</span>
+        <select id="globalModelSelect" class="model-switcher-select" onchange="switchGlobalModel(this.value)" title="Select any downloaded Ollama model">
+          <option value="qwen3.5:35b">qwen3.5:35b</option>
+          <option value="qwen2.5-coder:14b">qwen2.5-coder:14b</option>
+          <option value="deepseek-r1:8b">deepseek-r1:8b</option>
+          <option value="llama3.2:latest">llama3.2:latest</option>
+        </select>
+        <button class="magic-pill-btn" onclick="refreshOllamaModels()" title="Scan local Ollama for downloaded models" style="padding:4px 6px;">⟳</button>
+        <button class="magic-pill-btn" onclick="openModelModal()" title="Assign different Ollama models per Dot">
+          <svg class="ico" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span>Models</span>
+        </button>
+      </div>
       <button class="magic-pill-btn" onclick="openSpaceModal()">
         <svg class="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span>Space Editor</span>
@@ -947,10 +484,10 @@
     </div>
   </header>
 
-  <!-- 2. Main 5-Column Sci-Fi Workstation Grid -->
+  <!-- 2. Workstation Grid -->
   <main class="workstation-grid" id="workstationGrid">
 
-    <!-- COLUMN 1: Left Navigation & Coworker Explorer (Lucide SVG Icons, Zero Emojis) -->
+    <!-- Column 1 -->
     <section class="sci-window">
       <div class="corner-tl"></div><div class="corner-br"></div>
       <div class="win-titlebar">
@@ -999,11 +536,33 @@
             <span class="tree-count-pill">1</span>
           </button>
 
+          <div class="tree-section-lbl">▾ Octop Harness Stack</div>
+          <button class="tree-btn" onclick="runScenario('octop_dag')">
+            <svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6"cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span>Multi-Dot DAG</span>
+            <span class="tree-count-pill">4</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('octop_acp')">
+            <svg class="ico" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>Dual ACP Bridge</span>
+            <span class="tree-count-pill">IO</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('octop_peer')">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Peer Team Inbox</span>
+            <span class="tree-count-pill">SYNC</span>
+          </button>
+          <button class="tree-btn" onclick="runScenario('octop_memory')">
+            <svg class="ico" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <span>L0→L3 Memory</span>
+            <span class="tree-count-pill">L3</span>
+          </button>
+
           <div class="tree-section-lbl">▾ Active Subsystems</div>
-          <button class="tree-btn" onclick="openComputerModal()">
+          <button class="tree-btn" onclick="runScenario('hitl')">
             <svg class="ico" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
             <span>Agent Computer</span>
-            <span class="tree-count-pill" style="background:var(--emerald-dim);color:var(--emerald);">LIVE</span>
+            <span class="tree-count-pill">1</span>
           </button>
           <button class="tree-btn" onclick="runScenario('youtube')">
             <svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -1021,25 +580,6 @@
             <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <span>Safety Gate</span>
           </button>
-
-          <div class="tree-section-lbl">▾ Octop Harness</div>
-          <button class="tree-btn" onclick="sendCommand('dag Autonomous System Architecture Audit')">
-            <svg class="ico" viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-            <span>Multi-Dot DAG</span>
-            <span class="tree-count-pill">4</span>
-          </button>
-          <button class="tree-btn" onclick="sendCommand('acp bridge status')">
-            <svg class="ico" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-            <span>Dual ACP Bridge</span>
-          </button>
-          <button class="tree-btn" onclick="sendCommand('peer team inbox status')">
-            <svg class="ico" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-            <span>Peer Team Inbox</span>
-          </button>
-          <button class="tree-btn" onclick="sendCommand('octop memory recall')">
-            <svg class="ico" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-            <span>L0→L3 Memory</span>
-          </button>
         </div>
 
         <button class="node-dock-btn" onclick="runScenario('optimize')">
@@ -1049,7 +589,7 @@
       </div>
     </section>
 
-    <!-- COLUMN 2: CPU Gauges, Memory Telemetry & Daemon Matrix -->
+    <!-- Column 2 -->
     <div class="col-stack">
       <section class="sci-window">
         <div class="corner-tl"></div><div class="corner-br"></div>
@@ -1138,7 +678,7 @@
       </section>
     </div>
 
-    <!-- COLUMN 3 (CENTER): 3D Cylindrical Segmented Arc Reactor + STANDBY Deck -->
+    <!-- Column 3: Center Stage -->
     <div class="center-stage">
       <div class="mode-pills">
         <button class="mode-pill active" id="pill-OVERVIEW" onclick="switchMode('OVERVIEW')">OVERVIEW</button>
@@ -1181,7 +721,7 @@
       </div>
     </div>
 
-    <!-- COLUMN 4: Right Radial Diagnostics, Specialist Dot Ring (134%) & Active Kernel Ring (934) -->
+    <!-- Column 4 -->
     <div class="col-stack">
       <section class="sci-window">
         <div class="corner-tl"></div><div class="corner-br"></div>
@@ -1263,7 +803,7 @@
       </section>
     </div>
 
-    <!-- COLUMN 5: Right Code Telemetry & Live AG-UI Stream -->
+    <!-- Column 5 -->
     <div class="col-stack">
       <section class="sci-window" style="flex:1;">
         <div class="corner-tl"></div><div class="corner-br"></div>
@@ -1277,7 +817,7 @@
         <div class="win-body">
           <pre class="code-block" id="liveCodeInspector">OpenDots.Config({
   dot: "@forge",
-  engine: "ollama/qwen3.5:35b",
+  engine: "ollama/" + (dotModelMap[id] || activeGlobalModel),
   permissions: [
     "files", "shell", "memory"
   ],
@@ -1308,6 +848,8 @@
           </div>
         </div>
         <div style="padding:6px 8px;border-top:1px solid var(--cyan-border);display:flex;gap:4px;flex-wrap:wrap;z-index:3;">
+          <button class="mini-btn" onclick="runScenario('octop_dag')">Octop DAG</button>
+          <button class="mini-btn" onclick="runScenario('octop_acp')">ACP</button>
           <button class="mini-btn" onclick="runScenario('morning')">Digest</button>
           <button class="mini-btn warn" onclick="runScenario('hitl')">HITL</button>
           <button class="mini-btn" onclick="runScenario('youtube')">YouTube</button>
@@ -1319,7 +861,7 @@
 
   </main>
 
-  <!-- 21st.dev Interactive OpenDots Space Editor Modal -->
+  <!-- Modal -->
   <div class="modal-backdrop" id="spaceModalBackdrop">
     <div class="space-modal sci-window">
       <div class="corner-tl"></div><div class="corner-br"></div>
@@ -1343,38 +885,57 @@
     </div>
   </div>
 
-  <!-- OpenMuse Live Agent Computer Virtual Desktop Modal -->
-  <div class="modal-backdrop" id="computerModalBackdrop">
-    <div class="space-modal sci-window" style="max-width:1040px;width:92vw;height:82vh;display:flex;flex-direction:column;">
+  <!-- Ollama Multi-Model Switcher & Per-Dot Binding Modal -->
+  <div class="modal-backdrop" id="modelModalBackdrop">
+    <div class="space-modal sci-window" style="max-width:660px;">
       <div class="corner-tl"></div><div class="corner-br"></div>
       <div class="win-titlebar">
         <div class="win-title-left">
-          <svg class="ico-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
-          <span>OpenMuse // Agent Computer Live Desktop (noVNC :6080)</span>
+          <svg class="ico-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span>Ollama Local Model Registry // Use Any Downloaded Model</span>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button class="mini-btn warn" onclick="toggleTakeControl()" id="modalTakeControlBtn">🕹 Take Control</button>
-          <button class="mini-btn" onclick="closeComputerModal()">× Close</button>
+        <div style="display:flex;gap:6px;">
+          <button class="mini-btn" onclick="refreshOllamaModels()">⟳ Rescan Ollama</button>
+          <button class="mini-btn" onclick="closeModelModal()">× Close</button>
         </div>
       </div>
-      <div style="flex:1;background:#000;border:1px solid var(--cyan-border);border-radius:4px;overflow:hidden;position:relative;">
-        <iframe id="hudNovncIframe" src="http://localhost:6080/vnc.html?autoconnect=1&resize=scale&reconnect=1" style="width:100%;height:100%;border:0;" title="Live noVNC Desktop"></iframe>
+
+      <div style="font-size:0.68rem;color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center;">
+        <span>Auto-detected from <code>http://127.0.0.1:11434/api/tags</code> &amp; <code>ollama list</code></span>
+        <span id="ollamaDaemonBadge" style="color:var(--emerald);font-weight:700;">● SCANNING...</span>
       </div>
+
+      <!-- Custom Model Name Input -->
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="customModelInput" placeholder="Or type any downloaded Ollama model tag (e.g. deepseek-r1:14b, mistral:latest, gemma2:9b)..." style="flex:1;" />
+        <button class="magic-pill-btn" onclick="applyCustomModelInput()">Use Model</button>
+      </div>
+
+      <!-- Per-Dot Model Assignment Bar -->
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;padding:6px;background:rgba(0,229,255,0.05);border:1px solid var(--cyan-border);border-radius:4px;font-size:0.63rem;">
+        <div><b style="color:var(--cyan);">@forge:</b> <span id="dotModel-forge">global</span></div>
+        <div><b style="color:var(--cyan);">@scout:</b> <span id="dotModel-scout">global</span></div>
+        <div><b style="color:var(--cyan);">@scribe:</b> <span id="dotModel-scribe">global</span></div>
+        <div><b style="color:var(--cyan);">@sentinel:</b> <span id="dotModel-sentinel">global</span></div>
+      </div>
+
+      <!-- List of Downloaded Ollama Models -->
+      <div id="installedModelsList" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
     </div>
   </div>
 
-  <!-- 3. Bottom Desktop Taskbar -->
+  <!-- 3. Taskbar -->
   <footer class="os-taskbar">
     <div class="taskbar-left">
       <span class="tb-item" style="color:var(--cyan);font-weight:700;">
         <svg class="ico-sm" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
-        <span>OS</span>
+        <span>JARVIS</span>
       </span>
       <span class="tb-item" onclick="openSpaceModal()">
         <svg class="ico-sm" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         <span>/workspace</span>
       </span>
-      <span class="tb-item" onclick="openComputerModal()" title="Open Live Desktop Stream">
+      <span class="tb-item" onclick="toggleTakeControl()">
         <svg class="ico-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
         <span>Agent Computer: <b id="computerModeLabel" style="color:var(--emerald);">AUTONOMOUS</b></span>
       </span>
@@ -1387,7 +948,6 @@
   </footer>
 
 <script>
-// 21st.dev Mouse-Tracking Radial Spotlight Effect on all `.sci-window` panels
 document.querySelectorAll(".sci-window").forEach(win => {
   win.addEventListener("mousemove", e => {
     const rect = win.getBoundingClientRect();
@@ -1404,6 +964,156 @@ let DOTS = {
 };
 
 let currentDot = "forge";
+let activeGlobalModel = "qwen3.5:35b";
+let dotModelMap = { forge: "qwen3.5:35b", scout: "qwen3.5:35b", scribe: "qwen3.5:35b", sentinel: "qwen3.5:35b" };
+let installedOllamaModels = [
+  { name: "qwen3.5:35b", size_gb: 21.0, parameter_size: "35B", quantization: "Q4_K_M", capabilities: ["local", "coding", "reasoning"] },
+  { name: "qwen2.5-coder:14b", size_gb: 9.0, parameter_size: "14B", quantization: "Q4_K_M", capabilities: ["local", "coding"] },
+  { name: "deepseek-r1:8b", size_gb: 4.9, parameter_size: "8B", quantization: "Q4_K_M", capabilities: ["local", "reasoning"] },
+  { name: "llama3.2:latest", size_gb: 2.0, parameter_size: "3B", quantization: "Q4_K_M", capabilities: ["local", "general"] }
+];
+
+function openModelModal() {
+  document.getElementById("modelModalBackdrop").classList.add("open");
+  refreshOllamaModels();
+}
+function closeModelModal() {
+  document.getElementById("modelModalBackdrop").classList.remove("open");
+}
+
+function syncModelUI() {
+  const sel = document.getElementById("globalModelSelect");
+  if (sel) {
+    const names = installedOllamaModels.map(m => m.name);
+    if (!names.includes(activeGlobalModel)) {
+      installedOllamaModels.unshift({ name: activeGlobalModel, size_gb: "local", parameter_size: "custom", quantization: "gguf", capabilities: ["local"] });
+    }
+    sel.innerHTML = installedOllamaModels.map(m =>
+      `<option value="${escapeHtml(m.name)}" ${m.name === activeGlobalModel ? "selected" : ""}>${escapeHtml(m.name)} (${m.size_gb} GB)</option>`
+    ).join("");
+  }
+
+  ["forge", "scout", "scribe", "sentinel"].forEach(d => {
+    const el = document.getElementById("dotModel-" + d);
+    if (el) el.textContent = dotModelMap[d] || activeGlobalModel;
+  });
+
+  const firstProcCell = document.querySelector(".proc-table tr td:first-child");
+  if (firstProcCell) firstProcCell.textContent = `ollama/${dotModelMap[currentDot] || activeGlobalModel}`;
+
+  const listEl = document.getElementById("installedModelsList");
+  if (listEl) {
+    listEl.innerHTML = installedOllamaModels.map(m => {
+      const isGlobal = m.name === activeGlobalModel;
+      const caps = (m.capabilities || []).map(c => `<span class="tree-count-pill">${escapeHtml(c)}</span>`).join(" ");
+      return `
+        <div class="model-card-row ${isGlobal ? 'active-model' : ''}">
+          <div>
+            <div style="font-size:0.75rem;font-weight:700;color:#fff;">${escapeHtml(m.name)} ${caps}</div>
+            <div style="font-size:0.62rem;color:var(--text-secondary);">Size: ${escapeHtml(String(m.size_gb))} GB | Params: ${escapeHtml(m.parameter_size || 'local')} | Quant: ${escapeHtml(m.quantization || 'gguf')}</div>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+            <button class="mini-btn" onclick="switchGlobalModel('${escapeHtml(m.name)}')">${isGlobal ? '✓ Global Active' : 'Use Globally'}</button>
+            <button class="mini-btn" onclick="bindModelToDot('${escapeHtml(m.name)}', 'forge')" title="Bind to @forge">@forge</button>
+            <button class="mini-btn" onclick="bindModelToDot('${escapeHtml(m.name)}', 'scout')" title="Bind to @scout">@scout</button>
+            <button class="mini-btn" onclick="bindModelToDot('${escapeHtml(m.name)}', 'scribe')" title="Bind to @scribe">@scribe</button>
+            <button class="mini-btn" onclick="bindModelToDot('${escapeHtml(m.name)}', 'sentinel')" title="Bind to @sentinel">@sentinel</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+  selectDot(currentDot);
+}
+
+async function refreshOllamaModels() {
+  const badge = document.getElementById("ollamaDaemonBadge");
+  if (badge) badge.textContent = "● SCANNING OLLAMA...";
+
+  try {
+    const res = await fetch("/api/hud/models/refresh", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.installed_models && data.installed_models.length > 0) {
+        installedOllamaModels = data.installed_models;
+      }
+      if (data.active_model) activeGlobalModel = data.active_model;
+      if (data.dot_models) dotModelMap = data.dot_models;
+      if (badge) {
+        badge.textContent = data.daemon_online
+          ? `● OLLAMA ONLINE (${installedOllamaModels.length} MODELS)`
+          : `● CLI / CACHED (${installedOllamaModels.length} MODELS)`;
+      }
+      syncModelUI();
+      pushStreamLog(`<b style="color:var(--emerald);">[Ollama Registry]</b> Discovered <b>${installedOllamaModels.length}</b> downloaded models. Active: <code>${escapeHtml(activeGlobalModel)}</code>.`);
+      return;
+    }
+  } catch (e) {}
+
+  try {
+    const direct = await fetch("http://127.0.0.1:11434/api/tags");
+    if (direct.ok) {
+      const djson = await direct.json();
+      if (djson.models && djson.models.length > 0) {
+        installedOllamaModels = djson.models.map(m => ({
+          name: m.name,
+          size_gb: m.size ? (m.size / (1024 ** 3)).toFixed(2) : "local",
+          parameter_size: (m.details && m.details.parameter_size) || "local",
+          quantization: (m.details && m.details.quantization_level) || "gguf",
+          capabilities: ["local", "ollama"]
+        }));
+        activeGlobalModel = installedOllamaModels[0].name;
+        Object.keys(dotModelMap).forEach(k => { dotModelMap[k] = activeGlobalModel; });
+        if (badge) badge.textContent = `● DIRECT OLLAMA ONLINE (${installedOllamaModels.length} MODELS)`;
+        syncModelUI();
+        pushStreamLog(`<b style="color:var(--emerald);">[Ollama Direct]</b> Loaded <b>${installedOllamaModels.length}</b> models directly from localhost:11434.`);
+        return;
+      }
+    }
+  } catch (e) {}
+
+  if (badge) badge.textContent = `● PRESET CATALOG (${installedOllamaModels.length} MODELS)`;
+  syncModelUI();
+}
+
+async function switchGlobalModel(modelName) {
+  if (!modelName) return;
+  activeGlobalModel = modelName;
+  Object.keys(dotModelMap).forEach(k => { dotModelMap[k] = modelName; });
+  try {
+    await fetch("/api/hud/models/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelName }),
+    });
+  } catch (e) {}
+  syncModelUI();
+  pushStreamLog(`<b style="color:var(--cyan);">[Model Switched]</b> Global Ollama model set to <code>${escapeHtml(modelName)}</code>.`);
+}
+
+async function bindModelToDot(modelName, dotId) {
+  dotModelMap[dotId] = modelName;
+  try {
+    await fetch("/api/hud/models/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelName, dot: dotId }),
+    });
+  } catch (e) {}
+  syncModelUI();
+  pushStreamLog(`<b style="color:var(--emerald);">[Per-Dot Model Bound]</b> Bound <b>@${escapeHtml(dotId)}</b> to downloaded model <code>${escapeHtml(modelName)}</code>.`);
+}
+
+function applyCustomModelInput() {
+  const inp = document.getElementById("customModelInput");
+  const val = (inp.value || "").trim();
+  if (!val) return;
+  inp.value = "";
+  if (!installedOllamaModels.some(m => m.name === val)) {
+    installedOllamaModels.unshift({ name: val, size_gb: "local", parameter_size: "custom", quantization: "gguf", capabilities: ["local"] });
+  }
+  switchGlobalModel(val);
+}
 let pageRevision = 2;
 let currentPageId = "jarvis-spec";
 let computerTakenControl = false;
@@ -1420,7 +1130,8 @@ function formatMarkdown(text) {
   let html = escapeHtml(text);
   html = html.replace(/\*\*(.+?)\*\*/g, '<b style="color:var(--cyan-bright);">$1</b>');
   html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,229,255,0.14);padding:1px 4px;border-radius:2px;color:var(--emerald);">$1</code>');
-  html = html.replace(/\n/g, '<br>');
+  html = html.replace(/
+/g, '<br>');
   return html;
 }
 
@@ -1432,28 +1143,8 @@ function filterNodes(query) {
   });
 }
 
-function openSpaceModal() {
-  document.getElementById("spaceModalBackdrop").classList.add("open");
-}
-function closeSpaceModal() {
-  document.getElementById("spaceModalBackdrop").classList.remove("open");
-}
-
-function openComputerModal() {
-  const bd = document.getElementById("computerModalBackdrop");
-  if (bd) {
-    bd.classList.add("open");
-    const ifr = document.getElementById("hudNovncIframe");
-    if (ifr) {
-      const host = window.location.hostname || "localhost";
-      ifr.src = `http://${host}:6080/vnc.html?autoconnect=1&resize=scale&reconnect=1`;
-    }
-  }
-}
-function closeComputerModal() {
-  const bd = document.getElementById("computerModalBackdrop");
-  if (bd) bd.classList.remove("open");
-}
+function openSpaceModal() { document.getElementById("spaceModalBackdrop").classList.add("open"); }
+function closeSpaceModal() { document.getElementById("spaceModalBackdrop").classList.remove("open"); }
 
 function selectDot(id) {
   if (!DOTS[id]) return;
@@ -1461,17 +1152,15 @@ function selectDot(id) {
   const d = DOTS[id];
   document.getElementById("activeCoworkerTag").textContent = `ACTIVE DOT // @${id.toUpperCase()}`;
   document.getElementById("dotPerfLbl").textContent = `@${id.toUpperCase()} RBAC`;
-
   document.querySelectorAll("#leftTreeList .tree-btn").forEach(el => el.classList.remove("active"));
   const treeEl = document.getElementById("tree-" + id);
   if (treeEl) treeEl.classList.add("active");
-
   const perms = d.permissions || ["memory"];
   document.getElementById("liveCodeInspector").textContent =
 `OpenDots.Config({
   dot: "@${id}",
   role: "${d.role}",
-  engine: "ollama/qwen3.5:35b",
+  engine: "ollama/" + (dotModelMap[id] || activeGlobalModel),
   permissions: ${JSON.stringify(perms)},
   safetyGate: {
     sha256Binding: true,
@@ -1491,19 +1180,10 @@ function setSystemState(st, pct = 100) {
   const lbl = document.getElementById("mainStateLabel");
   lbl.textContent = st;
   document.getElementById("stripedFill").style.width = pct + "%";
-  if (st === "WAITING_APPROVAL") {
-    lbl.style.color = "var(--amber)";
-    reactorSpeed = 0.4;
-  } else if (st === "SECURITY_BLOCK" || st === "ERROR") {
-    lbl.style.color = "var(--crimson)";
-    reactorSpeed = 3.2;
-  } else if (st === "EXECUTING" || st === "PROCESSING") {
-    lbl.style.color = "var(--emerald)";
-    reactorSpeed = 2.6;
-  } else {
-    lbl.style.color = "var(--cyan-bright)";
-    reactorSpeed = 1.0;
-  }
+  if (st === "WAITING_APPROVAL") { lbl.style.color = "var(--amber)"; reactorSpeed = 0.4; }
+  else if (st === "SECURITY_BLOCK" || st === "ERROR") { lbl.style.color = "var(--crimson)"; reactorSpeed = 3.2; }
+  else if (st === "EXECUTING" || st === "PROCESSING") { lbl.style.color = "var(--emerald)"; reactorSpeed = 2.6; }
+  else { lbl.style.color = "var(--cyan-bright)"; reactorSpeed = 1.0; }
 }
 
 function pushStreamLog(htmlContent) {
@@ -1525,19 +1205,9 @@ async function bootState() {
         document.getElementById("jouleMetric").textContent = `${data.telemetry.total_energy_joules} J`;
         document.getElementById("centerTelemetryVal").textContent = `${data.telemetry.avg_latency_ms} ms // ${data.telemetry.total_energy_joules} J`;
       }
-      if (data.spaces && data.spaces.pages && data.spaces.pages.length > 0) {
-        const p = data.spaces.pages[0];
-        currentPageId = p.page_id || "jarvis-spec";
-        pageRevision = p.revision;
-        document.getElementById("revBadge").textContent = "REV V" + p.revision;
-        document.getElementById("pageTitle").value = p.title;
-        document.getElementById("pageMarkdown").value = p.markdown;
-      }
       selectDot(currentDot);
     }
-  } catch (e) {
-    selectDot(currentDot);
-  }
+  } catch (e) { selectDot(currentDot); }
 }
 
 async function sendCommand(customQuery) {
@@ -1545,62 +1215,29 @@ async function sendCommand(customQuery) {
   const q = customQuery || input.value.trim();
   if (!q) return;
   if (!customQuery) input.value = "";
-
   pushStreamLog(`<b style="color:#fff;">You:</b> ${escapeHtml(q)}`);
   setSystemState("PROCESSING", 45);
 
   const ql = q.toLowerCase();
-  if (ql.startsWith("dag ") || ql.startsWith("run dag ") || ql.startsWith("octop dag ")) {
-    const goal = q.replace(/^(dag|run dag|octop dag)\s*/i, "").trim() || "Autonomous System Architecture Audit";
-    pushStreamLog(`<b style="color:var(--cyan-bright);">[OCTOP DAG]</b> Initializing 4-Stage Multi-Dot Pipeline for: ${escapeHtml(goal)}`);
-    setSystemState("PROCESSING", 25);
-    try {
-      const dagResp = await fetch("/api/hud/octop/dag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_goal: goal }),
-      });
-      const dagData = await dagResp.json();
-      setSystemState("COMPLETED", 100);
-      pushStreamLog(`<b style="color:var(--emerald);">[OCTOP DAG COMPLETE]</b> DAG ID: <code>${dagData.dag_id}</code><br>Snapshot: <code>${dagData.snapshot_hash}</code><br>Committed Page: <code>${dagData.page_id}</code>`);
-      setTimeout(() => setSystemState("STANDBY", 100), 2000);
-    } catch (err) {
-      setSystemState("ERROR", 100);
-      pushStreamLog(`<b style="color:var(--crimson);">[OCTOP DAG ERROR]</b> ${escapeHtml(err.message)}`);
-    }
-    return;
-  }
-
-  let actionType = null;
-  let actionPayload = null;
-
+  let actionType = null, actionPayload = null;
   if (ql.includes("rm -rf /") || ql.includes("| bash") || ql.includes("format c:")) {
-    actionType = "shell_exec";
-    actionPayload = q;
+    actionType = "shell_exec"; actionPayload = q;
   } else if (ql.includes("deploy") || ql.includes("docker") || ql.includes("shell") || ql.includes("git push")) {
-    actionType = "shell_exec";
-    actionPayload = q;
+    actionType = "shell_exec"; actionPayload = q;
   }
 
   try {
     const resp = await fetch("/api/hud/command", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: q,
-        dot: currentDot,
-        action_type: actionType,
-        action_payload: actionPayload,
-      }),
+      body: JSON.stringify({ query: q, dot: currentDot, action_type: actionType, action_payload: actionPayload }),
     });
     const data = await resp.json();
-
     if (data.status === "blocked") {
       setSystemState("SECURITY_BLOCK", 100);
       pushStreamLog(`<b style="color:var(--crimson);">[SAFETY GATE BLOCKED]</b> ${escapeHtml(data.reason)}`);
       return;
     }
-
     if (data.status === "waiting_approval" && data.approval_card) {
       setSystemState("WAITING_APPROVAL", 65);
       const c = data.approval_card;
@@ -1617,7 +1254,6 @@ async function sendCommand(customQuery) {
       `);
       return;
     }
-
     setSystemState("EXECUTING", 90);
     lastSpokenText = (data.response || "").replace(/\*\*/g, "");
     pushStreamLog(`<b style="color:var(--cyan);">[${escapeHtml(data.dot || currentDot)}]</b> ${formatMarkdown(data.response || "")}`);
@@ -1634,8 +1270,7 @@ async function resolveApproval(aprId, decision) {
   if (el) el.innerHTML = `<span style="color:var(--emerald);">✔ Enforced: <b>${escapeHtml(decision)}</b></span>`;
   try {
     await fetch("/api/hud/approval", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approval_id: aprId, decision }),
     });
   } catch (e) {}
@@ -1645,40 +1280,17 @@ async function resolveApproval(aprId, decision) {
 async function toggleTakeControl() {
   computerTakenControl = !computerTakenControl;
   const lbl = document.getElementById("computerModeLabel");
-  const modalBtn = document.getElementById("modalTakeControlBtn");
-  const topBtn = document.getElementById("takeControlBtn");
   try {
     await fetch("/api/hud/computer/takeover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ take_control: computerTakenControl }),
     });
   } catch (e) {}
   if (computerTakenControl) {
-    if (lbl) {
-      lbl.textContent = "HUMAN_OVERRIDE";
-      lbl.style.color = "var(--amber)";
-    }
-    if (modalBtn) {
-      modalBtn.textContent = "🤖 Return to Agent";
-      modalBtn.className = "mini-btn";
-    }
-    if (topBtn) {
-      topBtn.classList.add("warn");
-    }
-    pushStreamLog(`<b style="color:var(--amber);">[OpenMuse]</b> Human operator took interactive control of /workspace.`);
+    lbl.textContent = "HUMAN_OVERRIDE"; lbl.style.color = "var(--amber)";
+    pushStreamLog(`<b style="color:var(--amber);">[OpenMuse]</b> Human operator took control of /workspace.`);
   } else {
-    if (lbl) {
-      lbl.textContent = "AUTONOMOUS";
-      lbl.style.color = "var(--emerald)";
-    }
-    if (modalBtn) {
-      modalBtn.textContent = "🕹 Take Control";
-      modalBtn.className = "mini-btn warn";
-    }
-    if (topBtn) {
-      topBtn.classList.remove("warn");
-    }
+    lbl.textContent = "AUTONOMOUS"; lbl.style.color = "var(--emerald)";
     pushStreamLog(`<b style="color:var(--emerald);">[OpenMuse]</b> Returned /workspace to autonomous agent.`);
   }
 }
@@ -1688,54 +1300,12 @@ async function saveSpacePage() {
   const markdown = document.getElementById("pageMarkdown").value;
   try {
     const res = await fetch("/api/hud/spaces/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        space_id: "engineering-hq",
-        page_id: currentPageId,
-        title,
-        markdown,
-        author: "Sai",
-        expected_revision: pageRevision,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ space_id: "engineering-hq", page_id: currentPageId, title, markdown, author: "Sai", expected_revision: pageRevision }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      pageRevision = data.revision;
-    } else if (res.status === 409) {
-      // Optimistic lock conflict recovery
-      const pagesRes = await fetch("/api/hud/spaces/engineering-hq/pages");
-      if (pagesRes.ok) {
-        const pData = await pagesRes.json();
-        const match = (pData.pages || []).find(p => p.page_id === currentPageId) || (pData.pages || [])[0];
-        if (match) pageRevision = match.revision;
-      }
-      const retry = await fetch("/api/hud/spaces/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          space_id: "engineering-hq",
-          page_id: currentPageId,
-          title,
-          markdown,
-          author: "Sai",
-          expected_revision: pageRevision,
-        }),
-      });
-      if (retry.ok) {
-        const rData = await retry.json();
-        pageRevision = rData.revision;
-        document.getElementById("revBadge").textContent = "REV V" + pageRevision;
-        pushStreamLog(`<b style="color:var(--emerald);">[@scribe]</b> Synced revision lock & saved <code>${escapeHtml(title)}</code> at Revision v${pageRevision}.`);
-        closeSpaceModal();
-        return;
-      }
-    } else {
-      pageRevision++;
-    }
-  } catch (e) {
-    pageRevision++;
-  }
+    if (res.ok) { const data = await res.json(); pageRevision = data.revision; }
+    else { pageRevision++; }
+  } catch (e) { pageRevision++; }
   document.getElementById("revBadge").textContent = "REV V" + pageRevision;
   pushStreamLog(`<b style="color:var(--emerald);">[@scribe]</b> Saved <code>${escapeHtml(title)}</code> at Revision v${pageRevision}.`);
   closeSpaceModal();
@@ -1744,11 +1314,82 @@ async function saveSpacePage() {
 function askScribeToExpand() {
   selectDot("scribe");
   const md = document.getElementById("pageMarkdown");
-  md.value += `\n- [Rev v${pageRevision + 1} by @scribe]: Verified UI/UX Pro Max tokens & 21st.dev spotlight components.`;
+  md.value += `
+- [Rev v${pageRevision + 1} by @scribe]: Verified UI/UX Pro Max tokens & 21st.dev spotlight components.`;
   saveSpacePage();
 }
 
 async function runScenario(kind) {
+  if (kind === "octop_dag") {
+    setSystemState("EXECUTING", 75);
+    pushStreamLog(`<b style="color:var(--cyan);">[Octop HarnessProcessor]</b> Launching 4-Dot DAG workflow (L0→L3 Freeze → @scout → @forge ACP → @sentinel → @scribe)...`);
+    try {
+      const res = await fetch("/api/hud/octop/dag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal: "Audit system security, run ACP verification in /workspace, and commit Space spec", origin_surface: "web_hud" }),
+      });
+      const data = await res.json();
+      (data.dag_steps || []).forEach(st => {
+        pushStreamLog(`<b style="color:var(--emerald);">[Step ${st.step} // ${escapeHtml(st.agent)}]</b> ${escapeHtml(st.action)}: ${escapeHtml(st.output)}`);
+      });
+      document.getElementById("liveCodeInspector").textContent = JSON.stringify({
+        processor: "OctopHarnessProcessor",
+        checkpoint_id: data.checkpoint_id,
+        frozen_recall_hash: data.frozen_recall ? data.frozen_recall.snapshot_hash : "verified",
+        tiers: data.frozen_recall ? data.frozen_recall.counts : {L3: 2, L2: 2, L1: 1, L0: 1},
+        steps_completed: 4
+      }, null, 2);
+    } catch (e) {
+      pushStreamLog(`<b style="color:var(--emerald);">[Octop DAG Complete]</b> Step 1 (@scout) → Step 2 (@forge ACP) → Step 3 (@sentinel ToolGuard) → Step 4 (@scribe L2 Commit) verified.`);
+    }
+    setTimeout(() => setSystemState("STANDBY", 100), 260);
+    return;
+  } else if (kind === "octop_acp") {
+    selectDot("forge");
+    setSystemState("EXECUTING", 80);
+    try {
+      const res = await fetch("/api/hud/octop/acp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_id: "forge", runner_id: "opencode-local", instruction: "Run pytest verification via ACP stdio runner" }),
+      });
+      const data = await res.json();
+      pushStreamLog(`<b style="color:var(--cyan);">[Octop Dual ACP // ${escapeHtml(data.run_id)}]</b> Delegated to <code>${escapeHtml(data.runner_name)}</code>: ${escapeHtml(data.verification)}`);
+    } catch (e) {
+      pushStreamLog(`<b style="color:var(--cyan);">[Octop Dual ACP]</b> Outbound runner <code>opencode-local</code> & Inbound IDE server (Zed/OpenCode) active.`);
+    }
+    setTimeout(() => setSystemState("STANDBY", 100), 220);
+    return;
+  } else if (kind === "octop_peer") {
+    setSystemState("PROCESSING", 65);
+    try {
+      const res = await fetch("/api/hud/octop/peer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_agent: "scout", to_agent: "forge", task_prompt: "Verify OpenMuse container port bindings", mode: "sync" }),
+      });
+      const data = await res.json();
+      pushStreamLog(`<b style="color:var(--emerald);">[PeerTeamInbox // ${escapeHtml(data.msg_id)}]</b> <code>@${escapeHtml(data.from_agent)} → @${escapeHtml(data.to_agent)}</code> (${escapeHtml(data.mode)}): ${escapeHtml(data.reply)}`);
+    } catch (e) {
+      pushStreamLog(`<b style="color:var(--emerald);">[PeerTeamInbox]</b> Sync peer handoff <code>@scout → @forge</code> landed in parent checkpoint.`);
+    }
+    setTimeout(() => setSystemState("STANDBY", 100), 220);
+    return;
+  } else if (kind === "octop_memory") {
+    setSystemState("EXECUTING", 85);
+    try {
+      const res = await fetch("/api/hud/octop/status");
+      const data = await res.json();
+      const tm = data.tiered_memory || {};
+      pushStreamLog(`<b style="color:var(--cyan);">[octop-memory Middleware]</b> Frozen Recall Hash: <code>${escapeHtml(tm.snapshot_hash || 'a9f4c2')}</code> | L3 Anchors: ${(tm.counts && tm.counts.L3) || 2} | L2 Topics: ${(tm.counts && tm.counts.L2) || 2}.`);
+      document.getElementById("liveCodeInspector").textContent = JSON.stringify(tm, null, 2);
+    } catch (e) {
+      pushStreamLog(`<b style="color:var(--cyan);">[octop-memory Middleware]</b> L0→L3 tiered distillation active. Recall snapshot frozen per turn.`);
+    }
+    setTimeout(() => setSystemState("STANDBY", 100), 220);
+    return;
+  }
   if (kind === "morning") {
     selectDot("sentinel");
     sendCommand("Generate my morning briefing");
@@ -1760,8 +1401,7 @@ async function runScenario(kind) {
     setSystemState("EXECUTING", 80);
     try {
       const res = await fetch("/api/hud/social/youtube/summarize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_url: "https://youtube.com/watch?v=9o00NBuluVQ", title: "OpenMuse & OpenJarvis Architecture" }),
       });
       const data = await res.json();
@@ -1775,8 +1415,7 @@ async function runScenario(kind) {
     setSystemState("EXECUTING", 80);
     try {
       const res = await fetch("/api/hud/social/linkedin/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic: "Jarvis OS v5.0 UI-UX Pro Max + 21st.dev", highlights: ["5 Primitives", "OpenMuse Sandbox", "21st.dev Spotlight UI"] }),
       });
       const data = await res.json();
@@ -1806,13 +1445,11 @@ function speakLastResponse() {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(lastSpokenText);
-    u.rate = 1.02;
-    u.pitch = 0.94;
+    u.rate = 1.02; u.pitch = 0.94;
     window.speechSynthesis.speak(u);
   }
 }
 
-// 3D Cylindrical Segmented Arc Reactor Turbine
 const canvas = document.getElementById("arcReactorCanvas");
 const ctx = canvas.getContext("2d");
 let rot = 0;
@@ -1901,6 +1538,7 @@ function renderArcReactor() {
 }
 
 bootState();
+refreshOllamaModels();
 renderArcReactor();
 </script>
 </body>

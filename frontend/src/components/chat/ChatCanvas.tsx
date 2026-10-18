@@ -258,8 +258,8 @@ export const ChatCanvas: React.FC = () => {
       )}
 
       {/* Input Deck */}
-      <div className="pt-2 select-none">
-        <div className="glass-panel rounded-glass-xl border-os-border-glass p-2 shadow-2xl flex items-center gap-2">
+      <div className="pt-2">
+        <div className="glass-panel bg-os-input rounded-glass-xl border-os-border-glass p-2 shadow-2xl flex items-center gap-2 focus-within:ring-2 focus-within:ring-os-focus focus-within:ring-offset-2 focus-within:ring-offset-os-bg">
           <button
             onClick={toggleVoice}
             className={`btn-press p-2.5 rounded-glass-md transition-all ${
@@ -284,7 +284,7 @@ export const ChatCanvas: React.FC = () => {
               }
             }}
             placeholder="Ask OS anything or direct an action (e.g., 'Schedule meeting with Alex at 3pm')..."
-            className="flex-1 bg-transparent px-2 text-xs md:text-sm text-os-primary placeholder:text-os-muted focus:outline-none"
+            className="flex-1 select-text bg-transparent px-2 text-xs md:text-sm text-os-primary caret-os-accent placeholder:text-os-placeholder focus:outline-none"
             disabled={isStreaming}
           />
 
