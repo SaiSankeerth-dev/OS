@@ -7,8 +7,7 @@ import {
   Moon,
   ShieldAlert,
   Cpu,
-  CheckCircle2,
-  AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useVoice } from '../../context/VoiceContext';
@@ -16,6 +15,7 @@ import { AmbientOrb } from '../orb/AmbientOrb';
 
 export const Topbar: React.FC = () => {
   const {
+    currentView,
     me,
     theme,
     toggleTheme,
@@ -27,11 +27,46 @@ export const Topbar: React.FC = () => {
   } = useApp();
 
   const { isVoiceActive, toggleVoice } = useVoice();
+  const getViewBreadcrumb = () => {
+    switch (currentView) {
+      case 'home':
+      case 'overview':
+        return 'Overview';
+      case 'chat':
+        return 'Ask OS';
+      case 'discovery':
+        return 'Discovery / Skills & Templates';
+      case 'tasks':
+      case 'plan':
+        return 'Tasks';
+      case 'computer':
+        return 'Computer';
+      case 'connections':
+      case 'connectors':
+        return 'Connections';
+      case 'activity':
+      case 'approvals':
+        return 'Activity';
+      case 'settings':
+      case 'memory':
+      case 'agents':
+        return 'Settings';
+      default:
+        return 'Overview';
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full h-14 border-b border-os-border bg-os-bg/85 backdrop-blur-xl px-4 md:px-5 flex items-center justify-between">
-      {/* Left: Branding & Ambient Presence */}
+      {/* Left: Window Dots + Branding & Breadcrumb */}
       <div className="flex items-center gap-3">
+        {/* Apple macOS Window Control Dots */}
+        <div className="flex items-center gap-1.5 mr-1" aria-hidden="true">
+          <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-black/15 shadow-sm transition-transform hover:scale-110" />
+          <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-black/15 shadow-sm transition-transform hover:scale-110" />
+          <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-black/15 shadow-sm transition-transform hover:scale-110" />
+        </div>
+
         <div
           className="flex items-center gap-2.5 cursor-pointer group select-none"
           onClick={() => setCurrentView('home')}
@@ -39,36 +74,27 @@ export const Topbar: React.FC = () => {
           <img
             src="/static/logo.png"
             alt="OS Logo"
-            className="w-8 h-8 rounded-full object-contain filter drop-shadow-[0_0_12px_rgba(99,102,241,0.35)] transition-transform duration-200 group-hover:scale-105"
+            className="w-7 h-7 rounded-full object-contain filter drop-shadow-[0_0_12px_rgba(99,102,241,0.35)] transition-transform duration-200 group-hover:scale-105"
           />
-          <AmbientOrb state={orbState} size={28} />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base tracking-tight text-os-primary group-hover:text-indigo-400 transition-colors">
-                OS
-              </span>
-              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-os-secondary">
-                {me?.mode || 'Builder Mode'}
-              </span>
-            </div>
+          <AmbientOrb state={orbState} size={24} />
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-sm tracking-tight text-os-primary group-hover:text-indigo-400 transition-colors">
+              OS
+            </span>
+            <span className="text-os-muted text-xs">/</span>
+            <span className="text-xs font-semibold text-os-secondary">
+              {getViewBreadcrumb()}
+            </span>
           </div>
         </div>
 
-        {/* Model & Network Status Pill */}
-        <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-os-border text-xs">
-          <div className="flex items-center gap-1.5 text-os-secondary">
-            {me?.model_ok ? (
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-            ) : (
-              <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-            )}
-            <span className="font-mono text-[11px] text-os-muted">
-              {me?.model || 'Ollama Connected'}
-            </span>
-          </div>
+        {/* Model status is informational: routing is configured in Settings. */}
+        <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-os-border/60 text-xs" title={me?.model_ok ? 'Configured model is responding' : 'No responding model is currently available'}>
+          <span className={`h-2 w-2 rounded-full ${me?.model_ok ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden="true" />
+          <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-300" aria-hidden="true" />
+          <span className="max-w-36 truncate font-semibold text-[11px] text-os-primary">
+            {me?.model || 'No model configured'}
+          </span>
         </div>
       </div>
 
@@ -80,7 +106,7 @@ export const Topbar: React.FC = () => {
         >
           <div className="flex items-center gap-2">
             <Search className="w-3.5 h-3.5 text-os-muted group-hover:text-os-primary transition-colors" />
-            <span>Search tasks, plans, tools, or ask OS...</span>
+            <span>Search or ask OS...</span>
           </div>
           <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-black/20 border border-white/10 text-[10px] font-mono text-os-muted">
             <span>⌘</span>K
@@ -139,7 +165,7 @@ export const Topbar: React.FC = () => {
 
         {/* User Pill */}
         <div className="flex items-center gap-2 pl-2 border-l border-os-border">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-black select-none">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-black select-none shadow-sm">
             {me?.name ? me.name.charAt(0).toUpperCase() : 'S'}
           </div>
         </div>

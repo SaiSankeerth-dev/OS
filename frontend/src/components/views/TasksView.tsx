@@ -12,6 +12,11 @@ import {
   ArrowUpRight,
   Sparkles,
   ChevronRight,
+  Bot,
+  User,
+  Search,
+  X,
+  Check,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Commitment, Task, DailyPlan, PlanItem } from '../../types/api';
@@ -20,6 +25,23 @@ import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { useApp } from '../../context/AppContext';
+
+const getTaskCategory = (task: Task): { label: string; color: string } => {
+  const text = `${task.title} ${task.description || ''}`.toLowerCase();
+  if (text.includes('research') || text.includes('search') || text.includes('review') || text.includes('analyze')) {
+    return { label: 'Research', color: 'bg-blue-500/15 text-blue-500 border-blue-500/30' };
+  }
+  if (text.includes('code') || text.includes('build') || text.includes('bug') || text.includes('fix') || text.includes('git') || text.includes('api')) {
+    return { label: 'Development', color: 'bg-cyan-500/15 text-cyan-500 border-cyan-500/30' };
+  }
+  if (text.includes('email') || text.includes('sync') || text.includes('cron') || text.includes('docker') || text.includes('schedule')) {
+    return { label: 'Automation', color: 'bg-amber-500/15 text-amber-500 border-amber-500/30' };
+  }
+  if (text.includes('write') || text.includes('doc') || text.includes('report') || text.includes('post')) {
+    return { label: 'Writing', color: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' };
+  }
+  return { label: 'General', color: 'bg-slate-500/15 text-slate-400 border-slate-500/30' };
+};
 
 interface TasksViewProps {
   initialTab?: 'tasks' | 'plan' | 'commitments';
@@ -37,6 +59,9 @@ export const TasksView: React.FC<TasksViewProps> = ({ initialTab = 'tasks' }) =>
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'scheduled'>('all');
+  const [taskSearch, setTaskSearch] = useState('');
 
   // New item modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -142,6 +167,25 @@ export const TasksView: React.FC<TasksViewProps> = ({ initialTab = 'tasks' }) =>
     }
   };
 
+  const filteredTasks = tasks.filter((t) => {
+    const isDone = t.status === 'DONE';
+    const matchesFilter =
+      filterStatus === 'all'
+        ? true
+        : filterStatus === 'active'
+        ? !isDone
+        : filterStatus === 'completed'
+        ? isDone
+        : filterStatus === 'scheduled'
+        ? !!t.deadline
+        : true;
+    const matchesSearch =
+      !taskSearch ||
+      t.title.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      (t.description && t.description.toLowerCase().includes(taskSearch.toLowerCase()));
+    return matchesFilter && matchesSearch;
+  });
+
   return (
     <div className="max-w-6xl mx-auto w-full px-4 md:px-8 py-6 space-y-6 animate-in fade-in duration-200">
       {/* Top Header */}
@@ -223,73 +267,185 @@ export const TasksView: React.FC<TasksViewProps> = ({ initialTab = 'tasks' }) =>
         </button>
       </div>
 
-      {/* Tab 1: All Tasks */}
+      {/* Tab 1: All Tasks (Master Reference Panel 4) */}
       {activeTab === 'tasks' && (
-        <div className="space-y-2.5">
-          {tasks.length === 0 ? (
-            <GlassCard className="p-12 text-center text-xs text-os-muted">
-              No tasks currently tracked in execution pool. Click "New Task" to create one.
-            </GlassCard>
-          ) : (
-            tasks.map((t) => {
-              const isDone = t.status === 'DONE';
-              return (
-                <GlassCard
-                  key={t.id}
-                  className={`p-4 flex items-center justify-between transition-all ${
-                    isDone ? 'opacity-60 bg-os-surface/40' : 'hover:border-os-border-glass'
+        <div className="space-y-4">
+          {/* Filter Pills & Task Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {[
+                { id: 'all', label: `All (${tasks.length})` },
+                { id: 'active', label: `Active (${tasks.filter((t) => t.status !== 'DONE').length})` },
+                { id: 'completed', label: `Completed (${tasks.filter((t) => t.status === 'DONE').length})` },
+                { id: 'scheduled', label: `Scheduled (${tasks.filter((t) => !!t.deadline).length})` },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  onClick={() => setFilterStatus(pill.id as any)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    filterStatus === pill.id
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-os-surface hover:bg-os-surface-active text-os-secondary hover:text-os-primary border border-os-border'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={async () => {
-                        if (!isDone) {
-                          try {
-                            await api.completeTask(String(t.id));
-                            addNotification({
-                              type: 'success',
-                              title: 'Task Done',
-                              message: 'Completion recorded with verification proof.',
-                            });
-                            fetchData();
-                          } catch (err: any) {
-                            addNotification({
-                              type: 'error',
-                              title: 'Failed',
-                              message: err.message,
-                            });
-                          }
-                        }
-                      }}
-                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
-                        isDone
-                          ? 'bg-emerald-500 border-emerald-500 text-black'
-                          : 'border-os-border hover:border-emerald-400 text-transparent'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    </button>
-                    <div>
-                      <div
-                        className={`text-xs md:text-sm font-medium ${
-                          isDone ? 'line-through text-os-muted' : 'text-os-primary'
-                        }`}
-                      >
-                        {t.title}
-                      </div>
-                      <div className="text-[10px] font-mono text-os-muted mt-0.5">
-                        Duration: {t.estimated_duration_minutes || 60}m · Priority: {t.priority || 50}
-                        {t.deadline && ` · Due: ${new Date(t.deadline).toLocaleDateString()}`}
-                      </div>
-                    </div>
-                  </div>
+                  {pill.label}
+                </button>
+              ))}
+            </div>
 
-                  <Badge variant={isDone ? 'neutral' : 'cyan'} size="sm">
-                    {t.status}
-                  </Badge>
-                </GlassCard>
-              );
-            })
+            <div className="flex items-center gap-2 bg-os-surface px-3 py-1.5 rounded-xl border border-os-border focus-within:border-blue-500/50 w-full sm:w-64 shadow-sm">
+              <Search className="w-3.5 h-3.5 text-os-muted flex-shrink-0" />
+              <input
+                type="text"
+                value={taskSearch}
+                onChange={(e) => setTaskSearch(e.target.value)}
+                placeholder="Search tasks..."
+                className="w-full bg-transparent text-xs text-os-primary placeholder-os-muted focus:outline-none"
+              />
+              {taskSearch && (
+                <button onClick={() => setTaskSearch('')} className="text-os-muted hover:text-os-primary">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Master Reference Tasks Table */}
+          {filteredTasks.length === 0 ? (
+            <div className="p-12 text-center text-xs text-os-muted rounded-2xl bg-os-surface border border-os-border space-y-2">
+              <CheckSquare className="w-8 h-8 mx-auto text-os-muted/50" />
+              <p>No tasks match the selected filter.</p>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsModalOpen(true)}
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+              >
+                Create New Task
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-os-border bg-os-surface overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-os-surface-active/60 border-b border-os-border/60 text-[10px] font-mono uppercase tracking-wider text-os-muted">
+                    <tr>
+                      <th className="py-3 px-4 font-semibold">Task Name</th>
+                      <th className="py-3 px-4 font-semibold">Status</th>
+                      <th className="py-3 px-4 font-semibold">Category</th>
+                      <th className="py-3 px-4 font-semibold">Assignee</th>
+                      <th className="py-3 px-4 font-semibold">Due Date</th>
+                      <th className="py-3 px-4 text-right font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-os-border/40">
+                    {filteredTasks.map((t) => {
+                      const isDone = t.status === 'DONE';
+                      const category = getTaskCategory(t);
+                      return (
+                        <tr key={t.id} className="hover:bg-os-surface-active/30 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    if (!isDone) {
+                                      await api.completeTask(String(t.id));
+                                      addNotification({
+                                        type: 'success',
+                                        title: 'Task Done',
+                                        message: 'Completion recorded with verification proof.',
+                                      });
+                                    }
+                                    fetchData();
+                                  } catch (err: any) {
+                                    addNotification({
+                                      type: 'error',
+                                      title: 'Action Failed',
+                                      message: err.message,
+                                    });
+                                  }
+                                }}
+                                className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors flex-shrink-0 ${
+                                  isDone
+                                    ? 'bg-emerald-500 border-emerald-500 text-black'
+                                    : 'border-os-border hover:border-emerald-400 text-transparent'
+                                }`}
+                                title={isDone ? 'Task completed' : 'Mark complete'}
+                              >
+                                <Check className="w-3 h-3 stroke-[3]" />
+                              </button>
+                              <div className="min-w-0">
+                                <div className={`font-semibold text-xs ${isDone ? 'line-through text-os-muted' : 'text-os-primary'}`}>
+                                  {t.title}
+                                </div>
+                                {t.description && (
+                                  <div className="text-[11px] text-os-muted line-clamp-1 mt-0.5">
+                                    {t.description}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                              isDone
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-blue-400 animate-pulse'}`} />
+                              {isDone ? 'Completed' : 'In Progress'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${category.color}`}>
+                              {category.label}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
+                                AI
+                              </div>
+                              <span className="text-[11px] text-os-secondary font-medium">OS Agent</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap text-os-secondary font-mono text-[11px]">
+                            {t.deadline ? new Date(t.deadline).toLocaleDateString() : 'Today'}
+                          </td>
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  if (!isDone) {
+                                    await api.completeTask(String(t.id));
+                                    addNotification({
+                                      type: 'success',
+                                      title: 'Task Done',
+                                      message: 'Completion recorded with verification proof.',
+                                    });
+                                  }
+                                  fetchData();
+                                } catch (err: any) {
+                                  addNotification({
+                                    type: 'error',
+                                    title: 'Action Failed',
+                                    message: err.message,
+                                  });
+                                }
+                              }}
+                              className="text-xs text-blue-500 hover:text-blue-400 font-medium px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                            >
+                              {isDone ? 'Reopen' : 'Done'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
       )}

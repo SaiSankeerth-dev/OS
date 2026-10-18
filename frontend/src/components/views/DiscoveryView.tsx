@@ -23,7 +23,13 @@ import {
   FileText,
   ChevronRight,
   ShieldAlert,
+  BarChart2,
+  Mail,
+  Folder,
+  Check,
+  Plus,
 } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -82,6 +88,102 @@ interface Candidate {
 }
 
 export const DiscoveryView: React.FC = () => {
+  const { setCurrentView } = useApp();
+  const [mainTab, setMainTab] = useState<'skills' | 'github'>('skills');
+  const [skillCategory, setSkillCategory] = useState<string>('All');
+  const [skillSearch, setSkillSearch] = useState<string>('');
+  const [installedSkills, setInstalledSkills] = useState<Record<string, boolean>>({
+    'web-research': true,
+    'data-analysis': true,
+    'report-gen': true,
+    'email-assistant': true,
+    'code-helper': true,
+    'file-ops': true,
+  });
+
+  const skillsList = [
+    {
+      id: 'web-research',
+      title: 'Web Research',
+      category: 'Research',
+      icon: Sparkles,
+      color: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+      badgeClass: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
+      description: 'Deep search the web, synthesize findings, extract tables, and cite verified sources.',
+      prompt: 'Perform in-depth web research and comparative analysis on ',
+    },
+    {
+      id: 'data-analysis',
+      title: 'Data Analysis',
+      category: 'Data',
+      icon: BarChart2,
+      color: 'text-purple-500 bg-purple-500/10 border-purple-500/20',
+      badgeClass: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
+      description: 'Analyze CSV, JSON, and tabular datasets, generate statistical summaries, and produce visual charts.',
+      prompt: 'Analyze this dataset, calculate summary statistics, and generate key insights: ',
+    },
+    {
+      id: 'report-gen',
+      title: 'Report Generation',
+      category: 'Writing',
+      icon: FileText,
+      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+      badgeClass: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+      description: 'Synthesize multi-source documents, meeting notes, and research into polished Markdown and PDF reports.',
+      prompt: 'Generate an executive summary and detailed strategic report on ',
+    },
+    {
+      id: 'email-assistant',
+      title: 'Email Assistant',
+      category: 'Automation',
+      icon: Mail,
+      color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+      badgeClass: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+      description: 'Draft, triage, and review emails with human approval gating via Gmail and Outlook adapters.',
+      prompt: 'Review unread high-priority emails, summarize urgent action items, and draft replies.',
+    },
+    {
+      id: 'code-helper',
+      title: 'Code Helper',
+      category: 'Development',
+      icon: Code2,
+      color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20',
+      badgeClass: 'bg-cyan-500/15 text-cyan-500 border-cyan-500/30',
+      description: 'Explain, refactor, write tests, and inspect codebases within the OpenCode sandbox workspace.',
+      prompt: 'Review code in this workspace, write comprehensive tests, and explain the architecture.',
+    },
+    {
+      id: 'file-ops',
+      title: 'File Operations',
+      category: 'Automation',
+      icon: Folder,
+      color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+      badgeClass: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
+      description: 'Organize, convert, extract archives, and manage workspace files safely within /workspace.',
+      prompt: 'Inspect files in /workspace, summarize the directory tree, and clean temporary files.',
+    },
+  ];
+
+  const handleRunSkill = (skill: typeof skillsList[0]) => {
+    try {
+      sessionStorage.setItem('os-pending-query', skill.prompt);
+    } catch (_) {}
+    setCurrentView('chat');
+  };
+
+  const toggleInstallSkill = (id: string) => {
+    setInstalledSkills((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const filteredSkills = skillsList.filter((s) => {
+    const matchesCategory = skillCategory === 'All' || s.category === skillCategory;
+    const matchesSearch =
+      !skillSearch ||
+      s.title.toLowerCase().includes(skillSearch.toLowerCase()) ||
+      s.description.toLowerCase().includes(skillSearch.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'high_priority' | 'qualified' | 'evaluated'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -226,47 +328,197 @@ export const DiscoveryView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 space-y-6 animate-in fade-in duration-200">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-os-border/50">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-cyan-500 dark:text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Compass className="w-3.5 h-3.5" /> Open-Source Intelligence
-            </span>
-            <span className="h-1 w-1 rounded-full bg-cyan-400"></span>
-            <span className="text-xs text-os-secondary">Early-Signal Detection & Virtual Lab</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-os-primary tracking-tight mt-1">
-            Proactive Repository Discovery
-          </h1>
-          <p className="text-xs md:text-sm text-os-secondary mt-0.5 max-w-2xl">
-            Detects high-momentum AI tools, MCP servers, and agent skills before they peak. Evaluates real engineering quality and tests candidates in isolated virtual labs.
-          </p>
+      {/* Top Segmented Mode Selector: Skills & Templates vs Repository Discovery */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-os-border/50">
+        <div className="inline-flex items-center p-1 rounded-xl bg-os-surface border border-os-border shadow-inner gap-1">
+          <button
+            onClick={() => setMainTab('skills')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              mainTab === 'skills'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-os-secondary hover:text-os-primary'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Skills & Templates</span>
+          </button>
+          <button
+            onClick={() => setMainTab('github')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              mainTab === 'github'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-os-secondary hover:text-os-primary'
+            }`}
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>GitHub Intelligence ({candidates.length})</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="glass"
-            size="sm"
-            onClick={handleScanNow}
-            isLoading={isScanning}
-            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-          >
-            Scan GitHub
-          </Button>
-          <Button
-            variant="glass"
-            size="sm"
-            onClick={() => setSettingsOpen(true)}
-            leftIcon={<Settings className="w-3.5 h-3.5" />}
-          >
-            Settings
-          </Button>
-        </div>
+        {mainTab === 'github' && (
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={handleScanNow}
+              isLoading={isScanning}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Scan GitHub
+            </Button>
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={() => setSettingsOpen(true)}
+              leftIcon={<Settings className="w-3.5 h-3.5" />}
+            >
+              Settings
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Filter Tabs & Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {mainTab === 'skills' ? (
+        /* Panel 3: Skills & Templates Catalog */
+        <div className="space-y-6">
+          {/* Top Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-os-primary tracking-tight">
+                Skills & Agent Templates
+              </h1>
+              <p className="text-xs text-os-secondary mt-0.5">
+                Extend OS with specialized capabilities, automated tools, and domain skills
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-os-surface px-3.5 py-2 rounded-xl border border-os-border focus-within:border-blue-500/50 w-full sm:w-80 shadow-sm transition-all">
+              <Search className="w-4 h-4 text-os-muted flex-shrink-0" />
+              <input
+                type="text"
+                value={skillSearch}
+                onChange={(e) => setSkillSearch(e.target.value)}
+                placeholder="Search skills, tools, and integrations..."
+                className="w-full bg-transparent text-xs text-os-primary placeholder-os-muted focus:outline-none"
+              />
+              {skillSearch && (
+                <button onClick={() => setSkillSearch('')} className="text-os-muted hover:text-os-primary">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 7 Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {['All', 'Research', 'Development', 'Automation', 'Writing', 'Data', 'Integrations'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSkillCategory(cat)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  skillCategory === cat
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-os-surface hover:bg-os-surface-active text-os-secondary hover:text-os-primary border border-os-border'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* 6 Skill Cards Responsive Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredSkills.map((skill) => {
+              const Icon = skill.icon;
+              const isInstalled = installedSkills[skill.id];
+
+              return (
+                <div
+                  key={skill.id}
+                  className="p-5 rounded-2xl bg-os-surface border border-os-border hover:border-blue-500/30 transition-all shadow-sm flex flex-col justify-between space-y-4 group"
+                >
+                  <div className="space-y-3">
+                    {/* Top Row: Category Pill + Icon */}
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${skill.badgeClass}`}>
+                        {skill.category}
+                      </span>
+                      <div className={`p-2.5 rounded-xl border ${skill.color}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-bold text-os-primary group-hover:text-blue-500 transition-colors">
+                        {skill.title}
+                      </h3>
+                      <p className="text-xs text-os-secondary mt-1.5 leading-relaxed line-clamp-3">
+                        {skill.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row Actions: [Add/Installed] & [Run] */}
+                  <div className="flex items-center justify-between pt-2 border-t border-os-border/40">
+                    <button
+                      onClick={() => toggleInstallSkill(skill.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        isInstalled
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : 'bg-white/5 hover:bg-white/10 text-os-secondary border border-os-border'
+                      }`}
+                    >
+                      {isInstalled ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add</span>
+                        </>
+                      )}
+                    </button>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleRunSkill(skill)}
+                      leftIcon={<Play className="w-3 h-3 fill-current" />}
+                    >
+                      Run Skill
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* GitHub Repository Intelligence Subview */
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-os-border/50">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-cyan-500 dark:text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5" /> Open-Source Intelligence
+                </span>
+                <span className="h-1 w-1 rounded-full bg-cyan-400"></span>
+                <span className="text-xs text-os-secondary">Early-Signal Detection & Virtual Lab</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold text-os-primary tracking-tight mt-1">
+                Proactive Repository Discovery
+              </h1>
+              <p className="text-xs md:text-sm text-os-secondary mt-0.5 max-w-2xl">
+                Detects high-momentum AI tools, MCP servers, and agent skills before they peak. Evaluates real engineering quality and tests candidates in isolated virtual labs.
+              </p>
+            </div>
+          </div>
+
+          {/* Filter Tabs & Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 bg-os-surface/60 p-1 rounded-glass-md border border-os-border/50 overflow-x-auto">
           <button
             onClick={() => setActiveTab('all')}
@@ -488,6 +740,8 @@ export const DiscoveryView: React.FC = () => {
               </GlassCard>
             );
           })}
+        </div>
+      )}
         </div>
       )}
 

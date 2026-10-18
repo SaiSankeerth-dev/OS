@@ -1,6 +1,7 @@
 export interface Task {
   id: string | number;
   title: string;
+  description?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED' | 'BLOCKED';
   priority?: number;
   estimated_duration_minutes?: number;

@@ -1,0 +1,12 @@
+{
+  "phase": "final-20261018-final-light",
+  "baseUrl": "http://127.0.0.1:3000",
+  "viewport": {
+    "width": 1536,
+    "height": 1024
+  },
+  "theme": "light",
+  "title": "OS — Your Personal AI Assistant",
+  "runtimeErrors": [],
+  "generatedAt": "2026-10-18T05:52:59.313Z"
+}

@@ -43,7 +43,7 @@ try {
   });
 
   await check('sandbox terminal command', async () => {
-    await page.getByRole('button', { name: /Sandbox Lab/ }).click();
+    await page.getByRole('button', { name: /Terminal|Sandbox Lab/ }).click();
     const command = page.getByPlaceholder('e.g. uname -a, python --version, ls -la');
     await command.fill('python --version');
     await command.press('Enter');
@@ -57,7 +57,7 @@ try {
   });
 
   await check('browser mode and fullscreen', async () => {
-    await page.getByRole('button', { name: /Native Viewport/ }).click();
+    await page.getByRole('button', { name: /Browser|Native Viewport/ }).click();
     await page.getByRole('button', { name: 'Fullscreen', exact: true }).click();
     await page.waitForTimeout(300);
     const active = await page.evaluate(() => Boolean(document.fullscreenElement));
@@ -70,10 +70,13 @@ try {
 
   await check('connections configuration dialog', async () => {
     await page.getByRole('navigation').getByRole('button', { name: 'Connections', exact: true }).click();
-    await page.getByRole('button', { name: 'Configure', exact: true }).first().click();
-    await page.waitForTimeout(300);
+    // Connections is lazy loaded and then fetches the real connector list.  Waiting for
+    // a rendered action avoids treating its initial loading state as a dialog failure.
+    const configure = page.getByRole('button', { name: 'Configure', exact: true }).first();
+    await configure.waitFor({ state: 'visible', timeout: 10000 });
+    await configure.click();
     const dialog = page.getByRole('dialog');
-    if (!(await dialog.isVisible())) throw new Error('Configure did not open a dialog.');
+    await dialog.waitFor({ state: 'visible', timeout: 10000 });
     await page.screenshot({ path: path.join(outputDir, 'connections-configure-dialog.png') });
     await page.keyboard.press('Escape');
     return 'Configure opened its dialog and dismissed with Escape.';

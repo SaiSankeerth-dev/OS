@@ -36,7 +36,12 @@ async function capture(name) {
 }
 
 async function openView(label, name) {
+  console.log(`Opening ${label}`);
   await page.getByRole('navigation').getByRole('button', { name: label, exact: true }).click();
+  // Wait for React's route-level fallback itself. Checking all document text
+  // produced false timeouts when an otherwise rendered page mentioned loading
+  // in a status message or activity record.
+  await page.getByText('Loading module...', { exact: true }).waitFor({ state: 'hidden', timeout: 10000 });
   await capture(name);
 }
 
@@ -58,7 +63,8 @@ try {
   await openView('Connections', 'connections');
   await openView('Activity', 'activity');
   await openView('Settings', 'settings');
-  await openView('Cyber HUD', 'cyber-hud');
+  // Cyber HUD remains an internal, non-primary route; it is intentionally not
+  // part of the unified eight-item navigation or the reference-page capture.
 
   const report = {
     phase,

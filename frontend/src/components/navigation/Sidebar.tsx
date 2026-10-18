@@ -34,7 +34,6 @@ export const Sidebar: React.FC = () => {
     { id: 'discovery', label: 'Discovery', icon: Compass },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
     { id: 'computer', label: 'Computer', icon: Monitor, badgeVariant: 'emerald' },
-    { id: 'hud', label: 'Cyber HUD', icon: Cpu, badgeVariant: 'cyan' },
     { id: 'connections', label: 'Connections', icon: Link2 },
     {
       id: 'activity',
@@ -58,7 +57,6 @@ export const Sidebar: React.FC = () => {
     if (id === 'discovery' && currentView === 'discovery') return true;
     if (id === 'tasks' && (currentView === 'tasks' || currentView === 'plan')) return true;
     if (id === 'computer' && currentView === 'computer') return true;
-    if (id === 'hud' && currentView === 'hud') return true;
     if (id === 'connections' && (currentView === 'connections' || currentView === 'connectors')) return true;
     if (id === 'activity' && (currentView === 'activity' || currentView === 'approvals')) return true;
     if (id === 'settings' && (currentView === 'settings' || currentView === 'memory' || currentView === 'agents')) return true;
@@ -67,11 +65,27 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className="w-16 md:w-52 border-r border-os-border bg-os-bg/55 backdrop-blur-md flex flex-col justify-between p-3 select-none flex-shrink-0">
-      {/* Navigation Links */}
-      <nav className="space-y-1.5">
-        <div className="hidden md:block px-3 py-2 text-[10px] font-mono tracking-wider uppercase text-os-muted">
-          Operating System
+      {/* Top Section: Brand + Nav */}
+      <div className="space-y-3">
+        {/* Sidebar Header Brand (as seen in Master Reference) */}
+        <div className="px-2 pt-1 pb-3 hidden md:flex items-center gap-2.5 border-b border-os-border/40">
+          <img
+            src="/static/logo.png"
+            alt="OS Logo"
+            className="w-6 h-6 rounded-full object-contain filter drop-shadow-sm"
+          />
+          <div className="flex flex-col">
+            <span className="font-extrabold text-sm tracking-tight text-os-primary leading-none">
+              OS
+            </span>
+            <span className="text-[10px] text-os-secondary leading-tight mt-0.5 font-medium">
+              Your AI Computer
+            </span>
+          </div>
         </div>
+
+        {/* Navigation Links */}
+        <nav className="space-y-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = isItemActive(item.id);
@@ -111,6 +125,7 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
+      </div>
 
       {/* Bottom Footer Details */}
       <div className="pt-4 border-t border-os-border/50 hidden md:block px-3">

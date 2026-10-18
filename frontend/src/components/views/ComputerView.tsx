@@ -1187,7 +1187,7 @@ export const ComputerView: React.FC = () => {
               }`}
             >
               <Globe className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Native Viewport</span>
+              <span>Browser</span>
               {sessionId && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               )}
@@ -1202,7 +1202,7 @@ export const ComputerView: React.FC = () => {
               }`}
             >
               <Monitor className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Linux Virtual Computer</span>
+              <span>Desktop</span>
               <span
                 className={`text-[9px] uppercase font-mono px-1.5 py-0.5 rounded border font-semibold ${
                   desktopStatus?.status === 'ready'
@@ -1214,7 +1214,7 @@ export const ComputerView: React.FC = () => {
                     : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                 }`}
               >
-                {desktopStatus?.status?.toUpperCase() || 'OFFLINE'}
+                {desktopStatus?.status?.toUpperCase() || 'READY'}
               </span>
             </button>
 
@@ -1230,9 +1230,24 @@ export const ComputerView: React.FC = () => {
               }`}
             >
               <Terminal className="w-3.5 h-3.5 text-purple-400" />
-              <span>Sandbox Lab</span>
+              <span>Terminal</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('lab');
+                setTimeout(() => {
+                  const filesEl = document.getElementById('workspace-files-card');
+                  if (filesEl) filesEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  else labSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-150"
+            >
+              <Folder className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Files</span>
               <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-slate-300">
-                {workspaceFiles.length} files
+                {workspaceFiles.length}
               </span>
             </button>
           </div>
@@ -2072,10 +2087,9 @@ export const ComputerView: React.FC = () => {
         </div>
 
         {/* Dedicated Workspace & Sandbox Lab, Task Assignment, and Approvals: Hidden in Fullscreen */}
-        {!isFullscreen && (
-          <>
+        {!isFullscreen && activeTab === 'lab' && (
+          <div ref={labSectionRef}>
             {/* Dedicated Virtual Sandbox Lab & Workspace Panel */}
-            <div ref={labSectionRef} className="scroll-mt-20">
             <GlassCard className="p-4 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-os-border/40 pb-3">
                 <div className="flex items-center gap-2.5">
@@ -2108,9 +2122,9 @@ export const ComputerView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
                 {/* Workspace File Explorer */}
-                <div className="bg-os-surface/40 border border-os-border/60 rounded-lg p-3 flex flex-col justify-between space-y-3">
+                <div className="order-2 bg-os-surface/40 border border-os-border/60 rounded-lg p-3 flex flex-col justify-between space-y-3">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between border-b border-os-border/40 pb-2">
                       <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5 font-medium">
@@ -2167,7 +2181,7 @@ export const ComputerView: React.FC = () => {
                 </div>
 
                 {/* macOS iTerm2-Inspired Sandbox Terminal Runner */}
-                <div className="bg-slate-950/90 border border-white/10 rounded-xl overflow-hidden flex flex-col justify-between shadow-lg">
+                <div className="order-1 min-h-[32rem] bg-slate-950/90 border border-white/10 rounded-xl overflow-hidden flex flex-col justify-between shadow-lg">
                   {/* Terminal Window Chrome */}
                   <div className="flex items-center justify-between px-3 py-2 bg-slate-900 border-b border-white/10 select-none">
                     <div className="flex items-center gap-1.5">
@@ -2200,6 +2214,7 @@ export const ComputerView: React.FC = () => {
                       <div className="flex-1 flex items-center bg-black/60 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-mono">
                         <span className="text-emerald-400 mr-1.5 select-none font-bold">$</span>
                         <input
+                          aria-label="Sandbox command"
                           type="text"
                           value={terminalCmd}
                           onChange={(e) => setTerminalCmd(e.target.value)}
@@ -2242,7 +2257,7 @@ export const ComputerView: React.FC = () => {
                       ))}
                     </div>
 
-                    <div className="bg-black/90 p-3 rounded-lg text-[11px] font-mono text-slate-300 max-h-36 overflow-y-auto whitespace-pre-wrap border border-white/5 leading-relaxed">
+                    <div className="bg-black/90 p-3 rounded-lg text-[11px] font-mono text-slate-300 min-h-[21rem] flex-1 overflow-y-auto whitespace-pre-wrap border border-white/5 leading-relaxed">
                       {cmdOutput ? (
                         <>
                           <div className="text-slate-500 select-none pb-1">jarvis@os-linux:~/workspace$ {terminalCmd}</div>
@@ -2262,8 +2277,12 @@ export const ComputerView: React.FC = () => {
                 </div>
               </div>
             </GlassCard>
-            </div>
+          </div>
 
+        )}
+
+        {!isFullscreen && activeTab !== 'lab' && (
+          <>
             {/* Dedicated Task-Scoped AI Execution Panel */}
             <GlassCard className="p-4 space-y-3 border-cyan-500/30 bg-cyan-500/5">
               <div className="flex items-center justify-between">

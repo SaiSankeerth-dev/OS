@@ -38,6 +38,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 _STATIC = _HERE / "static"
 _WORKSPACE = Path.home() / "workspace"
+_MODEL_READINESS_TIMEOUT_SECONDS = 5
 
 # --------------------------------------------------------------------------
 # App + engine (built once at startup, same as cli.py)
@@ -68,7 +69,12 @@ async def lifespan(app: FastAPI):
         mgr = ConversationManager(
             cfg, router, fast_router=LayaRouter(), state_store=state_store
         )
-        ok = await mgr.health()
+        # The dashboard must remain usable in local-first mode when Ollama is
+        # stopped.  A readiness probe is intentionally short; real model calls
+        # retain the configured request timeout once a user sends a message.
+        ok = await asyncio.wait_for(
+            mgr.health(), timeout=_MODEL_READINESS_TIMEOUT_SECONDS
+        )
         _engine["model_ok"] = bool(ok)
     except Exception as e:  # Ollama down etc. - dashboard still serves
         log.warning("engine degraded (no model): %s", e)
