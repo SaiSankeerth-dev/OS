@@ -85,6 +85,36 @@ def _check_system_info(data: dict) -> VerificationResult:
     return VerificationResult(True, "system fields present")
 
 
+def _check_browser(data: dict) -> VerificationResult:
+    # Batch B: browser results must carry session identity + observed
+    # state. Draft-mode interactive tools must carry the hash-bound
+    # description AND the machine-readable action (no action, no approval).
+    if not _nonempty_str(data.get("session_id")):
+        return VerificationResult(False, "browser result has no session_id")
+    action = data.get("browser_action")
+    if action is not None:
+        if not isinstance(action, dict) or not action.get("kind"):
+            return VerificationResult(False, "browser draft has no action")
+        if not _nonempty_str(data.get("draft")):
+            return VerificationResult(False, "browser draft has no description")
+        return VerificationResult(True, "browser draft with bound action")
+    if "elements" in data:
+        if not isinstance(data["elements"], list):
+            return VerificationResult(False, "browser elements not a list")
+        return VerificationResult(True, f"{len(data['elements'])} elements")
+    if "path" in data:  # screenshot
+        if not _nonempty_str(data["path"]):
+            return VerificationResult(False, "screenshot has no path")
+        return VerificationResult(True, "screenshot saved")
+    if "logs" in data:  # console
+        if not isinstance(data["logs"], list):
+            return VerificationResult(False, "console logs not a list")
+        return VerificationResult(True, "console logs present")
+    if not _nonempty_str(data.get("url")):
+        return VerificationResult(False, "browser result has no observed URL")
+    return VerificationResult(True, "browser result with session + URL")
+
+
 def _check_mcp(data: dict) -> VerificationResult:
     # MCP servers are external processes: a "success" with no payload
     # is exactly the lie this phase exists to catch.
@@ -104,6 +134,7 @@ _CONTRACTS: list[tuple[str, Any]] = [
     ("memory_forget", _check_memory_forget),
     ("get_current_datetime", _check_datetime),
     ("get_system_info", _check_system_info),
+    ("browser", _check_browser),
 ]
 
 

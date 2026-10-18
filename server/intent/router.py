@@ -151,6 +151,23 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "web_search",
     ),
     (
+        # Batch B: open a URL in a real interactive browser session.
+        # "browse to <url>". Bare "open <url>" stays on web_read below.
+        re.compile(r"^\s*browse\s+to\s+(https?://\S+)\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "browser_open",
+    ),
+    (
+        # "open <url> in the browser" - the suffix distinguishes it from
+        # web_read's bare "open <url>".
+        re.compile(
+            r"^\s*open\s+(https?://\S+?)\s+in\s+(?:the\s+)?browser\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "browser_open",
+    ),
+    (
         # Real internet: read a page. "read https://...", "open <url>".
         # Read-only; page content is data, never instructions.
         re.compile(
@@ -242,6 +259,7 @@ _TOOL_ARG = {
     "calc": "expression",
     "web_search": "query",
     "web_read": "url",
+    "browser_open": "url",
 }
 
 

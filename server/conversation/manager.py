@@ -66,6 +66,10 @@ _REJECT_ALL_RE = re.compile(
     r"^\s*(reject\s+all|no\s+to\s+all|discard\s+all)\s*[.!]?\s*$",
     re.IGNORECASE,
 )
+# Batch A: indexed decisions ("approve 2") so a bare "yes"/"no" never has to
+# guess which of several pending items the user means.
+_APPROVE_N_RE = re.compile(r"^\s*approve\s+(\d+)\s*[.!]?\s*$", re.IGNORECASE)
+_REJECT_N_RE = re.compile(r"^\s*(?:reject|cancel)\s+(\d+)\s*[.!]?\s*$", re.IGNORECASE)
 
 
 class ConversationState(str, enum.Enum):
@@ -440,7 +444,21 @@ class ConversationManager:
         # lifecycle run for APPROVE -> EXECUTE -> VERIFY -> REMEMBER.
         if supervised.needs_approval and result.status == "success":
             data = result.data or {}
-            if "draft" in data:
+            if "browser_action" in data:
+                # Batch B: interactive browser action. The draft describes
+                # the exact element + action (hash-bound); the machine
+                # readable action executes only if the user approves.
+                action = data["browser_action"]
+                draft = data.get("draft") or "Browser action"
+                pending = PendingApproval(
+                    skill=tool_name,
+                    input_text=draft,
+                    draft=draft,
+                    approved_hash=content_hash(draft),
+                    run_id=supervised.run_id,
+                    action_args=action if isinstance(action, dict) else {},
+                )
+            elif "draft" in data:
                 # Drafting skill with external effects (linkedin): stash
                 # the draft and wait for the next turn's approve/reject.
                 draft = data["draft"]
@@ -688,6 +706,25 @@ class ConversationManager:
                 "That changed since I showed it - I won't approve "
                 "something you didn't actually see. Ask me to do it again."
             )
+        if pending.action_args:
+            # Batch B: an approved browser action. Execute it for real and
+            # report the observed page state - never a bare "done".
+            def _run_browser_action() -> str:
+                from web.om.browser import get_browser
+                from server.tools.browser_tool import (
+                    format_browser_action_result,
+                )
+
+                res = get_browser().perform_action(pending.action_args)
+                self._approval_store.log(
+                    pending.skill, pending.input_text, str(res), "EXECUTED",
+                )
+                return format_browser_action_result(pending.action_args, res)
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, pending.skill, _run_browser_action
+            )
+            return completed.message
         if pending.skill == "linkedin":
             # STUB: no LinkedIn connector configured yet. Replace
             # this branch with a real publish call when one exists -
@@ -736,9 +773,28 @@ class ConversationManager:
             return "Okay, discarded. Nothing was posted."
         return "Okay, discarded."
 
+    def _pending_list(self) -> str:
+        """One-line-per-item summary so the user can pick by number."""
+        lines = []
+        for i, p in enumerate(self._pending):
+            brief = (p.input_text or p.draft or "").strip().replace("\n", " ")
+            lines.append(f"{i + 1}. [{p.skill}] {brief[:70]}")
+        return "\n".join(lines)
+
+    def _ambiguous_multi(self, verb: str) -> str:
+        return (
+            "You've got several things waiting for approval - "
+            "I won't guess which one you mean.\n"
+            + self._pending_list()
+            + f"\n\nSay '{verb} 2' (the number), or '{verb} all'."
+        )
+
     async def _handle_pending_approval(self, user_text: str):
-        # Phase 10: the queue. Approve/reject act on the oldest item;
-        # "approve all" / "reject all" drain the whole queue in order.
+        # Phase 10: the queue. Approve/reject act on the oldest item only
+        # when it is the SOLE pending item; a bare "yes"/"no" with several
+        # waiting refuses to guess and asks the user to pick by number.
+        # "approve all" / "reject all" / "approve N" / "reject N" drain or
+        # pick explicitly.
         self._prune_expired()
         if not self._pending:
             text = (
@@ -756,26 +812,60 @@ class ConversationManager:
             while self._pending:
                 parts.append(await self._approve_one(self._pending.pop(0)))
             text = "\n\n".join(parts)
+        elif _APPROVE_N_RE.match(user_text):
+            idx = int(_APPROVE_N_RE.match(user_text).group(1)) - 1
+            if 0 <= idx < len(self._pending):
+                text = await self._approve_one(self._pending.pop(idx))
+                if self._pending:
+                    text += f"\n\n({len(self._pending)} more waiting.)"
+            else:
+                text = (
+                    f"There's no item {idx + 1} - "
+                    f"{len(self._pending)} waiting:\n{self._pending_list()}"
+                )
         elif _APPROVE_RE.match(user_text):
-            text = await self._approve_one(self._pending.pop(0))
-            if self._pending:
-                text += f"\n\n({len(self._pending)} more waiting.)"
+            if len(self._pending) > 1:
+                text = self._ambiguous_multi("approve")
+            else:
+                text = await self._approve_one(self._pending.pop(0))
+                if self._pending:
+                    text += f"\n\n({len(self._pending)} more waiting.)"
         elif _REJECT_ALL_RE.match(user_text):
             parts = []
             while self._pending:
                 parts.append(self._reject_one(self._pending.pop(0)))
             text = "\n\n".join(parts)
+        elif _REJECT_N_RE.match(user_text):
+            idx = int(_REJECT_N_RE.match(user_text).group(1)) - 1
+            if 0 <= idx < len(self._pending):
+                text = self._reject_one(self._pending.pop(idx))
+                if self._pending:
+                    text += f"\n\n({len(self._pending)} more waiting.)"
+            else:
+                text = (
+                    f"There's no item {idx + 1} - "
+                    f"{len(self._pending)} waiting:\n{self._pending_list()}"
+                )
         elif _REJECT_RE.match(user_text):
-            text = self._reject_one(self._pending.pop(0))
-            if self._pending:
-                text += f"\n\n({len(self._pending)} more waiting.)"
+            if len(self._pending) > 1:
+                text = self._ambiguous_multi("reject")
+            else:
+                text = self._reject_one(self._pending.pop(0))
+                if self._pending:
+                    text += f"\n\n({len(self._pending)} more waiting.)"
         else:
             # Ambiguous reply while something is pending - don't guess in
             # either direction, don't silently drop the pending items.
             pending = self._pending[0]
             n = len(self._pending)
             waiting = f" ({n} waiting)" if n > 1 else ""
-            if pending.skill == "linkedin":
+            if n > 1:
+                text = (
+                    f"I've still got {n} things waiting on your approval. "
+                    "Say 'approve 2' (the number), 'approve all', or "
+                    f"'reject all'.\n{self._pending_list()}"
+                )
+            elif pending.skill == "linkedin":
                 text = (
                     f"I've still got a draft waiting on your approval{waiting}. "
                     "Say 'yes' to post it or 'no' to discard it."

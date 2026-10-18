@@ -39,6 +39,19 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     # effect, so they run straight through like the other read tools.
     "web_search": ToolPolicy.ALLOW,
     "web_read": ToolPolicy.ALLOW,
+    # Batch B: browser. Reading pages/screenshotting is read-only (ALLOW);
+    # every state-changing interaction is draft-only until approved.
+    "browser_open": ToolPolicy.ALLOW,
+    "browser_read": ToolPolicy.ALLOW,
+    "browser_elements": ToolPolicy.ALLOW,
+    "browser_screenshot": ToolPolicy.ALLOW,
+    "browser_console": ToolPolicy.ALLOW,
+    "browser_wait": ToolPolicy.ALLOW,
+    "browser_click": ToolPolicy.NEEDS_APPROVAL,
+    "browser_fill": ToolPolicy.NEEDS_APPROVAL,
+    "browser_type": ToolPolicy.NEEDS_APPROVAL,
+    "browser_press": ToolPolicy.NEEDS_APPROVAL,
+    "browser_select": ToolPolicy.NEEDS_APPROVAL,
 }
 
 

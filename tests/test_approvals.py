@@ -58,10 +58,17 @@ def test_pending_queue_is_fifo(tmp_path):
     _draft(m, "surviving an on-call rotation")
     assert len(m._pending) == 2
 
-    first = _collect(m, "approve")
+    # Batch A: a bare "approve" with several waiting refuses to guess.
+    refused = _collect(m, "approve")
+    assert "won't guess" in refused
+    assert len(m._pending) == 2
+
+    # Indexed approval still honors FIFO order.
+    first = _collect(m, "approve 1")
     assert "[stub] Would post to LinkedIn" in first
     assert len(m._pending) == 1  # oldest approved, newest still waiting
 
+    # Down to one: a bare "approve" is unambiguous again.
     second = _collect(m, "approve")
     assert "[stub] Would post to LinkedIn" in second
     assert m._pending == []
@@ -91,7 +98,11 @@ def test_reject_one_leaves_rest_waiting(tmp_path):
     m = _manager(tmp_path)
     _draft(m, "shipping a retry system")
     _draft(m, "surviving an on-call rotation")
-    out = _collect(m, "reject")
+    # Batch A: a bare "reject" with several waiting refuses to guess.
+    refused = _collect(m, "reject")
+    assert "won't guess" in refused
+    assert len(m._pending) == 2
+    out = _collect(m, "reject 1")
     assert len(m._pending) == 1
     assert "more waiting" in out
 

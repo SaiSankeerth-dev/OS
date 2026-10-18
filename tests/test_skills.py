@@ -33,7 +33,8 @@ def test_discovers_all_skill_contracts():
     infos = {i.name: i for i in SkillLoader().discover()}
     for name in ("linkedin", "datetime", "system", "memory", "calc"):
         assert infos[name].status == "active", name
-    assert infos["browser"].status == "planned"
+    # Batch B: the browser skill graduated from planned to active.
+    assert infos["browser"].status == "active"
     assert infos["files"].status == "planned"
 
 
@@ -43,7 +44,8 @@ def test_load_registers_active_tools_only(tmp_path):
     loaded = SkillLoader().load(reg, state_store=store)
     names = {i.name for i in loaded}
     assert {"linkedin", "datetime", "system", "memory", "calc"} <= names
-    assert "browser" not in names and "files" not in names
+    # Batch B: browser graduated to active; files is still planned.
+    assert "browser" in names and "files" not in names
     for tool in ("linkedin_draft", "get_current_datetime", "get_system_info",
                  "memory_save", "memory_recall", "calc"):
         reg.get(tool)  # raises KeyError if missing

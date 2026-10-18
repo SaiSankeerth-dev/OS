@@ -34,6 +34,9 @@ class PendingApproval:
     run_id: str = ""  # supervisor lifecycle run this approval belongs to
     created_ts: float = field(default_factory=time.time)
     pending_id: int = 0  # Phase 12: row id in the pending table (0 = not persisted)
+    # Batch B: machine-readable action to execute on approval (e.g. a
+    # browser click). Empty for plain accept/reject approvals.
+    action_args: dict = field(default_factory=dict)
 
     def expired(self, timeout_sec: float) -> bool:
         return (time.time() - self.created_ts) > timeout_sec
@@ -82,6 +85,11 @@ class ApprovalStore:
                 )
                 """
             )
+            # Batch B: machine-readable action args for approvals that
+            # execute something on approval (browser clicks etc.).
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(pending)")]
+            if "action_json" not in cols:
+                conn.execute("ALTER TABLE pending ADD COLUMN action_json TEXT")
             conn.commit()
         finally:
             conn.close()
@@ -125,12 +133,14 @@ class ApprovalStore:
 
     def save_pending(self, p: PendingApproval) -> int:
         """Persist a queued approval. Returns the row id."""
+        import json
+
         conn = sqlite3.connect(self.db_path)
         try:
             cur = conn.execute(
                 "INSERT INTO pending "
-                "(skill, input, draft, approved_hash, run_id, created_ts) "
-                "VALUES (?,?,?,?,?,?)",
+                "(skill, input, draft, approved_hash, run_id, created_ts, action_json) "
+                "VALUES (?,?,?,?,?,?,?)",
                 (
                     p.skill,
                     p.input_text,
@@ -138,6 +148,7 @@ class ApprovalStore:
                     p.approved_hash,
                     p.run_id,
                     p.created_ts,
+                    json.dumps(p.action_args) if p.action_args else None,
                 ),
             )
             conn.commit()
@@ -147,12 +158,24 @@ class ApprovalStore:
 
     def load_pending(self) -> list[PendingApproval]:
         """Restore the queue in FIFO order after a restart."""
+        import json
+
         conn = sqlite3.connect(self.db_path)
         try:
             rows = conn.execute(
                 "SELECT id, skill, input, draft, approved_hash, run_id, "
-                "created_ts FROM pending ORDER BY id ASC"
+                "created_ts, action_json FROM pending ORDER BY id ASC"
             ).fetchall()
+
+            def _action(raw) -> dict:
+                if not raw:
+                    return {}
+                try:
+                    parsed = json.loads(raw)
+                except (ValueError, TypeError):
+                    return {}
+                return parsed if isinstance(parsed, dict) else {}
+
             return [
                 PendingApproval(
                     skill=r[1],
@@ -162,6 +185,7 @@ class ApprovalStore:
                     run_id=r[5],
                     created_ts=r[6],
                     pending_id=r[0],
+                    action_args=_action(r[7]),
                 )
                 for r in rows
             ]
