@@ -13,6 +13,7 @@ import {
   RefreshCw,
   X,
   ArrowRight,
+  Compass,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { NavView } from '../../types/ui';
@@ -74,6 +75,8 @@ export const CommandPalette: React.FC = () => {
     // Navigation
     { id: 'nav-home', title: 'Go to Overview ("What matters now")', category: 'Navigation', icon: ArrowRight, view: 'home' },
     { id: 'nav-chat', title: 'Open Ask OS Canvas', category: 'Navigation', icon: Sparkles, view: 'chat' },
+    { id: 'nav-discovery', title: 'Open GitHub Intelligence & Discovery', category: 'Navigation', icon: Compass, view: 'discovery' },
+    { id: 'nav-computer', title: 'Open Computer & Interactive Browser', category: 'Navigation', icon: ArrowRight, view: 'computer' },
     { id: 'nav-plan', title: 'Open Day Plan & Schedule', category: 'Navigation', icon: Calendar, view: 'plan' },
     { id: 'nav-tasks', title: 'View Commitments & Tasks', category: 'Navigation', icon: CheckSquare, view: 'tasks' },
     { id: 'nav-approvals', title: 'Review Safety Approvals', category: 'Navigation', icon: ShieldAlert, view: 'approvals' },

@@ -109,6 +109,67 @@ class TestJarvisOSIntegration(unittest.TestCase):
         self.assertEqual(li["integration"], "LinkedIn")
         self.assertIn("content", li["result"])
 
+    def test_octop_processor_and_checkpoint_persistence(self):
+        from jarvis_os.primitives.octop_harness import OctopHarnessProcessor
+        proc = OctopHarnessProcessor(db_path=":memory:")
+        cid = proc.save_checkpoint("web_hud", "sess_001", {"dot": "forge", "turn": 3, "status": "active"})
+        self.assertTrue(cid.startswith("chk_web_hud_sess_001"))
+
+        loaded = proc.load_checkpoint("web_hud", "sess_001")
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["dot"], "forge")
+        self.assertEqual(loaded["turn"], 3)
+
+    def test_octop_tiered_memory_and_snapshot_hash(self):
+        from jarvis_os.primitives.octop_harness import TieredOctopMemory
+        mem = TieredOctopMemory()
+        mem.record_l0("calc 2+2", "4", "forge")
+        mem.update_l1("active_project", "OS-Upgrade")
+        mem.add_l2_summary("Architecture", "Unified kernel with Octop harness", tags="arch,octop")
+        mem.add_l3_anchor("OS-L3-TEST: Verification mandatory.")
+
+        snap = mem.freeze_recall_snapshot()
+        self.assertIn("snapshot_hash", snap)
+        self.assertEqual(len(snap["snapshot_hash"]), 64)  # Valid SHA-256 hex string
+        self.assertEqual(snap["tiers"]["L0_count"], 1)
+        self.assertIn("active_project", snap["tiers"]["L1_keys"])
+        self.assertGreaterEqual(snap["tiers"]["L3_count"], 5)
+
+    def test_octop_dual_acp_bridge(self):
+        from jarvis_os.primitives.octop_harness import DualACPBridge
+        bridge = DualACPBridge(kernel=self.kernel)
+
+        # 1. Initialize
+        init_res = bridge.handle_inbound_rpc({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+        self.assertEqual(init_res["jsonrpc"], "2.0")
+        self.assertIn("serverInfo", init_res["result"])
+
+        # 2. List tools
+        tools_res = bridge.handle_inbound_rpc({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        self.assertEqual(len(tools_res["result"]["tools"]), 4)
+
+        # 3. Dot command
+        cmd_res = bridge.handle_inbound_rpc({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "dot/command",
+            "params": {"query": "calculate 50 * 2", "dot": "forge"}
+        })
+        self.assertIn("response", cmd_res["result"])
+
+    def test_enterprise_runtime_execute_dag(self):
+        ent = EnterpriseJarvisRuntime(db_path=":memory:")
+        steps_captured = []
+        dag = ent.execute_dag(
+            "Verify complete OS architecture and security invariants",
+            on_step_callback=lambda s: steps_captured.append(s),
+        )
+        self.assertEqual(dag["status"], "completed")
+        self.assertEqual(len(dag["stages"]), 4)
+        self.assertEqual(len(steps_captured), 4)
+        self.assertIn("snapshot_hash", dag)
+        self.assertIn("page_id", dag)
+
 
 if __name__ == "__main__":
     unittest.main()

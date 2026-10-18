@@ -34,7 +34,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<NavView>('home');
-  const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
+  const [theme, setThemeState] = useState<'dark' | 'light'>('light');
   const [me, setMe] = useState<MeData | null>(null);
   const [orbState, setOrbState] = useState<OrbState>('IDLE');
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
@@ -45,7 +45,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Initialize theme
   useEffect(() => {
     const savedTheme = localStorage.getItem('os-theme') as 'dark' | 'light' | null;
-    const initialTheme = savedTheme || 'dark';
+    const initialTheme = savedTheme || 'light';
     setThemeState(initialTheme);
     document.documentElement.setAttribute('data-theme', initialTheme);
   }, []);

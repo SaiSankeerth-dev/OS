@@ -143,6 +143,18 @@ class MCPConfig:
 
 
 @dataclass
+class ComputerConfig:
+    enabled: bool = True
+    primary_backend: str = "browser_harness"
+    allow_paid_cloud_sandboxes: bool = False
+    profile_dir: str = ".os_browser_profile"
+    headless: bool = True
+    action_timeout_sec: float = 30.0
+    max_steps_per_task: int = 25
+    max_retries_per_step: int = 2
+
+
+@dataclass
 class Config:
     llm: LLMConfig = field(default_factory=LLMConfig)
     conversation: ConversationConfig = field(default_factory=ConversationConfig)
@@ -156,6 +168,7 @@ class Config:
     research: ResearchConfig = field(default_factory=ResearchConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     gstack: GstackConfig = field(default_factory=GstackConfig)
+    computer: ComputerConfig = field(default_factory=ComputerConfig)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -279,6 +292,16 @@ def load_config(config_dir: Path | None = None) -> Config:
             enabled=bool(get("gstack.enabled", False)),
             install_dir=get("gstack.install_dir", None),
             workspace_dir=get("gstack.workspace_dir", None),
+        ),
+        computer=ComputerConfig(
+            enabled=bool(get("computer.enabled", True)),
+            primary_backend=get("computer.primary_backend", "browser_harness"),
+            allow_paid_cloud_sandboxes=bool(get("computer.allow_paid_cloud_sandboxes", False)),
+            profile_dir=get("computer.profile_dir", ".os_browser_profile"),
+            headless=bool(get("computer.headless", True)),
+            action_timeout_sec=float(get("computer.action_timeout_sec", 30.0)),
+            max_steps_per_task=int(get("computer.max_steps_per_task", 25)),
+            max_retries_per_step=int(get("computer.max_retries_per_step", 2)),
         ),
         raw=data,
     )

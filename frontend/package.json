@@ -1,5 +1,6 @@
 {
   "name": "os-frontend",
+  "description": "Apple-inspired web frontend for OS Personal AI Operating System",
   "private": true,
   "version": "1.0.0",
   "type": "module",

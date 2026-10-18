@@ -1,0 +1,28 @@
+services:
+  os-virtual-desktop:
+    build:
+      context: ./desktop
+      dockerfile: Dockerfile
+    image: os-virtual-desktop:latest
+    container_name: os-virtual-desktop
+    ports:
+      # noVNC / Selkies HTML5 streaming UI
+      - "127.0.0.1:6080:6080"
+      # Chromium Remote Debugging Protocol (CDP) for OS Playwright AI Agent
+      - "127.0.0.1:9222:9222"
+    volumes:
+      # Isolated sandboxed developer workspace
+      - os-desktop-workspace:/workspace
+      # Persistent Chromium profile
+      - os-desktop-profile:/root/.config/chromium
+    environment:
+      - DISPLAY=:1
+      - RESOLUTION=1280x800x24
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    shm_size: "2gb"
+
+volumes:
+  os-desktop-workspace:
+  os-desktop-profile:

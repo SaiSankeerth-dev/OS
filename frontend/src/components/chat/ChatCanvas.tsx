@@ -146,7 +146,7 @@ export const ChatCanvas: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-5xl mx-auto w-full px-4 md:px-6 py-4">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] max-w-7xl mx-auto w-full px-5 md:px-8 py-5">
       {/* Header Canvas Presence */}
       <div className="flex items-center justify-between pb-3 border-b border-os-border mb-3 select-none">
         <div className="flex items-center gap-3">
@@ -201,7 +201,7 @@ export const ChatCanvas: React.FC = () => {
 
             {/* Bubble */}
             <div
-              className={`max-w-2xl rounded-glass-lg p-4 text-xs md:text-sm leading-relaxed ${
+              className={`max-w-3xl rounded-glass-lg p-4 text-xs md:text-sm leading-relaxed ${
                 msg.sender === 'user'
                   ? 'bg-emerald-500/15 border border-emerald-500/25 text-os-primary rounded-br-sm'
                   : 'glass-panel border-os-border-glass text-os-primary rounded-bl-sm'

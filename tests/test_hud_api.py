@@ -155,3 +155,34 @@ def test_hud_html_serves():
     res = client.get("/hud")
     assert res.status_code == 200
     assert "OS // CYBER-HUD" in res.text
+
+
+def test_hud_octop_dag_endpoint():
+    res = client.post("/api/hud/octop/dag", json={"user_goal": "Deploy and verify test pipeline"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "completed"
+    assert "dag_id" in data
+    assert "snapshot_hash" in data
+    assert len(data["stages"]) == 4
+    assert "page_id" in data
+
+
+def test_hud_octop_checkpoints_and_presets():
+    res = client.get("/api/hud/octop/presets")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data["presets"]) >= 17
+    assert "forge" in data["mbti_library"]
+    assert "scout" in data["mbti_library"]
+    assert data["mbti_library"]["forge"]["persona"] == "INTJ-Architect"
+
+    res_chk = client.get("/api/hud/octop/checkpoints")
+    assert res_chk.status_code == 200
+    assert "checkpoints" in res_chk.json()
+
+
+def test_connector_revoke_delete_method():
+    res = client.delete("/api/connectors/discord/revoke")
+    assert res.status_code == 200
+    assert res.json()["ok"] is True

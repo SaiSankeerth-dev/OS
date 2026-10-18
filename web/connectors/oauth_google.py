@@ -7,6 +7,10 @@ refresh token — encrypted — in the vault. All five Google connectors share
 this one sign-in.
 """
 from __future__ import annotations
+import os
+
+# Allow local HTTP redirect URIs (e.g. http://localhost:3000) for local desktop development
+os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
 GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/calendar",
@@ -25,18 +29,29 @@ def build_flow(client_id: str, client_secret: str, redirect_uri: str):
         raise RuntimeError(
             "google-auth-oauthlib isn't installed (pip install google-auth-oauthlib)."
         ) from e
-    return Flow.from_client_config(
-        {
-            "web": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-            }
-        },
-        scopes=GOOGLE_SCOPES,
-        redirect_uri=redirect_uri,
-    )
+
+    cid = client_id.strip() if client_id else ""
+    sec = client_secret.strip() if client_secret else ""
+    client_config = {
+        "client_id": cid,
+        "client_secret": sec,
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "redirect_uris": [redirect_uri],
+    }
+    # Google OAuth client configs can be declared under 'web' or 'installed'
+    try:
+        return Flow.from_client_config(
+            {"web": client_config},
+            scopes=GOOGLE_SCOPES,
+            redirect_uri=redirect_uri,
+        )
+    except Exception:
+        return Flow.from_client_config(
+            {"installed": client_config},
+            scopes=GOOGLE_SCOPES,
+            redirect_uri=redirect_uri,
+        )
 
 
 def authorization_url(client_id: str, client_secret: str, redirect_uri: str,

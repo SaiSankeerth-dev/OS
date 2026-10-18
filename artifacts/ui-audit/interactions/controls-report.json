@@ -1,0 +1,14 @@
+[
+  {
+    "name": "connections configuration dialog",
+    "status": "PASS"
+  },
+  {
+    "name": "light and dark theme toggle",
+    "status": "PASS"
+  },
+  {
+    "name": "computer inspector collapse",
+    "status": "PASS"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "sidebar navigation",
+    "status": "PASS",
+    "detail": "All primary sidebar destinations rendered."
+  },
+  {
+    "name": "inspector collapse",
+    "status": "PASS",
+    "detail": "Inspector collapsed and work surface expanded."
+  },
+  {
+    "name": "sandbox terminal command",
+    "status": "PASS",
+    "detail": "Python 3.11.2"
+  },
+  {
+    "name": "browser mode and fullscreen",
+    "status": "PASS",
+    "detail": "Entered and exited native fullscreen."
+  },
+  {
+    "name": "connections configuration dialog",
+    "status": "PASS",
+    "detail": "Configure opened its dialog and dismissed with Escape."
+  },
+  {
+    "name": "light and dark theme toggle",
+    "status": "PASS",
+    "detail": "Both theme states toggled."
+  }
+]

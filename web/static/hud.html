@@ -1000,10 +1000,10 @@
           </button>
 
           <div class="tree-section-lbl">▾ Active Subsystems</div>
-          <button class="tree-btn" onclick="runScenario('hitl')">
+          <button class="tree-btn" onclick="openComputerModal()">
             <svg class="ico" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
             <span>Agent Computer</span>
-            <span class="tree-count-pill">1</span>
+            <span class="tree-count-pill" style="background:var(--emerald-dim);color:var(--emerald);">LIVE</span>
           </button>
           <button class="tree-btn" onclick="runScenario('youtube')">
             <svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -1020,6 +1020,25 @@
           <button class="tree-btn" onclick="runScenario('block')">
             <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <span>Safety Gate</span>
+          </button>
+
+          <div class="tree-section-lbl">▾ Octop Harness</div>
+          <button class="tree-btn" onclick="sendCommand('dag Autonomous System Architecture Audit')">
+            <svg class="ico" viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            <span>Multi-Dot DAG</span>
+            <span class="tree-count-pill">4</span>
+          </button>
+          <button class="tree-btn" onclick="sendCommand('acp bridge status')">
+            <svg class="ico" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            <span>Dual ACP Bridge</span>
+          </button>
+          <button class="tree-btn" onclick="sendCommand('peer team inbox status')">
+            <svg class="ico" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            <span>Peer Team Inbox</span>
+          </button>
+          <button class="tree-btn" onclick="sendCommand('octop memory recall')">
+            <svg class="ico" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <span>L0→L3 Memory</span>
           </button>
         </div>
 
@@ -1324,18 +1343,38 @@
     </div>
   </div>
 
+  <!-- OpenMuse Live Agent Computer Virtual Desktop Modal -->
+  <div class="modal-backdrop" id="computerModalBackdrop">
+    <div class="space-modal sci-window" style="max-width:1040px;width:92vw;height:82vh;display:flex;flex-direction:column;">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="win-titlebar">
+        <div class="win-title-left">
+          <svg class="ico-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+          <span>OpenMuse // Agent Computer Live Desktop (noVNC :6080)</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="mini-btn warn" onclick="toggleTakeControl()" id="modalTakeControlBtn">🕹 Take Control</button>
+          <button class="mini-btn" onclick="closeComputerModal()">× Close</button>
+        </div>
+      </div>
+      <div style="flex:1;background:#000;border:1px solid var(--cyan-border);border-radius:4px;overflow:hidden;position:relative;">
+        <iframe id="hudNovncIframe" src="http://localhost:6080/vnc.html?autoconnect=1&resize=scale&reconnect=1" style="width:100%;height:100%;border:0;" title="Live noVNC Desktop"></iframe>
+      </div>
+    </div>
+  </div>
+
   <!-- 3. Bottom Desktop Taskbar -->
   <footer class="os-taskbar">
     <div class="taskbar-left">
       <span class="tb-item" style="color:var(--cyan);font-weight:700;">
         <svg class="ico-sm" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
-        <span>JARVIS</span>
+        <span>OS</span>
       </span>
       <span class="tb-item" onclick="openSpaceModal()">
         <svg class="ico-sm" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         <span>/workspace</span>
       </span>
-      <span class="tb-item" onclick="toggleTakeControl()">
+      <span class="tb-item" onclick="openComputerModal()" title="Open Live Desktop Stream">
         <svg class="ico-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
         <span>Agent Computer: <b id="computerModeLabel" style="color:var(--emerald);">AUTONOMOUS</b></span>
       </span>
@@ -1398,6 +1437,22 @@ function openSpaceModal() {
 }
 function closeSpaceModal() {
   document.getElementById("spaceModalBackdrop").classList.remove("open");
+}
+
+function openComputerModal() {
+  const bd = document.getElementById("computerModalBackdrop");
+  if (bd) {
+    bd.classList.add("open");
+    const ifr = document.getElementById("hudNovncIframe");
+    if (ifr) {
+      const host = window.location.hostname || "localhost";
+      ifr.src = `http://${host}:6080/vnc.html?autoconnect=1&resize=scale&reconnect=1`;
+    }
+  }
+}
+function closeComputerModal() {
+  const bd = document.getElementById("computerModalBackdrop");
+  if (bd) bd.classList.remove("open");
 }
 
 function selectDot(id) {
@@ -1495,6 +1550,27 @@ async function sendCommand(customQuery) {
   setSystemState("PROCESSING", 45);
 
   const ql = q.toLowerCase();
+  if (ql.startsWith("dag ") || ql.startsWith("run dag ") || ql.startsWith("octop dag ")) {
+    const goal = q.replace(/^(dag|run dag|octop dag)\s*/i, "").trim() || "Autonomous System Architecture Audit";
+    pushStreamLog(`<b style="color:var(--cyan-bright);">[OCTOP DAG]</b> Initializing 4-Stage Multi-Dot Pipeline for: ${escapeHtml(goal)}`);
+    setSystemState("PROCESSING", 25);
+    try {
+      const dagResp = await fetch("/api/hud/octop/dag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_goal: goal }),
+      });
+      const dagData = await dagResp.json();
+      setSystemState("COMPLETED", 100);
+      pushStreamLog(`<b style="color:var(--emerald);">[OCTOP DAG COMPLETE]</b> DAG ID: <code>${dagData.dag_id}</code><br>Snapshot: <code>${dagData.snapshot_hash}</code><br>Committed Page: <code>${dagData.page_id}</code>`);
+      setTimeout(() => setSystemState("STANDBY", 100), 2000);
+    } catch (err) {
+      setSystemState("ERROR", 100);
+      pushStreamLog(`<b style="color:var(--crimson);">[OCTOP DAG ERROR]</b> ${escapeHtml(err.message)}`);
+    }
+    return;
+  }
+
   let actionType = null;
   let actionPayload = null;
 
@@ -1569,6 +1645,8 @@ async function resolveApproval(aprId, decision) {
 async function toggleTakeControl() {
   computerTakenControl = !computerTakenControl;
   const lbl = document.getElementById("computerModeLabel");
+  const modalBtn = document.getElementById("modalTakeControlBtn");
+  const topBtn = document.getElementById("takeControlBtn");
   try {
     await fetch("/api/hud/computer/takeover", {
       method: "POST",
@@ -1577,12 +1655,30 @@ async function toggleTakeControl() {
     });
   } catch (e) {}
   if (computerTakenControl) {
-    lbl.textContent = "HUMAN_OVERRIDE";
-    lbl.style.color = "var(--amber)";
+    if (lbl) {
+      lbl.textContent = "HUMAN_OVERRIDE";
+      lbl.style.color = "var(--amber)";
+    }
+    if (modalBtn) {
+      modalBtn.textContent = "🤖 Return to Agent";
+      modalBtn.className = "mini-btn";
+    }
+    if (topBtn) {
+      topBtn.classList.add("warn");
+    }
     pushStreamLog(`<b style="color:var(--amber);">[OpenMuse]</b> Human operator took interactive control of /workspace.`);
   } else {
-    lbl.textContent = "AUTONOMOUS";
-    lbl.style.color = "var(--emerald)";
+    if (lbl) {
+      lbl.textContent = "AUTONOMOUS";
+      lbl.style.color = "var(--emerald)";
+    }
+    if (modalBtn) {
+      modalBtn.textContent = "🕹 Take Control";
+      modalBtn.className = "mini-btn warn";
+    }
+    if (topBtn) {
+      topBtn.classList.remove("warn");
+    }
     pushStreamLog(`<b style="color:var(--emerald);">[OpenMuse]</b> Returned /workspace to autonomous agent.`);
   }
 }

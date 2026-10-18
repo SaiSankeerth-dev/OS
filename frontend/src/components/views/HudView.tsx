@@ -19,6 +19,8 @@ import {
   Shield,
   Activity,
   Layers,
+  GitBranch,
+  Sun,
 } from 'lucide-react';
 
 interface DotInfo {
@@ -64,8 +66,9 @@ export const HudView: React.FC = () => {
   const [pipelinePercent, setPipelinePercent] = useState<number>(0);
   const [reactorSpeedMultiplier, setReactorSpeedMultiplier] = useState<number>(1.0);
 
-  // Computer takeover state
+  // Computer takeover & tab state
   const [isHumanControl, setIsHumanControl] = useState<boolean>(false);
+  const [computerTab, setComputerTab] = useState<'terminal' | 'desktop'>('desktop');
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     '$ os init --hardware-aware\n[OK] Detected hardware architecture + local engine active.',
     '$ os doctor\n[OK] All 5 Composable Primitives verified. Safety gates active.',
@@ -242,16 +245,65 @@ export const HudView: React.FC = () => {
     };
   }, [reactorSpeedMultiplier]);
 
+  const runMultiDotDag = async (goal: string) => {
+    setPipeline('DOT RBAC', 'PROCESSING', 25);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Math.random().toString(),
+        sender: 'os',
+        text: `Starting 4-Stage Multi-Dot DAG for goal: "${goal}"\n• Stage 1: Freeze L0->L3 Recall Snapshot\n• Stage 2: Scout Deep Research & Handoff to Forge\n• Stage 3: Forge Execution via ACP Runner\n• Stage 4: Sentinel Telemetry Audit & Scribe Page Commit`,
+      },
+    ]);
+    try {
+      setPipeline('ENGINE', 'WORKING', 65);
+      const res = await api.executeOctopDag(goal);
+      setPipeline('TELEMETRY', 'COMPLETED', 100);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          sender: 'os',
+          text: `Multi-Dot DAG Complete [${res.dag_id}]!\n• Snapshot Hash: ${res.snapshot_hash}\n• Space Page: ${res.page_id}\nAll 4 stages executed and verified.`,
+        },
+      ]);
+      setTerminalLogs((prev) => [
+        ...prev,
+        `$ os octop-dag --run "${goal}"\n[OK] DAG ${res.dag_id} complete. Hash: ${res.snapshot_hash?.slice(0, 16)}...`,
+      ]);
+      setTimeout(() => {
+        setPipeline('STANDBY', 'STANDBY', 0);
+      }, 1500);
+    } catch (err: any) {
+      setPipeline('STANDBY', 'ERROR', 0);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          sender: 'os',
+          text: `DAG failed: ${err.message}`,
+        },
+      ]);
+    }
+  };
+
   const handleSendCommand = async (customQuery?: string, overrideDot?: string) => {
     const q = customQuery || inputText.trim();
     if (!q) return;
     if (!customQuery) setInputText('');
 
+    const ql = q.toLowerCase();
+    if (ql.startsWith('dag ') || ql.startsWith('run dag ') || ql.startsWith('octop dag ')) {
+      const goal = q.replace(/^(dag|run dag|octop dag)\s*/i, '').trim();
+      setMessages((prev) => [...prev, { id: Math.random().toString(), sender: 'user', text: q }]);
+      runMultiDotDag(goal || 'Autonomous System Architecture Audit');
+      return;
+    }
+
     const targetDot = overrideDot || activeDot;
     setMessages((prev) => [...prev, { id: Math.random().toString(), sender: 'user', text: q }]);
     setPipeline('DOT RBAC', 'PROCESSING', 35);
 
-    const ql = q.toLowerCase();
     let actionType: string | undefined = undefined;
     let actionPayload: string | undefined = undefined;
 
@@ -526,6 +578,8 @@ export const HudView: React.FC = () => {
     } else if (preset === 'destructive') {
       setActiveDot('forge');
       handleSendCommand('rm -rf / --no-preserve-root', 'forge');
+    } else if (preset === 'octop_dag') {
+      runMultiDotDag('Autonomous System Architecture & Security Audit');
     }
   };
 
@@ -687,40 +741,53 @@ export const HudView: React.FC = () => {
               <div className="text-[10px] text-cyan-400/70 uppercase font-bold mb-1.5">1-Click Presets:</div>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
-                  onClick={() => handleRunPreset('morning')}
-                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                  onClick={() => handleRunPreset('octop_dag')}
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-400/40 bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-200 transition-colors text-left truncate flex items-center gap-1.5 col-span-2 font-bold"
                 >
-                  ☀ Morning Digest
+                  <GitBranch className="w-3 h-3 text-cyan-400" />
+                  <span>Multi-Dot DAG (4-Stage)</span>
+                </button>
+                <button
+                  onClick={() => handleRunPreset('morning')}
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate flex items-center gap-1.5"
+                >
+                  <Sun className="w-3 h-3 text-cyan-400" />
+                  <span>Morning Digest</span>
                 </button>
                 <button
                   onClick={() => handleRunPreset('optimize')}
-                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate flex items-center gap-1.5"
                 >
-                  ⚡ OS Optimize
+                  <Zap className="w-3 h-3 text-cyan-400" />
+                  <span>OS Optimize</span>
                 </button>
                 <button
                   onClick={() => handleRunPreset('risky_shell')}
-                  className="px-2 py-1 text-[10px] rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 transition-colors text-left truncate"
+                  className="px-2 py-1 text-[10px] rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 transition-colors text-left truncate flex items-center gap-1.5"
                 >
-                  🛡 HITL Deploy
+                  <Shield className="w-3 h-3 text-amber-400" />
+                  <span>HITL Deploy</span>
                 </button>
                 <button
                   onClick={() => handleRunPreset('youtube')}
-                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate flex items-center gap-1.5"
                 >
-                  📹 YouTube Summary
+                  <Video className="w-3 h-3 text-cyan-400" />
+                  <span>YouTube Summary</span>
                 </button>
                 <button
                   onClick={() => handleRunPreset('linkedin')}
-                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate"
+                  className="px-2 py-1 text-[10px] rounded border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-left truncate flex items-center gap-1.5"
                 >
-                  💼 LinkedIn Draft
+                  <Share2 className="w-3 h-3 text-cyan-400" />
+                  <span>LinkedIn Draft</span>
                 </button>
                 <button
                   onClick={() => handleRunPreset('destructive')}
-                  className="px-2 py-1 text-[10px] rounded border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 transition-colors text-left truncate"
+                  className="px-2 py-1 text-[10px] rounded border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 transition-colors text-left truncate flex items-center gap-1.5"
                 >
-                  🛑 Security Block
+                  <AlertTriangle className="w-3 h-3 text-rose-400" />
+                  <span>Security Block</span>
                 </button>
               </div>
             </div>
@@ -826,7 +893,31 @@ export const HudView: React.FC = () => {
           {/* Agent Computer */}
           <div className="p-3.5 rounded-lg bg-[#0a1324]/85 border border-cyan-500/20 flex flex-col gap-2.5 shadow-md">
             <div className="flex items-center justify-between text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-cyan-500/20 pb-2">
-              <span>OpenMuse // Agent Computer</span>
+              <div className="flex items-center gap-2">
+                <span>OpenMuse // Agent Computer</span>
+                <div className="flex items-center bg-black/50 rounded border border-cyan-500/30 p-0.5">
+                  <button
+                    onClick={() => setComputerTab('desktop')}
+                    className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                      computerTab === 'desktop'
+                        ? 'bg-cyan-500/30 text-cyan-200 font-bold border border-cyan-400/40'
+                        : 'text-cyan-400/60 hover:text-cyan-200'
+                    }`}
+                  >
+                    Live Desktop
+                  </button>
+                  <button
+                    onClick={() => setComputerTab('terminal')}
+                    className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                      computerTab === 'terminal'
+                        ? 'bg-cyan-500/30 text-cyan-200 font-bold border border-cyan-400/40'
+                        : 'text-cyan-400/60 hover:text-cyan-200'
+                    }`}
+                  >
+                    Terminal
+                  </button>
+                </div>
+              </div>
               <button
                 onClick={handleToggleTakeover}
                 className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
@@ -838,15 +929,35 @@ export const HudView: React.FC = () => {
                 {isHumanControl ? '🤖 Return to Agent' : '🕹 Take Control'}
               </button>
             </div>
-            <div className="text-[11px] text-cyan-200/60">
-              Mode:{' '}
-              <b className={isHumanControl ? 'text-amber-400' : 'text-emerald-400'}>
-                {isHumanControl ? 'HUMAN_OVERRIDE (TAKE CONTROL)' : 'AGENT_AUTONOMOUS'}
-              </b>
+            <div className="text-[11px] text-cyan-200/60 flex items-center justify-between">
+              <span>
+                Mode:{' '}
+                <b className={isHumanControl ? 'text-amber-400' : 'text-emerald-400'}>
+                  {isHumanControl ? 'HUMAN_OVERRIDE (TAKE CONTROL)' : 'AGENT_AUTONOMOUS'}
+                </b>
+              </span>
+              <span className="text-[10px] text-cyan-400/60 font-mono">
+                noVNC :6080 | CDP :9222
+              </span>
             </div>
-            <div className="h-[140px] p-2 rounded bg-black border border-cyan-500/20 font-mono text-[10px] text-emerald-400 overflow-y-auto whitespace-pre-wrap">
-              {terminalLogs.join('\n')}
-            </div>
+            {computerTab === 'desktop' ? (
+              <div className="h-[200px] rounded bg-black border border-cyan-500/20 overflow-hidden relative group">
+                <iframe
+                  src={`http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:6080/vnc.html?autoconnect=1&resize=scale&reconnect=1`}
+                  className="w-full h-full border-0"
+                  title="OpenMuse Virtual Computer Desktop"
+                />
+                {isHumanControl && (
+                  <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded bg-amber-500/80 text-black text-[9px] font-bold tracking-wider pointer-events-none">
+                    INTERACTIVE HUMAN CONTROL
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-[200px] p-2 rounded bg-black border border-cyan-500/20 font-mono text-[10px] text-emerald-400 overflow-y-auto whitespace-pre-wrap">
+                {terminalLogs.join('\n')}
+              </div>
+            )}
           </div>
 
           {/* OpenDots Space Editor */}

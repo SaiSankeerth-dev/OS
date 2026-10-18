@@ -10,6 +10,9 @@ import {
   Link2,
   Brain,
   Cpu,
+  Monitor,
+  Sliders,
+  Compass,
 } from 'lucide-react';
 import { NavView } from '../../types/ui';
 import { useApp } from '../../context/AppContext';
@@ -26,40 +29,52 @@ export const Sidebar: React.FC = () => {
   const { currentView, setCurrentView, pendingApprovalsCount, activeAgentsCount } = useApp();
 
   const navItems: NavItem[] = [
-    { id: 'home', label: 'Overview', icon: Home },
-    { id: 'hud', label: 'Cyber HUD', icon: Cpu, badgeVariant: 'cyan' },
+    { id: 'overview', label: 'Overview', icon: Home },
     { id: 'chat', label: 'Ask OS', icon: Sparkles },
-    { id: 'plan', label: 'Plan & Day', icon: Calendar },
-    { id: 'tasks', label: 'Commitments', icon: CheckSquare },
+    { id: 'discovery', label: 'Discovery', icon: Compass },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+    { id: 'computer', label: 'Computer', icon: Monitor, badgeVariant: 'emerald' },
+    { id: 'hud', label: 'Cyber HUD', icon: Cpu, badgeVariant: 'cyan' },
+    { id: 'connections', label: 'Connections', icon: Link2 },
     {
-      id: 'approvals',
-      label: 'Approvals & Safety',
+      id: 'activity',
+      label: 'Activity',
       icon: ShieldAlert,
       badgeCount: pendingApprovalsCount,
       badgeVariant: 'amber',
     },
     {
-      id: 'agents',
-      label: 'Workers & Agents',
-      icon: Bot,
+      id: 'settings',
+      label: 'Settings',
+      icon: Sliders,
       badgeCount: activeAgentsCount,
       badgeVariant: 'cyan',
     },
-    { id: 'activity', label: 'Evidence & Audit', icon: Clock },
-    { id: 'connectors', label: 'Connectors', icon: Link2 },
-    { id: 'memory', label: 'Memory & World', icon: Brain },
   ];
 
+  const isItemActive = (id: NavView) => {
+    if (id === 'overview' && (currentView === 'home' || currentView === 'overview')) return true;
+    if (id === 'chat' && currentView === 'chat') return true;
+    if (id === 'discovery' && currentView === 'discovery') return true;
+    if (id === 'tasks' && (currentView === 'tasks' || currentView === 'plan')) return true;
+    if (id === 'computer' && currentView === 'computer') return true;
+    if (id === 'hud' && currentView === 'hud') return true;
+    if (id === 'connections' && (currentView === 'connections' || currentView === 'connectors')) return true;
+    if (id === 'activity' && (currentView === 'activity' || currentView === 'approvals')) return true;
+    if (id === 'settings' && (currentView === 'settings' || currentView === 'memory' || currentView === 'agents')) return true;
+    return currentView === id;
+  };
+
   return (
-    <aside className="w-16 md:w-60 border-r border-os-border bg-os-bg/50 backdrop-blur-md flex flex-col justify-between p-3 select-none flex-shrink-0">
+    <aside className="w-16 md:w-52 border-r border-os-border bg-os-bg/55 backdrop-blur-md flex flex-col justify-between p-3 select-none flex-shrink-0">
       {/* Navigation Links */}
       <nav className="space-y-1.5">
         <div className="hidden md:block px-3 py-2 text-[10px] font-mono tracking-wider uppercase text-os-muted">
-          Workspace
+          Operating System
         </div>
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentView === item.id;
+          const isActive = isItemActive(item.id);
 
           return (
             <button
@@ -67,13 +82,13 @@ export const Sidebar: React.FC = () => {
               onClick={() => setCurrentView(item.id)}
               className={`btn-press w-full flex items-center gap-3 px-3 py-2.5 rounded-glass-md text-xs font-medium transition-all group ${
                 isActive
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shadow-glass-glow'
+                  ? 'bg-blue-500/12 text-blue-700 dark:text-blue-300 border border-blue-500/25 shadow-sm shadow-blue-500/10'
                   : 'text-os-secondary hover:text-os-primary hover:bg-white/5 border border-transparent'
               }`}
             >
               <Icon
                 className={`w-4 h-4 flex-shrink-0 transition-colors ${
-                  isActive ? 'text-emerald-400' : 'text-os-muted group-hover:text-os-primary'
+                  isActive ? 'text-blue-600 dark:text-blue-300' : 'text-os-muted group-hover:text-os-primary'
                 }`}
               />
               <span className="hidden md:inline truncate">{item.label}</span>

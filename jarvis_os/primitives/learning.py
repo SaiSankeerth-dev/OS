@@ -7,11 +7,12 @@ optimizations with verifiable traces.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class TraceLearningLoop:
-    def __init__(self) -> None:
+    def __init__(self, octop_memory: Optional[Any] = None) -> None:
+        self.octop_memory = octop_memory
         self.traces: List[Dict[str, Any]] = []
         self.learned_skills: List[str] = [
             "local-first-routing: Route arithmetic & system diagnostics to deterministic local rules (0J overhead).",
@@ -53,6 +54,14 @@ class TraceLearningLoop:
         )
         if new_skill not in self.learned_skills:
             self.learned_skills.append(new_skill)
+
+        # Distill failed traces into permanent L3 safety invariants
+        failed_traces = [t for t in self.traces if not t.get("success")]
+        if failed_traces and self.octop_memory is not None:
+            for ft in failed_traces:
+                guard = f"OS-L3-GUARD: Verified failure guardrail for {ft.get('dot_id', 'agent')} against '{ft.get('query', '')[:30]}'."
+                if hasattr(self.octop_memory, "add_l3_anchor"):
+                    self.octop_memory.add_l3_anchor(guard)
 
         return {
             "status": "optimized",

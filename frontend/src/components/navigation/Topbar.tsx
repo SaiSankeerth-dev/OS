@@ -29,7 +29,7 @@ export const Topbar: React.FC = () => {
   const { isVoiceActive, toggleVoice } = useVoice();
 
   return (
-    <header className="sticky top-0 z-40 w-full h-16 border-b border-os-border bg-os-bg/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between">
+    <header className="sticky top-0 z-40 w-full h-14 border-b border-os-border bg-os-bg/85 backdrop-blur-xl px-4 md:px-5 flex items-center justify-between">
       {/* Left: Branding & Ambient Presence */}
       <div className="flex items-center gap-3">
         <div

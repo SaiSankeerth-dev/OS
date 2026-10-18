@@ -54,8 +54,9 @@ class OllamaClient:
         temperature: float,
         max_tokens: int,
         stop: list[str] | None,
+        tool_json_schema: dict | None = None,
     ) -> dict:
-        return {
+        p: dict = {
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": True,
@@ -65,6 +66,9 @@ class OllamaClient:
                 **({"stop": stop} if stop else {}),
             },
         }
+        if tool_json_schema:
+            p["format"] = tool_json_schema
+        return p
 
     async def chat_stream(
         self,
@@ -73,6 +77,7 @@ class OllamaClient:
         temperature: float = 0.6,
         max_tokens: int = 256,
         stop: list[str] | None = None,
+        tool_json_schema: dict | None = None,
         perf: PerfTrace | None = None,
     ) -> AsyncIterator[ChatChunk]:
         """Yield ChatChunk tokens from Ollama as they arrive.
@@ -82,7 +87,13 @@ class OllamaClient:
         """
         req_start = time.perf_counter()
         first_seen = False
-        body = self._payload(messages, temperature=temperature, max_tokens=max_tokens, stop=stop)
+        body = self._payload(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stop=stop,
+            tool_json_schema=tool_json_schema,
+        )
 
         timeout = httpx.Timeout(self.timeout_sec, connect=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:

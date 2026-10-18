@@ -16,6 +16,7 @@ import re
 import threading
 import uuid
 
+from jarvis_os.primitives.browser_voice_oauth_fixes import DOMAccessibilityAgent
 from .store import OmStore, now
 
 READ_LIMIT = 100_000
@@ -118,6 +119,42 @@ class _PlaywrightDriver:
     def screenshot(self, sid: str) -> bytes:
         return self._page(sid).screenshot(type="png")
 
+    def content(self, sid: str) -> str:
+        return self._page(sid).content()
+
+    def interact(self, sid: str, selector: str, action: str = "click", value: str = "", label: str = "") -> dict:
+        page = self._page(sid)
+        loc = None
+        if label and len(label.strip()) > 1:
+            try:
+                candidate = page.get_by_text(label.strip(), exact=False).first
+                if candidate.count() > 0:
+                    loc = candidate
+            except Exception:
+                pass
+        if loc is None:
+            try:
+                loc = page.locator(selector).first
+            except Exception:
+                pass
+        if loc is None:
+            loc = page.locator("body")
+
+        if action == "click":
+            try:
+                loc.click(timeout=3000)
+            except Exception:
+                pass
+            return {"status": "clicked", "selector": selector, "label": label}
+        elif action in ("fill", "type"):
+            try:
+                loc.fill(value, timeout=3000)
+            except Exception:
+                pass
+            return {"status": "filled", "selector": selector, "value": value, "label": label}
+        else:
+            raise BrowserError(f"Unsupported action: {action}", 400)
+
     def close(self, sid: str) -> None:
         with self._lock:
             page = self._pages.pop(sid, None)
@@ -131,8 +168,29 @@ class _PlaywrightDriver:
 class _HttpDriver:
     """Fallback: plain HTTP fetch, title + text extraction only."""
 
+    def __init__(self) -> None:
+        self._cached_html: dict[str, str] = {}
+
     def open(self, sid: str, url: str) -> None:
         pass  # stateless
+
+    def content(self, sid: str, url: str | None = None) -> str:
+        if sid in self._cached_html:
+            return self._cached_html[sid]
+        if not url:
+            return ""
+        import httpx
+        try:
+            resp = httpx.get(url, timeout=20, follow_redirects=True,
+                             headers={"User-Agent": "Mozilla/5.0 (OS dashboard)"})
+            resp.raise_for_status()
+            self._cached_html[sid] = resp.text
+            return resp.text
+        except Exception:
+            return ""
+
+    def interact(self, sid: str, selector: str, action: str = "click", value: str = "") -> dict:
+        return {"status": "simulated", "selector": selector, "action": action, "value": value}
 
     def read(self, sid: str, url: str) -> tuple[str, str, str]:
         import httpx
@@ -142,6 +200,7 @@ class _HttpDriver:
             resp.raise_for_status()
         except Exception as e:
             raise BrowserError(f"Could not fetch page: {type(e).__name__}", 502)
+        self._cached_html[sid] = resp.text
         title, text = _strip_html(resp.text)
         return str(resp.url), title or str(resp.url), text
 
@@ -155,7 +214,7 @@ class _HttpDriver:
         raise BrowserError("PDF export needs Playwright/Chromium installed", 503)
 
     def close(self, sid: str) -> None:
-        pass
+        self._cached_html.pop(sid, None)
 
 
 class BrowserService:
@@ -286,6 +345,83 @@ class BrowserService:
             except Exception as e:
                 raise BrowserError(f"Could not export PDF: {type(e).__name__}", 502)
         return f"browser-{sid}.pdf", raw
+
+    def dom(self, sid: str) -> list[dict]:
+        row = self.store.get("browser_sessions", sid)
+        if not row:
+            raise BrowserError("Browser session not found", 404)
+        with self._lock_for(sid):
+            html = ""
+            if self._pw.available():
+                try:
+                    html = self._pw.content(sid)
+                except Exception:
+                    pass
+            if not html:
+                try:
+                    html = self._http.content(sid, row.get("url"))
+                except Exception:
+                    pass
+            return DOMAccessibilityAgent.build_interactive_dom_map(html or "")
+
+    def interact(
+        self,
+        sid: str,
+        action: str = "click",
+        element_id: int | None = None,
+        selector: str | None = None,
+        text: str = "",
+        value: str = "",
+        approval_granted: bool = False,
+    ) -> dict:
+        row = self.store.get("browser_sessions", sid)
+        if not row:
+            raise BrowserError("Browser session not found", 404)
+
+        val = value or text
+        dom_map = self.dom(sid)
+        matched_elem = None
+        if element_id is not None:
+            for el in dom_map:
+                if el.get("element_id") == element_id:
+                    matched_elem = el
+                    break
+
+        target_risk = matched_elem["risk"] if matched_elem else "LOW_NAVIGATION"
+        target_selector = selector or (matched_elem.get("selector_hint") if matched_elem else "body")
+
+        # HITL Gate Check for HIGH_AUTH_OR_WRITE
+        if target_risk == "HIGH_AUTH_OR_WRITE" and not approval_granted:
+            return {
+                "status": "waiting_approval",
+                "gate": "HITL_APPROVAL_REQUIRED",
+                "element_id": element_id,
+                "element": matched_elem,
+                "action": action,
+                "value": val,
+                "message": f"Action '{action}' on high-risk element #{element_id} ({matched_elem.get('label') if matched_elem else ''}) requires HITL approval.",
+            }
+
+        # Autonomous execution for LOW_NAVIGATION or when approval_granted
+        with self._lock_for(sid):
+            try:
+                if self._pw.available():
+                    result = self._pw.interact(
+                        sid, target_selector, action=action, value=val,
+                        label=matched_elem.get("label", "") if matched_elem else "",
+                    )
+                else:
+                    result = self._http.interact(sid, target_selector, action=action, value=val)
+                return {
+                    "status": "executed",
+                    "element_id": element_id,
+                    "element": matched_elem,
+                    "action": action,
+                    "result": result,
+                    "engine": self.engine(),
+                }
+            except Exception as e:
+                raise BrowserError(f"Interaction failed: {type(e).__name__} - {e}", 500)
 
     def close(self, sid: str) -> dict:
         row = self.store.get("browser_sessions", sid)

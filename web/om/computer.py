@@ -140,8 +140,13 @@ class ComputerService:
         if shutil.which("docker") is None:
             return False
         try:
-            proc = subprocess.run(["docker", "info"], capture_output=True, timeout=2)
-            return proc.returncode == 0
+            proc = subprocess.run(
+                ["docker", "version", "--format", "{{.Server.Version}}"],
+                capture_output=True,
+                text=True,
+                timeout=6,
+            )
+            return proc.returncode == 0 and bool(proc.stdout.strip())
         except Exception:
             return False
 
@@ -149,6 +154,13 @@ class ComputerService:
         return "docker" if self.docker_available() else "local"
 
     def _container(self) -> str:
+        if os.environ.get("OS_COMPUTER_CONTAINER"):
+            return os.environ["OS_COMPUTER_CONTAINER"]
+        r = self._docker(["ps", "--filter", "name=os-virtual-desktop",
+                          "--format", "{{.Names}}"], timeout=5)
+        names = (r.stdout or "").strip().splitlines()
+        if "os-virtual-desktop" in names:
+            return "os-virtual-desktop"
         return "os-computer"
 
     def _docker(self, args: list[str], inp: str | None = None,
@@ -168,9 +180,10 @@ class ComputerService:
                          truncated=trunc1 or trunc2)
 
     def _container_running(self) -> bool:
-        r = self._docker(["ps", "--filter", f"name=^/{self._container()}$",
-                          "--format", "{{.Names}}"], timeout=10)
-        return self._container() in (r.stdout or "")
+        r = self._docker(["ps", "--filter", f"name={self._container()}",
+                          "--format", "{{.Names}}"], timeout=5)
+        names = (r.stdout or "").strip().splitlines()
+        return self._container() in names
 
     def snapshot(self) -> dict:
         mode = self.mode()
@@ -332,38 +345,58 @@ class ComputerService:
             ], timeout=COMMAND_TIMEOUT + 10)
         lcwd = self._workspace_path_local(cwd)
         lcwd.mkdir(parents=True, exist_ok=True)
-        shell = None
-        if os.name == "nt":
-            for candidate in [
-                r"C:\Program Files\Git\bin\bash.exe",
-                r"C:\Program Files (x86)\Git\bin\bash.exe",
-                shutil.which("sh"),
-            ]:
-                if candidate and Path(candidate).exists():
-                    shell = str(candidate)
-                    break
-        if not shell:
-            shell = "/bin/bash" if Path("/bin/bash").exists() else (shutil.which("bash") or shutil.which("sh") or "/bin/sh")
-        env = _scrub_env()
-        env["WORKSPACE"] = str(lcwd)  # $WORKSPACE always points at the real dir
         try:
-            cmd_args = (
-                [shell, "--noprofile", "--norc", "-c", command]
-                if "bash" in str(shell).lower()
-                else [shell, "-c", command]
+            from .sandbox_jail import HardenedLocalSandbox, SandboxViolationError
+            sandbox = HardenedLocalSandbox(lcwd)
+            res = sandbox.execute_jailed(command, timeout_sec=COMMAND_TIMEOUT)
+            out, t1 = _cap(res.get("stdout") or "")
+            err, t2 = _cap(res.get("stderr") or "")
+            return RunResult(
+                stdout=out,
+                stderr=err,
+                exit_code=res.get("exit_code", 0),
+                timed_out=bool(res.get("timed_out")),
+                truncated=t1 or t2,
             )
-            proc = subprocess.run(
-                cmd_args,
-                cwd=str(lcwd), capture_output=True, text=True,
-                timeout=COMMAND_TIMEOUT, env=env,
+        except SandboxViolationError as sve:
+            return RunResult(
+                stdout="",
+                stderr=f"SandboxViolationError: {sve}",
+                exit_code=1,
             )
-        except subprocess.TimeoutExpired as e:
-            out, t1 = _cap((e.stdout or b"").decode("utf-8", "replace") if isinstance(e.stdout, bytes) else (e.stdout or ""))
-            return RunResult(stdout=out, stderr="command timed out", timed_out=True, truncated=t1)
-        out, t1 = _cap(proc.stdout or "")
-        err, t2 = _cap(proc.stderr or "")
-        return RunResult(stdout=out, stderr=err, exit_code=proc.returncode,
-                         truncated=t1 or t2)
+        except Exception:
+            shell = None
+            if os.name == "nt":
+                for candidate in [
+                    r"C:\Program Files\Git\bin\bash.exe",
+                    r"C:\Program Files (x86)\Git\bin\bash.exe",
+                    shutil.which("sh"),
+                ]:
+                    if candidate and Path(candidate).exists():
+                        shell = str(candidate)
+                        break
+            if not shell:
+                shell = "/bin/bash" if Path("/bin/bash").exists() else (shutil.which("bash") or shutil.which("sh") or "/bin/sh")
+            env = _scrub_env()
+            env["WORKSPACE"] = str(lcwd)
+            try:
+                cmd_args = (
+                    [shell, "--noprofile", "--norc", "-c", command]
+                    if "bash" in str(shell).lower()
+                    else [shell, "-c", command]
+                )
+                proc = subprocess.run(
+                    cmd_args,
+                    cwd=str(lcwd), capture_output=True, text=True,
+                    timeout=COMMAND_TIMEOUT, env=env,
+                )
+            except subprocess.TimeoutExpired as e:
+                out, t1 = _cap((e.stdout or b"").decode("utf-8", "replace") if isinstance(e.stdout, bytes) else (e.stdout or ""))
+                return RunResult(stdout=out, stderr="command timed out", timed_out=True, truncated=t1)
+            out, t1 = _cap(proc.stdout or "")
+            err, t2 = _cap(proc.stderr or "")
+            return RunResult(stdout=out, stderr=err, exit_code=proc.returncode,
+                             truncated=t1 or t2)
 
     @staticmethod
     def _receipt(row: dict) -> dict:

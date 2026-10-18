@@ -472,3 +472,65 @@ def test_microsoft_manifest_registered():
     assert m.auth_kind == "microsoft_oauth"
     assert m.cred_group == "microsoft"
     assert get_adapter("microsoft_outlook") is not None
+
+
+def test_google_oauth_credentials_and_start(client, monkeypatch):
+    """Google OAuth credentials inspect, initiation, and callback flow."""
+    import urllib.parse
+    import web.server as srv
+    import web.connectors.oauth_google as og
+
+    # Ensure clean slate for all Google group connectors
+    for c in ("google_calendar", "gmail", "google_sheets", "google_drive", "youtube"):
+        client.post(f"/api/connectors/{c}/revoke")
+
+    # Initially empty credentials
+    r = client.get("/api/connectors/google_calendar/credentials")
+    assert r.status_code == 200
+    assert r.json()["configured"] is False
+    assert r.json()["fields"]["client_id"] == ""
+
+    # Grant and save credentials
+    client.post("/api/connectors/google_calendar/grant", json={})
+    r = client.post("/api/connectors/google_calendar/credentials",
+                    json={"fields": {"client_id": "test-client.apps.googleusercontent.com",
+                                     "client_secret": "my-secret-123"}})
+    assert r.status_code == 200
+
+    # Inspect credentials again: client_id is visible, secret is masked
+    r = client.get("/api/connectors/google_calendar/credentials")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["configured"] is True
+    assert data["fields"]["client_id"] == "test-client.apps.googleusercontent.com"
+    assert data["fields"]["client_secret"] == "••••••••"
+    assert data["has_refresh_token"] is False
+
+    # Start OAuth
+    r = client.get("/api/connectors/google_calendar/oauth/start")
+    assert r.status_code == 200
+    res = r.json()
+    assert "accounts.google.com" in res["url"]
+    assert "/api/connectors/google/oauth/callback" in res["redirect_uri"]
+
+    # Exchange code via callback
+    monkeypatch.setattr(
+        og, "exchange_code",
+        lambda cid, sec, uri, full_url: {
+            "client_id": cid, "client_secret": sec, "refresh_token": "google-refresh-token"})
+    monkeypatch.setattr(srv, "_run_health", lambda cid: (True, "ok"))
+
+    state = urllib.parse.parse_qs(
+        urllib.parse.urlparse(res["url"]).query)["state"][0]
+    r = client.get(f"/api/connectors/google/oauth/callback?code=googlecode&state={state}")
+    assert r.status_code == 200
+    assert "Google connected" in r.text
+
+    # Detail now reflects connected and has refresh token
+    detail = client.get("/api/connectors/google_calendar").json()
+    assert detail["needs_oauth"] is False
+    assert detail["state"] == "connected"
+
+    # Revoke cleans up
+    client.post("/api/connectors/google_calendar/revoke")
+

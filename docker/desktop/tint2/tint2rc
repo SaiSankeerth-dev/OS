@@ -1,0 +1,146 @@
+# OS Virtual Desktop tint2 panel configuration
+# Theme: OS Dark Navy Glass with Cyan Accent
+
+# Background 1: Panel
+rounded = 0
+border_width = 1
+border_sides = T
+background_color = #060b14 90
+border_color = #00f0ff 25
+background_color_hover = #060b14 90
+border_color_hover = #00f0ff 40
+background_color_pressed = #060b14 90
+border_color_pressed = #00f0ff 40
+
+# Background 2: Inactive task
+rounded = 4
+border_width = 1
+border_sides = TBLR
+background_color = #0e1726 80
+border_color = #1e293b 80
+background_color_hover = #1e293b 90
+border_color_hover = #38bdf8 50
+background_color_pressed = #0e1726 90
+border_color_pressed = #00f0ff 60
+
+# Background 3: Active task
+rounded = 4
+border_width = 1
+border_sides = TBLR
+background_color = #162238 95
+border_color = #00f0ff 70
+background_color_hover = #1e2e4a 95
+border_color_hover = #00f0ff 90
+background_color_pressed = #162238 95
+border_color_pressed = #00f0ff 90
+
+# Background 4: Urgent task
+rounded = 4
+border_width = 1
+border_sides = TBLR
+background_color = #f59e0b 80
+border_color = #fbbf24 100
+background_color_hover = #f59e0b 90
+border_color_hover = #fbbf24 100
+background_color_pressed = #f59e0b 90
+border_color_pressed = #fbbf24 100
+
+# Background 5: Tooltip
+rounded = 3
+border_width = 1
+border_sides = TBLR
+background_color = #060b14 95
+border_color = #00f0ff 40
+background_color_hover = #060b14 95
+border_color_hover = #00f0ff 40
+background_color_pressed = #060b14 95
+border_color_pressed = #00f0ff 40
+
+# Panel
+panel_items = LTSC
+panel_size = 100% 30
+panel_margin = 0 0
+panel_padding = 4 1 4
+panel_background_id = 1
+wm_menu = 1
+panel_dock = 0
+panel_position = bottom center horizontal
+panel_layer = top
+panel_monitor = all
+panel_shrink = 0
+autohide = 0
+strut_policy = follow_size
+panel_window_name = tint2
+disable_transparency = 0
+mouse_effects = 1
+font_shadow = 0
+
+# Taskbar
+taskbar_mode = single_desktop
+taskbar_hide_if_empty = 0
+taskbar_padding = 2 0 4
+taskbar_background_id = 0
+taskbar_active_background_id = 0
+taskbar_name = 1
+taskbar_hide_inactive_tasks = 0
+taskbar_hide_different_monitor = 0
+taskbar_hide_different_desktop = 0
+taskbar_always_show_all_desktop_tasks = 0
+taskbar_name_padding = 6 2
+taskbar_name_background_id = 0
+taskbar_name_active_background_id = 0
+taskbar_name_font_color = #94a3b8 100
+taskbar_name_active_font_color = #00f0ff 100
+taskbar_distribute_size = 0
+taskbar_sort_order = none
+task_align = left
+
+# Tasks
+task_text = 1
+task_icon = 1
+task_centered = 1
+urgent_nb_of_blink = 10
+task_maximum_size = 200 26
+task_padding = 4 2 4
+task_tooltip = 1
+task_thumbnail = 0
+task_font_color = #e2e8f0 100
+task_active_font_color = #ffffff 100
+task_background_id = 2
+task_active_background_id = 3
+task_urgent_background_id = 4
+task_iconified_background_id = 2
+mouse_left = toggle_iconify
+mouse_middle = none
+mouse_right = close
+mouse_scroll_up = toggle
+mouse_scroll_down = iconify
+
+# System Tray
+systray_padding = 0 6 2
+systray_background_id = 0
+systray_sort = ascending
+systray_icon_size = 20
+systray_monitor = 1
+
+# Launcher
+launcher_padding = 4 2 4
+launcher_background_id = 0
+launcher_icon_size = 20
+launcher_item_app = /usr/share/applications/debian-xterm.desktop
+launcher_item_app = /usr/share/applications/chromium.desktop
+
+# Clock
+time1_format = %H:%M
+time2_format = %a %d %b
+clock_font_color = #38bdf8 100
+clock_padding = 6 0
+clock_background_id = 0
+clock_tooltip = %Y-%m-%d %H:%M:%S
+
+# Tooltip
+tooltip_show_timeout = 0.5
+tooltip_hide_timeout = 0.1
+tooltip_padding = 4 4
+tooltip_background_id = 5
+tooltip_font_color = #e2e8f0 100

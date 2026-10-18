@@ -100,6 +100,16 @@ export const ConnectorsView: React.FC = () => {
       setShowPasswordMap({});
       setActiveTab('setup');
 
+      // Load existing vault credentials
+      try {
+        const credRes = await api.getConnectorCredentials(c.id);
+        if (credRes && credRes.fields) {
+          setCredValues(credRes.fields);
+        }
+      } catch (e) {
+        console.warn('Could not load existing credentials:', e);
+      }
+
       // Load settings
       try {
         const sRes = await api.getConnectorSettings(c.id);
@@ -153,7 +163,21 @@ export const ConnectorsView: React.FC = () => {
     if (!activeConnector) return;
     setIsSavingCreds(true);
     try {
-      await api.saveConnectorCredentials(activeConnector.id, activeConnector.name, credValues);
+      // Auto-grant permissions if currently available
+      if (activeConnector.state === 'available') {
+        const scopesToGrant = selectedScopes.length ? selectedScopes : activeConnector.scopes || [];
+        await api.grantConnector(activeConnector.id, scopesToGrant);
+      }
+
+      // Strip masked placeholders before saving
+      const payload: Record<string, string> = {};
+      for (const [k, v] of Object.entries(credValues)) {
+        if (v && v !== '••••••••') {
+          payload[k] = v.trim();
+        }
+      }
+
+      await api.saveConnectorCredentials(activeConnector.id, activeConnector.name, payload);
       addNotification({
         type: 'success',
         title: 'Credentials Encrypted & Saved',
@@ -177,6 +201,23 @@ export const ConnectorsView: React.FC = () => {
   const handleStartOAuth = async () => {
     if (!activeConnector) return;
     try {
+      // Auto-grant if in available state
+      if (activeConnector.state === 'available') {
+        const scopesToGrant = selectedScopes.length ? selectedScopes : activeConnector.scopes || [];
+        await api.grantConnector(activeConnector.id, scopesToGrant);
+      }
+
+      // Auto-save any typed credentials first
+      const payload: Record<string, string> = {};
+      for (const [k, v] of Object.entries(credValues)) {
+        if (v && v !== '••••••••') {
+          payload[k] = v.trim();
+        }
+      }
+      if (Object.keys(payload).length > 0) {
+        await api.saveConnectorCredentials(activeConnector.id, activeConnector.name, payload);
+      }
+
       const res = await api.startConnectorOAuth(activeConnector.id);
       if (!res.url) {
         throw new Error('OAuth URL not returned from server');
@@ -699,18 +740,55 @@ export const ConnectorsView: React.FC = () => {
 
                 {/* OAuth Flow or Token Fields */}
                 <div className="space-y-3">
+                  {/* OAuth Redirect URI Helper */}
+                  {(activeConnector.auth_kind === 'google_oauth' ||
+                    activeConnector.auth_kind === 'microsoft_oauth') && (
+                    <div className="p-2.5 rounded-glass-sm bg-os-surface/40 border border-os-border/50 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-os-muted font-medium">Authorized Redirect URI (for GCP Console):</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const uri = `${window.location.origin}/api/connectors/${activeConnector.auth_kind === 'microsoft_oauth' ? 'microsoft' : 'google'}/oauth/callback`;
+                            navigator.clipboard.writeText(uri);
+                            addNotification({
+                              type: 'info',
+                              title: 'Copied to Clipboard',
+                              message: uri,
+                            });
+                          }}
+                          className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono text-[10px] transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>Copy URI</span>
+                        </button>
+                      </div>
+                      <div className="font-mono text-[11px] text-emerald-400/90 truncate select-all bg-black/40 px-2.5 py-1 rounded border border-white/5">
+                        {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/api/connectors/{activeConnector.auth_kind === 'microsoft_oauth' ? 'microsoft' : 'google'}/oauth/callback
+                      </div>
+                    </div>
+                  )}
+
                   {activeConnector.cred_fields && activeConnector.cred_fields.length > 0 && (
                     <div className="space-y-3">
                       {activeConnector.cred_fields.map((field) => (
                         <div key={field.key} className="space-y-1">
-                          <label className="text-xs font-semibold text-os-primary flex items-center justify-between">
-                            <span>{field.label || field.key}</span>
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-os-primary flex items-center gap-2">
+                              <span>{field.label || field.key}</span>
+                              {credValues[field.key] && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-medium flex items-center gap-1">
+                                  <Check className="w-2.5 h-2.5" />
+                                  <span>In Vault</span>
+                                </span>
+                              )}
+                            </label>
                             {field.help && (
                               <span className="text-[10px] text-os-muted font-normal">
                                 {field.help}
                               </span>
                             )}
-                          </label>
+                          </div>
                           <div className="relative">
                             <input
                               type={
@@ -779,7 +857,7 @@ export const ConnectorsView: React.FC = () => {
                         OAuth 2.0 Authorization
                       </div>
                       <p className="text-[11px] text-os-secondary">
-                        Once Client ID & Secret are saved above, click below to authorize access with your account.
+                        Once Client ID & Secret are entered or saved above, click below to authorize access with your account.
                       </p>
 
                       <div className="flex items-center gap-3 pt-1">

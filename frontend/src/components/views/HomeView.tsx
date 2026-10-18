@@ -12,26 +12,31 @@ import {
   RefreshCw,
   Layers,
   ChevronRight,
+  Monitor,
+  Link2,
+  CheckSquare,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { GlassCard } from '../common/GlassCard';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
-import { HomeViewData, DailyPlan, PlanItem, Task } from '../../types/api';
+import { HomeViewData, DailyPlan, PlanItem, Task, Connector } from '../../types/api';
 
 export const HomeView: React.FC = () => {
   const { me, setCurrentView, pendingApprovalsCount, activeAgentsCount } = useApp();
   const [homeData, setHomeData] = useState<HomeViewData | null>(null);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
+  const [connectors, setConnectors] = useState<Connector[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchHome = async () => {
     setIsLoading(true);
     try {
-      const [hRes, pRes] = await Promise.allSettled([
+      const [hRes, pRes, cRes] = await Promise.allSettled([
         api.getHomeView(),
         api.getPlan(),
+        api.getConnectors(),
       ]);
 
       if (hRes.status === 'fulfilled') {
@@ -39,6 +44,9 @@ export const HomeView: React.FC = () => {
       }
       if (pRes.status === 'fulfilled') {
         setPlanItems(pRes.value.items || []);
+      }
+      if (cRes.status === 'fulfilled') {
+        setConnectors(cRes.value.connectors || []);
       }
     } catch (err) {
       console.error('Failed to load home view data:', err);
@@ -51,8 +59,10 @@ export const HomeView: React.FC = () => {
     fetchHome();
   }, []);
 
+  const connectedCount = connectors.filter((c) => c.state === 'connected').length;
+
   return (
-    <div className="max-w-6xl mx-auto w-full px-4 md:px-8 py-6 space-y-8 animate-in fade-in duration-200">
+    <div className="max-w-6xl mx-auto w-full px-4 md:px-8 py-6 space-y-6 animate-in fade-in duration-200">
       {/* Greeting & Ambient Status Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-os-border/50">
         <div>
@@ -74,8 +84,8 @@ export const HomeView: React.FC = () => {
           </h1>
           <p className="text-xs md:text-sm text-os-secondary mt-0.5">
             {pendingApprovalsCount > 0
-              ? `You have ${pendingApprovalsCount} action approval waiting and tasks scheduled for today.`
-              : 'All systems nominal. OS is actively observing background feeds and commitments.'}
+              ? `You have ${pendingApprovalsCount} external action approval waiting and tasks scheduled for today.`
+              : 'All systems nominal. OS is actively observing background feeds, connectors, and commitments.'}
           </p>
         </div>
 
@@ -99,6 +109,79 @@ export const HomeView: React.FC = () => {
             Ask OS
           </Button>
         </div>
+      </div>
+
+      {/* Operational Summary 4-Column Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <GlassCard
+          className="p-3.5 cursor-pointer hover:border-os-border-glass transition-all"
+          onClick={() => setCurrentView('tasks')}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-os-muted">Tasks & Plan</span>
+            <CheckSquare className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-lg font-bold text-os-primary mt-1">
+            {planItems.length > 0 ? `${planItems.length} in plan` : 'Clear pool'}
+          </div>
+          <div className="text-[11px] text-os-secondary flex items-center gap-1 mt-0.5">
+            <span>Open Tasks Center</span>
+            <ChevronRight className="w-3 h-3" />
+          </div>
+        </GlassCard>
+
+        <GlassCard
+          className={`p-3.5 cursor-pointer transition-all ${
+            pendingApprovalsCount > 0 ? 'border-amber-500/40 bg-amber-500/10' : 'hover:border-os-border-glass'
+          }`}
+          onClick={() => setCurrentView('activity')}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-os-muted">Safety Approvals</span>
+            <ShieldAlert className={`w-4 h-4 ${pendingApprovalsCount > 0 ? 'text-amber-400' : 'text-os-muted'}`} />
+          </div>
+          <div className={`text-lg font-bold mt-1 ${pendingApprovalsCount > 0 ? 'text-amber-400' : 'text-os-primary'}`}>
+            {pendingApprovalsCount > 0 ? `${pendingApprovalsCount} Waiting` : '0 Pending'}
+          </div>
+          <div className="text-[11px] text-os-secondary flex items-center gap-1 mt-0.5">
+            <span>{pendingApprovalsCount > 0 ? 'Review & authorize' : 'All safe'}</span>
+            <ChevronRight className="w-3 h-3" />
+          </div>
+        </GlassCard>
+
+        <GlassCard
+          className="p-3.5 cursor-pointer hover:border-os-border-glass transition-all"
+          onClick={() => setCurrentView('connections')}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-os-muted">Digital Connectors</span>
+            <Link2 className="w-4 h-4 text-cyan-400" />
+          </div>
+          <div className="text-lg font-bold text-os-primary mt-1">
+            {connectedCount > 0 ? `${connectedCount} Connected` : 'Configuring'}
+          </div>
+          <div className="text-[11px] text-os-secondary flex items-center gap-1 mt-0.5">
+            <span>Google, GitHub & APIs</span>
+            <ChevronRight className="w-3 h-3" />
+          </div>
+        </GlassCard>
+
+        <GlassCard
+          className="p-3.5 cursor-pointer hover:border-os-border-glass transition-all"
+          onClick={() => setCurrentView('computer')}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase text-os-muted">Computer & Browser</span>
+            <Monitor className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-lg font-bold text-os-primary mt-1">
+            Isolated Control
+          </div>
+          <div className="text-[11px] text-os-secondary flex items-center gap-1 mt-0.5">
+            <span>Dual cursors active</span>
+            <ChevronRight className="w-3 h-3" />
+          </div>
+        </GlassCard>
       </div>
 
       {/* 1. HERO BEAT: "WHAT MATTERS RIGHT NOW" */}
@@ -128,7 +211,7 @@ export const HomeView: React.FC = () => {
                   OS prepared external actions awaiting your confirmation
                 </h3>
                 <p className="text-xs text-os-secondary max-w-2xl leading-relaxed">
-                  Connector requests (such as email dispatch or calendar changes) are held behind
+                  Connector requests (such as email dispatch, calendar changes, or automated browser writes) are held behind
                   tamper-evident SHA-256 integrity checks until you give explicit approval.
                 </p>
               </div>
@@ -137,7 +220,7 @@ export const HomeView: React.FC = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  onClick={() => setCurrentView('approvals')}
+                  onClick={() => setCurrentView('activity')}
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
                   Review Approvals ({pendingApprovalsCount})
@@ -199,7 +282,7 @@ export const HomeView: React.FC = () => {
                 <Button
                   variant="glass"
                   size="sm"
-                  onClick={() => setCurrentView('plan')}
+                  onClick={() => setCurrentView('tasks')}
                   rightIcon={<ChevronRight className="w-4 h-4" />}
                 >
                   Inspect Schedule
@@ -220,7 +303,7 @@ export const HomeView: React.FC = () => {
               <span>Today's Time-Carved Schedule</span>
             </div>
             <button
-              onClick={() => setCurrentView('plan')}
+              onClick={() => setCurrentView('tasks')}
               className="text-xs text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1"
             >
               <span>View Full Plan</span>
@@ -239,7 +322,7 @@ export const HomeView: React.FC = () => {
                       <Button
                         variant="glass"
                         size="sm"
-                        onClick={() => setCurrentView('plan')}
+                        onClick={() => setCurrentView('tasks')}
                         leftIcon={<Sparkles className="w-3.5 h-3.5 text-emerald-400" />}
                       >
                         Generate Daily Plan
@@ -259,7 +342,7 @@ export const HomeView: React.FC = () => {
                 return (
                   <div
                     key={item.id || idx}
-                    className="flex items-center justify-between p-2.5 rounded-glass-sm bg-white/5 hover:bg-white/10 border border-transparent hover:border-os-border transition-all"
+                    className="flex items-center justify-between p-2.5 rounded-glass-sm bg-os-surface/60 hover:bg-os-surface-active/50 border border-os-border/40 transition-all"
                   >
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-xs text-os-secondary w-16">
@@ -298,21 +381,21 @@ export const HomeView: React.FC = () => {
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="p-2.5 rounded-glass-sm bg-black/20 border border-white/5">
+              <div className="p-2.5 rounded-glass-sm bg-os-surface/60 border border-os-border/40">
                 <div className="font-semibold text-os-primary text-xs">Deadline Watcher</div>
                 <div className="text-[11px] text-os-muted mt-0.5">
                   Continually evaluating task progress and recalculating critical path.
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-glass-sm bg-black/20 border border-white/5">
+              <div className="p-2.5 rounded-glass-sm bg-os-surface/60 border border-os-border/40">
                 <div className="font-semibold text-os-primary text-xs">Calendar Conflict Guard</div>
                 <div className="text-[11px] text-os-muted mt-0.5">
                   Synchronizing busy slots with live Google Calendar adapter.
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-glass-sm bg-black/20 border border-white/5">
+              <div className="p-2.5 rounded-glass-sm bg-os-surface/60 border border-os-border/40">
                 <div className="font-semibold text-os-primary text-xs">Email Ingestion Pipe</div>
                 <div className="text-[11px] text-os-muted mt-0.5">
                   Extracting commitments and tasks from incoming communications.
@@ -324,7 +407,7 @@ export const HomeView: React.FC = () => {
               variant="ghost"
               size="sm"
               className="w-full text-xs text-os-secondary justify-center"
-              onClick={() => setCurrentView('agents')}
+              onClick={() => setCurrentView('settings')}
             >
               Inspect Specialized Workers →
             </Button>
@@ -353,7 +436,7 @@ export const HomeView: React.FC = () => {
             homeData.recent_activity.slice(0, 4).map((act) => (
               <div
                 key={act.id}
-                className="flex items-center justify-between p-2 rounded-glass-sm hover:bg-white/5 transition-colors text-xs"
+                className="flex items-center justify-between p-2 rounded-glass-sm hover:bg-os-surface-active/50 transition-colors text-xs"
               >
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />

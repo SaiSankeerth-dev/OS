@@ -63,6 +63,20 @@ DEFAULT_JOBS: list[dict[str, Any]] = [
         "enabled": True,
         "description": "Evaluate watcher rules",
     },
+    {
+        "name": "oauth_watchdog",
+        "cron": "*/10 * * * *",
+        "handler": "server.scheduler.jobs.oauth_watchdog",
+        "enabled": True,
+        "description": "Proactive OAuth Watchdog: refresh Google and Microsoft tokens 10m before expiry",
+    },
+    {
+        "name": "github_discovery_scan",
+        "cron": "0 */2 * * *",
+        "handler": "server.scheduler.jobs.github_discovery_scan",
+        "enabled": True,
+        "description": "Proactive GitHub Intelligence: discover emerging repositories, calculate star acceleration, and queue notifications",
+    },
 ]
 
 
@@ -365,6 +379,56 @@ async def _watcher_eval(user_id: str = "default_user") -> dict[str, Any]:
     }
 
 
+async def _oauth_watchdog(user_id: str = "default_user") -> dict[str, Any]:
+    """Proactive OAuth Watchdog: refresh Google and Microsoft tokens 10m prior to expiry."""
+    log.info("[Scheduler] Running oauth_watchdog")
+    from web.connectors.base import check_and_refresh_oauth
+    results = {}
+    for group in ["google", "microsoft"]:
+        try:
+            results[group] = check_and_refresh_oauth(group)
+        except Exception as e:
+            results[group] = {"status": "error", "error": str(e)}
+    return {
+        "job": "oauth_watchdog",
+        "status": "completed",
+        "refreshed_groups": results,
+    }
+
+
+async def _github_discovery_scan(user_id: str = "default_user") -> dict[str, Any]:
+    """Proactive GitHub Intelligence job: scan emerging repos, compute trajectories, and queue notifications."""
+    log.info("[Scheduler] Running github_discovery_scan")
+    try:
+        from server.intelligence.github_service import get_discovery_service
+        from server.intelligence.notifier import get_notifier
+
+        svc = get_discovery_service()
+        candidates = svc.scan_all()
+        notifier = get_notifier()
+
+        notified_count = 0
+        for c in candidates:
+            if c.score and not c.score.is_disqualified:
+                res = notifier.process_candidate_for_notification(c)
+                if res:
+                    notified_count += 1
+
+        return {
+            "job": "github_discovery_scan",
+            "status": "completed",
+            "discovered_count": len(candidates),
+            "notified_count": notified_count,
+        }
+    except Exception as e:
+        log.warning("[Scheduler] github_discovery_scan error: %s", e)
+        return {
+            "job": "github_discovery_scan",
+            "status": "error",
+            "error": str(e),
+        }
+
+
 # Handler registry
 JOB_HANDLERS: dict[str, Callable] = {
     "server.scheduler.jobs.morning_plan": _morning_plan,
@@ -372,6 +436,8 @@ JOB_HANDLERS: dict[str, Callable] = {
     "server.scheduler.jobs.deadline_check": _deadline_check,
     "server.scheduler.jobs.approval_nag": _approval_nag,
     "server.scheduler.jobs.watcher_eval": _watcher_eval,
+    "server.scheduler.jobs.oauth_watchdog": _oauth_watchdog,
+    "server.scheduler.jobs.github_discovery_scan": _github_discovery_scan,
 }
 
 

@@ -22,15 +22,15 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const variantStyles = {
     primary:
-      'bg-emerald-500 text-white font-medium hover:bg-emerald-400 border border-emerald-400/40 shadow-glass-glow',
+      'bg-blue-600 text-white font-medium hover:bg-blue-500 border border-blue-500/40 shadow-sm shadow-blue-500/20',
     glass:
-      'bg-white/5 hover:bg-white/10 text-os-primary border border-os-border hover:border-os-border-glass backdrop-blur-md',
+      'bg-os-surface/80 hover:bg-os-surface-active text-os-primary border border-os-border hover:border-os-border-glass backdrop-blur-md',
     secondary:
-      'bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30',
+      'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30',
     danger:
-      'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 shadow-glass-glow-danger',
+      'bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-glass-glow-danger',
     ghost:
-      'hover:bg-white/5 text-os-secondary hover:text-os-primary border border-transparent',
+      'hover:bg-os-surface/80 text-os-secondary hover:text-os-primary border border-transparent',
   }[variant];
 
   const sizeStyles = {

@@ -148,11 +148,12 @@ def main() -> int:
     ap.add_argument(
         "command",
         nargs="?",
-        choices=["dashboard"],
-        help="'dashboard' starts the web UI",
+        choices=["dashboard", "acp"],
+        help="'dashboard' starts the web UI; 'acp' runs the stdio Agent Client Protocol bridge",
     )
     ap.add_argument("--port", type=int, default=3000, help="dashboard port")
     ap.add_argument("--host", default="127.0.0.1", help="dashboard host")
+    ap.add_argument("--agent", default="forge", help="agent/dot persona for ACP sessions")
     args = ap.parse_args()
     if args.command == "dashboard":
         import os as _os
@@ -163,6 +164,27 @@ def main() -> int:
         from web.server import run as run_dashboard
 
         run_dashboard(port=args.port, host=args.host)
+        return 0
+    if args.command == "acp":
+        import json
+        from jarvis_os.enterprise_runtime import EnterpriseJarvisRuntime
+        from jarvis_os.primitives.octop_harness import DualACPBridge
+
+        kernel = EnterpriseJarvisRuntime()
+        bridge = DualACPBridge(kernel=kernel)
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+                resp = bridge.handle_inbound_rpc(req)
+                sys.stdout.write(json.dumps(resp) + "\n")
+                sys.stdout.flush()
+            except Exception as e:
+                err_resp = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": str(e)}}
+                sys.stdout.write(json.dumps(err_resp) + "\n")
+                sys.stdout.flush()
         return 0
     try:
         return asyncio.run(amain(args))

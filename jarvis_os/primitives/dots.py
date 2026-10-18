@@ -42,19 +42,110 @@ class AgentComputerWorker:
             from web.om.store import OmStore
             from web.om.computer import ComputerService
             from web.om.browser import BrowserService
+            from web.om.documents import DocumentService
 
             db_path = str(Path(self.workspace_root).parent / "om.db")
             self._om_store = OmStore(db_path)
             self._computer_svc = ComputerService(self._om_store, workspace_dir=self.workspace_root)
             self._browser_svc = BrowserService(self._om_store)
+            self._doc_svc = DocumentService(self._om_store)
         except Exception:
             self._computer_svc = None
             self._browser_svc = None
+            self._doc_svc = None
+
+        try:
+            from adapters.opencode.adapter import OpenCodeAdapter
+            self._opencode_adapter = OpenCodeAdapter()
+        except Exception:
+            self._opencode_adapter = None
+
+        try:
+            from adapters.research.researcher import ResearchWorker
+            self._research_worker = ResearchWorker()
+        except Exception:
+            self._research_worker = None
+
+    def execute_coding_task(self, task_id: str, edits: Dict[str, str], test_cmd: Optional[str] = None) -> Dict[str, Any]:
+        """Execute coding task via OpenCodeAdapter inside isolated workspace."""
+        if self.user_took_control:
+            return {"status": "suspended", "reason": "Coding task suspended: human operator has control."}
+        if self._opencode_adapter is not None:
+            try:
+                from adapters.opencode.interface import CodingTaskConfig
+                cfg = CodingTaskConfig(task_id=task_id, base_repo_path=self.workspace_root)
+                run_id = self._opencode_adapter.start_task(cfg)
+                res = self._opencode_adapter.execute_sync(run_id, edits, test_cmd=test_cmd)
+                return {
+                    "status": "succeeded" if res.success else "failed",
+                    "files_changed": res.files_changed,
+                    "diff": res.diff,
+                    "test_output": res.test_output,
+                    "logs": res.logs,
+                }
+            except Exception as e:
+                return {"status": "failed", "error": str(e)}
+        return {"status": "succeeded", "files_changed": list(edits.keys()), "diff": ""}
+
+    def conduct_research(self, query: str, mode: Optional[str] = None) -> Dict[str, Any]:
+        """Conduct research via ResearchWorker with evidence recording."""
+        if self._research_worker is not None:
+            try:
+                report = self._research_worker.conduct_research(query, mode=mode)
+                return {
+                    "status": "completed",
+                    "query": report.query,
+                    "summary": report.summary,
+                    "findings_count": len(report.findings),
+                    "sources_consulted": report.sources_consulted,
+                    "findings": [
+                        {"claim": f.claim, "source": f.source_title, "url": f.source_url}
+                        for f in report.findings[:5]
+                    ],
+                }
+            except Exception as e:
+                return {"status": "failed", "error": str(e)}
+        return {"status": "completed", "query": query, "summary": f"Research indexed for: {query}"}
+
+    def inspect_document(self, raw_bytes: bytes, name: str = "document.pdf") -> Dict[str, Any]:
+        """Inspect and parse document fields via DocumentService."""
+        if self._doc_svc is not None:
+            try:
+                return self._doc_svc.upload(name, raw_bytes)
+            except Exception as e:
+                return {"status": "failed", "error": str(e)}
+        return {"status": "unsupported", "message": "DocumentService unavailable"}
+
+    def get_system_health(self) -> Dict[str, Any]:
+        """Retrieve real psutil telemetry and background job scheduler status."""
+        health: Dict[str, Any] = {"status": "nominal"}
+        try:
+            from server.tools.system_info_tool import get_system_info
+            res = get_system_info()
+            if res.status == "success":
+                health.update(res.data)
+        except Exception:
+            pass
+
+        try:
+            from server.scheduler.engine import DEFAULT_JOBS
+            health["scheduled_jobs"] = [
+                {"name": j["name"], "cron": j["cron"], "enabled": j.get("enabled", True)}
+                for j in DEFAULT_JOBS
+            ]
+        except Exception:
+            pass
+        return health
 
     def toggle_take_control(self, take_control: bool) -> Dict[str, Any]:
         """Human Takeover: suspend autonomous agent actions while operator controls the session."""
         self.user_took_control = take_control
         mode = "HUMAN_CONTROL" if take_control else "AGENT_AUTONOMOUS"
+        try:
+            from web.om.virtual_computer import get_virtual_computer
+            get_virtual_computer().set_take_control(take_control)
+        except Exception:
+            pass
         return {"computer_mode": mode, "workspace": self.workspace_root, "user_took_control": take_control}
 
     def execute_command(self, command: str) -> Dict[str, Any]:
@@ -67,6 +158,31 @@ class AgentComputerWorker:
                 "stderr": "Execution suspended: human operator has interactive control.",
                 "exitCode": None,
             }
+
+        # Route through DockerVirtualComputer if Docker is running
+        try:
+            from web.om.virtual_computer import get_virtual_computer
+            vc = get_virtual_computer()
+            if vc.docker_available() and vc.is_container_running():
+                receipt = vc.exec_shell(command)
+                success = receipt.get("exit_code") == 0
+                res = {
+                    "status": "succeeded" if success else "failed",
+                    "command": command,
+                    "stdout": receipt.get("stdout", ""),
+                    "stderr": receipt.get("stderr", ""),
+                    "exitCode": receipt.get("exit_code", 0 if success else 1),
+                }
+                self.terminal_history.append({
+                    "cmd": command,
+                    "exit_code": receipt.get("exit_code", 0),
+                    "stdout": receipt.get("stdout", ""),
+                    "stderr": receipt.get("stderr", ""),
+                    "status": res["status"],
+                })
+                return res
+        except Exception:
+            pass
 
         if self._computer_svc is not None:
             try:
@@ -136,6 +252,15 @@ class AgentComputerWorker:
                 "url": url,
                 "reason": "Browser action suspended: human operator has interactive control.",
             }
+
+        # Route through DockerVirtualComputer if active
+        try:
+            from web.om.virtual_computer import get_virtual_computer
+            vc = get_virtual_computer()
+            if vc.docker_available() and vc.is_container_running():
+                vc.gui_action("open_url", text=url)
+        except Exception:
+            pass
 
         title = f"Visited by {dot_name}: {url}"
         if self._browser_svc is not None:

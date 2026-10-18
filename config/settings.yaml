@@ -152,3 +152,20 @@ gstack:
   # Default workspace for gstack skills.
   workspace_dir: null
 
+computer:
+  # Unified Computer Control & Multi-Backend Automation
+  enabled: true
+  primary_backend: browser_harness
+  allow_paid_cloud_sandboxes: false # Strict $0-spending budget policy
+  profile_dir: ".os_browser_profile" # Private browser profile outside git
+  headless: true
+  action_timeout_sec: 30.0
+  max_steps_per_task: 25
+  max_retries_per_step: 2
+  rate_limits:
+    cache_path: "data/rate_limits_cache.json"
+    sync_remote: false
+  safety:
+    require_approval_for_write: true
+    block_sensitive_ports: true
+

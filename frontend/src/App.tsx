@@ -1,20 +1,30 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { VoiceProvider } from './context/VoiceContext';
 import { Topbar } from './components/navigation/Topbar';
 import { Sidebar } from './components/navigation/Sidebar';
 import { CommandPalette } from './components/navigation/CommandPalette';
-import { HomeView } from './components/views/HomeView';
-import { ChatCanvas } from './components/chat/ChatCanvas';
-import { PlanView } from './components/views/PlanView';
-import { TasksView } from './components/views/TasksView';
-import { ApprovalsView } from './components/views/ApprovalsView';
-import { AgentsView } from './components/views/AgentsView';
-import { ActivityView } from './components/views/ActivityView';
-import { ConnectorsView } from './components/views/ConnectorsView';
-import { MemoryView } from './components/views/MemoryView';
-import { HudView } from './components/views/HudView';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
+
+// Fix 8: Code-splitting views via React.lazy() to eliminate monolith bundle
+const HomeView = lazy(() => import('./components/views/HomeView').then(m => ({ default: m.HomeView })));
+const ChatCanvas = lazy(() => import('./components/chat/ChatCanvas').then(m => ({ default: m.ChatCanvas })));
+const TasksView = lazy(() => import('./components/views/TasksView').then(m => ({ default: m.TasksView })));
+const ActivityView = lazy(() => import('./components/views/ActivityView').then(m => ({ default: m.ActivityView })));
+const ConnectorsView = lazy(() => import('./components/views/ConnectorsView').then(m => ({ default: m.ConnectorsView })));
+const SettingsView = lazy(() => import('./components/views/SettingsView').then(m => ({ default: m.SettingsView })));
+const ComputerView = lazy(() => import('./components/views/ComputerView').then(m => ({ default: m.ComputerView })));
+const DiscoveryView = lazy(() => import('./components/views/DiscoveryView').then(m => ({ default: m.DiscoveryView })));
+const HudView = lazy(() => import('./components/views/HudView').then(m => ({ default: m.HudView })));
+
+const ViewFallback: React.FC = () => (
+  <div className="flex-1 flex items-center justify-center p-12 text-os-secondary min-h-[360px]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-6 h-6 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin" />
+      <span className="text-xs uppercase tracking-widest text-os-tertiary">Loading module...</span>
+    </div>
+  </div>
+);
 
 const MainShell: React.FC = () => {
   const { currentView, notifications, removeNotification } = useApp();
@@ -22,25 +32,33 @@ const MainShell: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'home':
+      case 'overview':
         return <HomeView />;
-      case 'hud':
-        return <HudView />;
       case 'chat':
         return <ChatCanvas />;
-      case 'plan':
-        return <PlanView />;
+      case 'discovery':
+        return <DiscoveryView />;
       case 'tasks':
-        return <TasksView />;
-      case 'approvals':
-        return <ApprovalsView />;
-      case 'agents':
-        return <AgentsView />;
-      case 'activity':
-        return <ActivityView />;
+        return <TasksView initialTab="tasks" />;
+      case 'plan':
+        return <TasksView initialTab="plan" />;
+      case 'computer':
+        return <ComputerView />;
+      case 'connections':
       case 'connectors':
         return <ConnectorsView />;
+      case 'activity':
+        return <ActivityView initialTab="approvals" />;
+      case 'approvals':
+        return <ActivityView initialTab="approvals" />;
+      case 'settings':
+        return <SettingsView initialTab="memory" />;
       case 'memory':
-        return <MemoryView />;
+        return <SettingsView initialTab="memory" />;
+      case 'agents':
+        return <SettingsView initialTab="workers" />;
+      case 'hud':
+        return <HudView />;
       default:
         return <HomeView />;
     }
@@ -58,7 +76,9 @@ const MainShell: React.FC = () => {
 
         {/* View Surface */}
         <main className="flex-1 overflow-y-auto relative">
-          {renderView()}
+          <Suspense fallback={<ViewFallback />}>
+            {renderView()}
+          </Suspense>
         </main>
       </div>
 

@@ -104,3 +104,42 @@ class Adapter:
             raise AdapterError(
                 f"Missing {', '.join(missing)} — add it in the connector settings."
             )
+
+
+def check_and_refresh_oauth(cred_group: str, store: Any = None) -> dict[str, Any]:
+    """Check OAuth token expiry and proactively refresh 10 minutes (600s) before expiry."""
+    from jarvis_os.primitives.browser_voice_oauth_fixes import ProactiveOAuthWatchdog
+
+    if store is None:
+        from web.store import DashboardStore
+        store = DashboardStore()
+
+    creds = store.load_credentials(cred_group)
+    if not creds:
+        return {"status": "no_credentials", "cred_group": cred_group, "refreshed": False}
+
+    watchdog = ProactiveOAuthWatchdog(refresh_margin_sec=600)
+
+    if cred_group == "microsoft":
+        from .oauth_microsoft import refresh_access_token
+        res = watchdog.check_and_refresh(cred_group, creds, refresh_access_token)
+    elif cred_group == "google":
+        def _google_refresh(client_id: str, client_secret: str, refresh_token: str) -> str:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            c = Credentials(
+                token=None,
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+            c.refresh(Request())
+            return c.token or ""
+        res = watchdog.check_and_refresh(cred_group, creds, _google_refresh)
+    else:
+        return {"status": "unsupported_cred_group", "cred_group": cred_group, "refreshed": False}
+
+    if res.get("refreshed"):
+        store.save_credentials(cred_group, store.get_label(cred_group) or cred_group, creds)
+    return res

@@ -51,11 +51,16 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       {/* Dialog */}
-      <div className={`relative w-full ${maxWidthStyles} z-10 animate-in fade-in zoom-in-95 duration-200`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        className={`relative w-full ${maxWidthStyles} z-10 animate-in fade-in zoom-in-95 duration-200`}
+      >
         <GlassCard className="p-6 border-os-border-glass shadow-2xl">
           <div className="flex items-start justify-between pb-4 border-b border-os-border">
             <div>
-              <h3 className="text-lg font-semibold text-os-primary">{title}</h3>
+              <h3 id="modal-title" className="text-lg font-semibold text-os-primary">{title}</h3>
               {subtitle && <p className="text-xs text-os-secondary mt-0.5">{subtitle}</p>}
             </div>
             <button

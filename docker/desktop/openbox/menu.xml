@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://openbox.org/
+                file:///usr/share/openbox/menu.xsd">
+
+<menu id="root-menu" label="OS Virtual Desktop">
+  <item label="Web Browser (Chromium)">
+    <action name="Execute"><execute>chromium --no-sandbox --disable-dev-shm-usage "https://google.com"</execute></action>
+  </item>
+  <item label="Terminal">
+    <action name="Execute"><execute>xterm</execute></action>
+  </item>
+  <separator />
+  <item label="Restart Desktop Panel">
+    <action name="Execute"><execute>pkill tint2; tint2 &amp;</execute></action>
+  </item>
+  <item label="Reconfigure Window Manager">
+    <action name="Reconfigure" />
+  </item>
+  <item label="Restart Window Manager">
+    <action name="Restart" />
+  </item>
+</menu>
+</openbox_menu>

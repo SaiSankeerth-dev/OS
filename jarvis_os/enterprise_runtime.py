@@ -9,19 +9,42 @@ Combines:
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from .integrations.social_connectors import LinkedInConnector, YouTubeConnector
+from .primitives.octop_harness import (
+    DualACPBridge,
+    OctopHarnessProcessor,
+    PeerTeamInbox,
+    TieredOctopMemory,
+    execute_multi_dot_dag,
+)
 from .runtime import JarvisOSRuntime
 
 
 class EnterpriseJarvisRuntime(JarvisOSRuntime):
-    """Enterprise runtime with social connectors and persistent agent workspace."""
+    """Enterprise runtime with social connectors, Octop harness, and persistent agent workspace."""
 
     def __init__(self, db_path: str = ":memory:") -> None:
         super().__init__(db_path=db_path)
         self.linkedin = LinkedInConnector()
         self.youtube = YouTubeConnector()
+        self.octop_processor = OctopHarnessProcessor(
+            db_path="data/octop_checkpoints.db" if db_path != ":memory:" else ":memory:"
+        )
+        self.octop_memory = TieredOctopMemory()
+        self.peer_inbox = PeerTeamInbox()
+        self.acp_bridge = DualACPBridge(kernel=self)
+        if hasattr(self, "learning"):
+            self.learning.octop_memory = self.octop_memory
+
+    def execute_dag(
+        self,
+        user_goal: str,
+        on_step_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """Execute 4-stage Multi-Dot pipeline: Scout -> Forge -> Sentinel & Scribe."""
+        return execute_multi_dot_dag(self, user_goal, on_step_callback=on_step_callback)
 
     def execute_enterprise_task(
         self, query: str, preferred_dot: Optional[str] = None

@@ -1,13 +1,18 @@
 export type NavView = 
+  | 'overview'
   | 'home'
   | 'chat'
-  | 'plan'
   | 'tasks'
-  | 'approvals'
-  | 'agents'
-  | 'activity'
+  | 'plan'
+  | 'discovery'
+  | 'computer'
+  | 'connections'
   | 'connectors'
+  | 'activity'
+  | 'approvals'
+  | 'settings'
   | 'memory'
+  | 'agents'
   | 'hud';
 
 

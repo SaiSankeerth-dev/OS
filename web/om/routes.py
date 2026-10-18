@@ -238,6 +238,33 @@ def browsers_pdf(sid: str):
         raise _err(e)
 
 
+@router.post("/browsers/{sid}/interact")
+@router.post("/browser/{sid}/interact")
+async def browsers_interact(sid: str, request: Request):
+    body = await request.json()
+    try:
+        return _browser().interact(
+            sid=sid,
+            action=body.get("action", "click"),
+            element_id=body.get("element_id"),
+            selector=body.get("selector"),
+            text=body.get("text", ""),
+            value=body.get("value", ""),
+            approval_granted=body.get("approval_granted", False),
+        )
+    except Exception as e:
+        raise _err(e)
+
+
+@router.get("/browsers/{sid}/dom")
+@router.get("/browser/{sid}/dom")
+def browsers_dom(sid: str):
+    try:
+        return {"id": sid, "elements": _browser().dom(sid)}
+    except Exception as e:
+        raise _err(e)
+
+
 @router.post("/browsers/{sid}/close")
 def browsers_close(sid: str):
     try:

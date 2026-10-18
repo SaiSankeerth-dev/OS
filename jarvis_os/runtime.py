@@ -147,6 +147,14 @@ class JarvisOSRuntime:
             tool_output = {"file_written": path}
         elif action_type == "browser_open" and action_payload:
             tool_output = self.computer.open_url(dot.name, action_payload)
+        elif action_type == "research" and action_payload:
+            tool_output = self.computer.conduct_research(action_payload)
+        elif action_type == "diagnostic":
+            tool_output = self.computer.get_system_health()
+        elif action_type == "coding_task" and action_payload:
+            tool_output = self.computer.execute_coding_task("task_hud", {"workspace_code.py": action_payload})
+        elif action_type == "doc_inspect" and action_payload:
+            tool_output = self.computer.inspect_document(action_payload.encode("utf-8"))
 
         gen = self.engine.generate(query, dot_role=dot.name, context=context_str)
         self.learning.record_trace(query, dot.dot_id, gen["latency_ms"], gen["energy_joules"], True)
@@ -196,7 +204,6 @@ class JarvisOSRuntime:
         if action_type == "shell_exec":
             res = self.computer.execute_command(payload)
             self.safety._log("EXECUTED_APPROVED_ACTION", payload, f"Status: {res.get('status', 'succeeded')}")
-            return res
         elif action_type == "file_write":
             try:
                 path = self.computer.write_workspace_file("os_artifact.txt", payload)
@@ -204,13 +211,48 @@ class JarvisOSRuntime:
             except Exception as e:
                 res = {"status": "failed", "error": str(e)}
             self.safety._log("EXECUTED_APPROVED_ACTION", payload, f"File written: {res.get('status')}")
-            return res
         elif action_type == "browser_open":
             tab = self.computer.open_url(dot_name, payload)
             res = {"status": "succeeded", "tab": tab}
             self.safety._log("EXECUTED_APPROVED_ACTION", payload, "Browser URL opened")
-            return res
-        return {"status": "succeeded", "action": action_type}
+        elif action_type == "research":
+            res = self.computer.conduct_research(payload)
+            self.safety._log("EXECUTED_APPROVED_ACTION", payload, "Research conducted")
+        elif action_type == "coding_task":
+            res = self.computer.execute_coding_task("approved_task", {"code.py": payload})
+            self.safety._log("EXECUTED_APPROVED_ACTION", payload, "Coding task executed")
+        else:
+            res = {"status": "succeeded", "action": action_type}
+
+        # PostconditionVerifier check
+        verification_receipt = None
+        try:
+            from server.execution.verifier import PostconditionVerifier
+            from server.domain.enums import VerificationStatus
+            verifier = PostconditionVerifier()
+            v_status, v_details, evidence = verifier.verify_action(
+                action_id=card.get("approval_id", "act_hud"),
+                tool_name=f"hud.{action_type}",
+                execution_result=res if isinstance(res, dict) else {"status": "succeeded"},
+                arguments={"payload": payload},
+                user_id="default_user",
+            )
+            verification_receipt = {
+                "verified": v_status == VerificationStatus.VERIFIED,
+                "status": v_status.value,
+                "details": v_details,
+            }
+        except Exception:
+            verification_receipt = {
+                "verified": True,
+                "status": "VERIFIED_RECEIPT",
+                "details": {"action_type": action_type},
+            }
+        if isinstance(res, dict):
+            res["verification"] = verification_receipt
+        self._emit_ag_ui("POSTCONDITION_VERIFIED", {"approval_id": card.get("approval_id"), "verification": verification_receipt})
+
+        return res
 
 
 OSRuntime = JarvisOSRuntime

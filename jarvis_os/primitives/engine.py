@@ -53,21 +53,103 @@ def _safe_eval_math(expr: str) -> float | int:
     return _eval(parsed)
 
 
-class InferenceEngine:
-    """OS local inference engine with energy and latency telemetry."""
+from .hybrid_router import ASTRepoMapper, HybridModelRouter
 
-    def __init__(self, default_model: str = "llama3.2:8b", cloud_fallback: bool = False) -> None:
+
+class InferenceEngine:
+    """OS local inference engine with energy, latency telemetry, and hybrid grammar routing."""
+
+    def __init__(self, default_model: str = "llama3.2:8b", cloud_fallback: bool = False, base_url: str = "http://localhost:11434") -> None:
         self.default_model = default_model
         self.cloud_fallback = cloud_fallback
+        self.base_url = base_url.rstrip("/")
+        self.router = HybridModelRouter(local_model=default_model, allow_hybrid=cloud_fallback)
         self.telemetry_history: List[Dict[str, Any]] = []
 
-    def generate(self, prompt: str, dot_role: str = "OS", context: str = "") -> Dict[str, Any]:
+    def _call_ollama(
+        self,
+        prompt: str,
+        dot_role: str,
+        context: str,
+        tool_json_schema: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Attempt real local inference with Ollama; returns None if offline/error."""
+        import urllib.request
+        import json
+
+        system_prompt = f"You are {dot_role}, an expert AI coworker in the OS personal operating system."
+        if context:
+            system_prompt += f" Relevant workspace context:\n{context}"
+
+        payload: Dict[str, Any] = {
+            "model": self.default_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.6, "num_predict": 256},
+        }
+        if tool_json_schema is not None:
+            payload["format"] = tool_json_schema
+
+        try:
+            req = urllib.request.Request(
+                f"{self.base_url}/api/chat",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content = data.get("message", {}).get("content", "").strip()
+                    if content:
+                        return f"[{dot_role}] {content}"
+        except Exception:
+            pass
+        return None
+
+    def generate(
+        self,
+        prompt: str,
+        dot_role: str = "OS",
+        context: str = "",
+        files_dict: Optional[Dict[str, str]] = None,
+        tool_json_schema: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         start_t = time.perf_counter()
+
+        # If multi-file context provided, compress using ASTRepoMapper
+        if files_dict:
+            repo_map_res = ASTRepoMapper.build_repo_map(files_dict)
+            context = f"{context}\n\nStructural Codebase Map:\n{repo_map_res['repo_map']}".strip()
+
+        # Hybrid routing & secret scrubbing
+        route_decision = self.router.select_route(
+            prompt,
+            files_count=len(files_dict) if files_dict else 1,
+            require_strict_json=(tool_json_schema is not None),
+        )
+        if route_decision["target"] == "hybrid_cloud":
+            prompt = self.router.scrub_pii_and_secrets(prompt)
+
         prompt_lower = prompt.strip().lower()
 
-        # Deterministic fast path
-        response_text = self._deterministic_router(prompt, prompt_lower, dot_role, context)
+        # Check deterministic fast path first (0 latency overhead)
+        fast_response = self._deterministic_fast_path(prompt, prompt_lower, dot_role, context)
         provider_used = f"local/{self.default_model}"
+
+        if fast_response is not None:
+            response_text = fast_response
+        else:
+            # Try live Ollama LLM with grammar constraints
+            llm_res = self._call_ollama(prompt, dot_role, context, tool_json_schema=tool_json_schema)
+            if llm_res is not None:
+                response_text = llm_res
+                provider_used = f"ollama/{self.default_model}"
+            else:
+                response_text = self._deterministic_fallback(prompt, dot_role, context)
 
         elapsed_ms = max(0.1, round((time.perf_counter() - start_t) * 1000, 2))
         tokens = max(1, len(response_text.split()))
@@ -84,11 +166,32 @@ class InferenceEngine:
             "energy_joules": energy_joules,
             "energy_method": "Active compute TDP estimate (15W baseline)",
             "cost_usd": 0.0,
+            "routing": route_decision,
         }
         self.telemetry_history.append(record)
+        self._log_perf(elapsed_ms)
         return record
 
-    def _deterministic_router(self, prompt: str, prompt_lower: str, dot_role: str, context: str) -> str:
+    def _log_perf(self, elapsed_ms: float) -> None:
+        try:
+            import json
+            from pathlib import Path
+            perf_path = Path("logs/perf.jsonl")
+            perf_path.parent.mkdir(parents=True, exist_ok=True)
+            entry = {
+                "label": "hud_inference",
+                "total_ms": elapsed_ms,
+                "stages": [
+                    {"stage": "turn_start:hud", "since_turn_start_ms": 0.0},
+                    {"stage": "engine_done", "since_turn_start_ms": elapsed_ms},
+                ],
+            }
+            with open(perf_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry) + "\n")
+        except Exception:
+            pass
+
+    def _deterministic_fast_path(self, prompt: str, prompt_lower: str, dot_role: str, context: str) -> Optional[str]:
         # Math / calculation check
         math_match = re.search(r"calculate\s+([0-9\+\-\*\/\(\)\.\s]+)", prompt_lower)
         if math_match:
@@ -114,6 +217,9 @@ class InferenceEngine:
                 f"3. **Scheduled Tasks**: Morning Digest (08:00) & Repo Health Audit active."
             )
 
+        return None
+
+    def _deterministic_fallback(self, prompt: str, dot_role: str, context: str) -> str:
         if context:
             return (
                 f"[{dot_role}] Synthesizing response using local workspace context ({len(context)} chars): "

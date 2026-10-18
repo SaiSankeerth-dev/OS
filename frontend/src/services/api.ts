@@ -163,6 +163,10 @@ export const api = {
     return request<Connector>(`/api/connectors/${cid}`);
   },
 
+  async getConnectorDetail(cid: string): Promise<Connector> {
+    return request<Connector>(`/api/connectors/${cid}`);
+  },
+
   async grantConnector(cid: string, scopes?: string[]): Promise<{ ok: boolean; status: any }> {
     return request(`/api/connectors/${cid}/grant`, {
       method: 'POST',
@@ -180,6 +184,15 @@ export const api = {
     return request(`/api/connectors/${cid}/revoke`, {
       method: 'POST',
     });
+  },
+
+  async getConnectorCredentials(cid: string): Promise<{
+    configured: boolean;
+    fields: Record<string, string>;
+    has_refresh_token: boolean;
+    cred_group: string;
+  }> {
+    return request(`/api/connectors/${cid}/credentials`);
   },
 
   async saveConnectorCredentials(
@@ -280,6 +293,21 @@ export const api = {
     });
   },
 
+  async getHudComputerStatus(): Promise<any> {
+    return request<any>('/api/hud/computer/status');
+  },
+
+  async execHudComputerCommand(command: string, workdir = '/workspace'): Promise<any> {
+    return request<any>('/api/hud/computer/exec', {
+      method: 'POST',
+      body: JSON.stringify({ command, workdir }),
+    });
+  },
+
+  async getHudComputerScreenshot(): Promise<any> {
+    return request<any>('/api/hud/computer/screenshot');
+  },
+
   async saveHudSpacePage(spaceId: string, pageId: string, title: string, markdown: string, author = 'Sai', expectedRevision?: number): Promise<any> {
     return request<any>('/api/hud/spaces/save', {
       method: 'POST',
@@ -326,6 +354,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text }),
     });
+  },
+
+  async executeOctopDag(userGoal: string): Promise<any> {
+    return request<any>('/api/hud/octop/dag', {
+      method: 'POST',
+      body: JSON.stringify({ user_goal: userGoal }),
+    });
+  },
+
+  async getOctopPresets(): Promise<any> {
+    return request<any>('/api/hud/octop/presets');
   },
 };
 

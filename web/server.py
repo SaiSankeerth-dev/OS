@@ -30,7 +30,12 @@ from contextlib import asynccontextmanager
 
 log = logging.getLogger("os.dashboard")
 
+import sys
 _HERE = Path(__file__).resolve().parent
+_REPO_ROOT = _HERE.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 _STATIC = _HERE / "static"
 _WORKSPACE = Path.home() / "workspace"
 
@@ -78,6 +83,23 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="OS Dashboard", version="1.0.0", lifespan=lifespan)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _engine: dict = {}
 
@@ -149,6 +171,8 @@ async def _collect_text(mgr, text: str) -> str:
 # --------------------------------------------------------------------------
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+if (_STATIC / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(_STATIC / "assets")), name="assets")
 
 # OpenMuse feature port (web/om): computer, browser, activity, ideas, goals,
 # finance, documents, threads, notifications. See docs/OPENMUSE_PORT.md.
@@ -174,6 +198,24 @@ try:
     app.include_router(_hud_router)
 except Exception as _hud_err:
     log.warning("hud routes unavailable: %s", _hud_err)
+
+# OS Computer-Use & Multi-Backend Automation
+try:
+    from web.routes_computer_control import router as _computer_router
+
+    app.include_router(_computer_router)
+    log.info("Mounted computer-control router at /api/computer")
+except Exception as _comp_err:
+    log.warning("computer control routes unavailable: %s", _comp_err)
+
+# OS V3 Proactive GitHub Intelligence & Research Lab
+try:
+    from web.routes_discovery import router as _discovery_router
+
+    app.include_router(_discovery_router)
+    log.info("Mounted discovery router at /api/discovery")
+except Exception as _disc_err:
+    log.warning("discovery routes unavailable: %s", _disc_err)
 
 
 
@@ -673,11 +715,14 @@ def _connector_dict(c: dict) -> dict:
     if c["auth_kind"] in ("google_oauth", "microsoft_oauth"):
         creds = dash.load_credentials(c["cred_group"])
         needs_oauth = not creds.get("refresh_token")
+    health_msg = st["health_msg"]
+    if st["state"] == "available" and not health_msg:
+        health_msg = "Not configured. Grant permissions to connect."
     return {**c, "state": st["state"],
             "scopes_granted": st["scopes"],
             "has_credentials": st["has_credentials"],
             "needs_oauth": needs_oauth,
-            "health_msg": st["health_msg"],
+            "health_msg": health_msg,
             "health_at": st["health_at"],
             "last_used_at": st["last_used_at"]}
 
@@ -714,6 +759,7 @@ async def deny_connector(cid: str) -> dict:
 
 
 @app.post("/api/connectors/{cid}/revoke")
+@app.delete("/api/connectors/{cid}/revoke")
 async def revoke_connector(cid: str) -> dict:
     m = _manifest_or_404(cid)
     get_dash().revoke(cid, m.cred_group)
@@ -725,6 +771,30 @@ class CredsIn(BaseModel):
     fields: dict[str, str] = {}
 
 
+@app.get("/api/connectors/{cid}/credentials")
+async def get_creds(cid: str) -> dict:
+    m = _manifest_or_404(cid)
+    creds = get_dash().load_credentials(m.cred_group)
+    fields: dict[str, str] = {}
+    is_configured = False
+    for f in m.cred_fields:
+        val = creds.get(f.key, "")
+        if val:
+            is_configured = True
+            if f.secret:
+                fields[f.key] = "••••••••"
+            else:
+                fields[f.key] = val
+        else:
+            fields[f.key] = ""
+    return {
+        "configured": is_configured,
+        "fields": fields,
+        "has_refresh_token": bool(creds.get("refresh_token")),
+        "cred_group": m.cred_group,
+    }
+
+
 @app.post("/api/connectors/{cid}/credentials")
 async def save_creds(cid: str, inp: CredsIn) -> dict:
     m = _manifest_or_404(cid)
@@ -733,7 +803,9 @@ async def save_creds(cid: str, inp: CredsIn) -> dict:
     if st["state"] in ("available", "denied"):
         raise HTTPException(403, "grant permission first")
     merged = dash.load_credentials(m.cred_group)
-    merged.update({k: v for k, v in inp.fields.items() if v})
+    for k, v in inp.fields.items():
+        if v and v != "••••••••":
+            merged[k] = v.strip()
     dash.save_credentials(m.cred_group, inp.label or m.name, merged)
     status = _refresh_state(cid)
     return {"ok": True, "status": status}
@@ -754,7 +826,9 @@ async def oauth_start(cid: str, request: Request) -> dict:
         raise HTTPException(400, "this connector has no OAuth flow")
     provider = "Microsoft" if m.auth_kind == "microsoft_oauth" else "Google"
     creds = _creds_for(cid)
-    if not creds.get("client_id") or not creds.get("client_secret"):
+    client_id = (creds.get("client_id") or "").strip()
+    client_secret = (creds.get("client_secret") or "").strip()
+    if not client_id or not client_secret:
         raise HTTPException(400, f"save your {provider} OAuth Client ID and Secret first")
     group = _OAUTH_GROUPS[m.auth_kind]
     redirect_uri = str(request.base_url).rstrip("/") + f"/api/connectors/{group}/oauth/callback"
@@ -763,11 +837,11 @@ async def oauth_start(cid: str, request: Request) -> dict:
     _OAUTH_STATES[state] = {"cid": cid, "created": time.time()}
     try:
         url, _ = mod.authorization_url(
-            creds["client_id"], creds["client_secret"], redirect_uri, state=state)
+            client_id, client_secret, redirect_uri, state=state)
     except RuntimeError as e:
         _OAUTH_STATES.pop(state, None)
         raise HTTPException(400, str(e))
-    return {"url": url}
+    return {"url": url, "redirect_uri": redirect_uri}
 
 
 def _oauth_callback_common(request: Request, group: str, provider: str) -> HTMLResponse:
