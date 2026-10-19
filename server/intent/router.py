@@ -215,6 +215,34 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "computer_task",
     ),
     (
+        # Scheduler: "remind me to X at Y" / "remind me in N minutes"
+        re.compile(
+            r"^\s*remind\s+me\s+.+",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "schedule_reminder",
+    ),
+    (
+        # Scheduler: "what reminders do I have" / "list reminders"
+        re.compile(
+            r"^\s*(?:what\s+reminders\s+do\s+i\s+have|list\s+(my\s+)?reminders|"
+            r"show\s+(my\s+)?reminders)\s*\??\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "list_reminders",
+    ),
+    (
+        # Scheduler: "cancel reminder <id>"
+        re.compile(
+            r"^\s*cancel\s+reminder\s+(\w+)\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "cancel_reminder",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
@@ -323,6 +351,9 @@ _TOOL_ARG = {
     # computer_task also takes the FULL user text; try_deterministic()
     # parses the "screenshot" / "open X" / "volume up" shorthands itself.
     "computer_task": "__full_text__",
+    # schedule_reminder takes the FULL user text; parse_reminder() handles it.
+    "schedule_reminder": "__full_text__",
+    "cancel_reminder": "reminder_id",
 }
 
 

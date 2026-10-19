@@ -54,6 +54,16 @@ async def lifespan(app: FastAPI):
     cfg = load_config()
     _engine["cfg"] = cfg
     _engine["state_store"] = state_store = StateStore()  # tasks, suggestions, events — real store
+    # Scheduler: start background reminders (APScheduler + SQLite).
+    try:
+        from server.tools.scheduler_tool import get_scheduler
+        _scheduler = get_scheduler()
+        _scheduler.start()
+        _engine["scheduler"] = _scheduler
+        log.info("scheduler started")
+    except Exception as e:  # noqa: BLE001
+        log.warning("scheduler unavailable: %s", e)
+        _engine["scheduler"] = None
     # Memory Day 3: wire the new MemoryManager into chat via MemoryRetriever.
     # Memories are injected into the LLM prompt as labeled <memory> data.
     try:

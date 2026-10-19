@@ -57,6 +57,10 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "browser_task": ToolPolicy.NEEDS_APPROVAL,
     # Agentic computer: same - always needs approval before touching the desktop.
     "computer_task": ToolPolicy.NEEDS_APPROVAL,
+    # Scheduler: reminders are harmless and explicitly requested.
+    "schedule_reminder": ToolPolicy.ALLOW,
+    "list_reminders": ToolPolicy.ALLOW,
+    "cancel_reminder": ToolPolicy.ALLOW,
 }
 
 
