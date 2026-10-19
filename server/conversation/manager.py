@@ -689,16 +689,27 @@ class ConversationManager:
         return True
 
     async def _approve_one(self, pending: PendingApproval) -> str:
-        """Approve a single pending item. Returns the reply text."""
-        # Phase 1 fix: the item leaves the persisted queue only AFTER
-        # successful execution. If execution raises, the row stays so a
-        # restart doesn't lose user-authorized work (was: deleted at start).
+        """Approve a single pending item. Returns the reply text.
+
+        Step 2A: uses atomic claim + status transitions. The DB row is
+        marked succeeded/failed, never deleted (history preserved).
+        """
+        # Atomic claim: only proceed if we win the claim.
+        if pending.pending_id:
+            claimed = self._approval_store.claim_pending(pending.pending_id)
+            if not claimed:
+                status = self._approval_store.get_status(pending.pending_id)
+                return f"Already handled (status: {status}). Not executing twice."
         try:
             result = await self._execute_approved(pending)
-        except Exception:
+        except Exception as e:
+            if pending.pending_id:
+                self._approval_store.mark_failed(
+                    pending.pending_id, f"{type(e).__name__}: {e}"
+                )
             raise
         if pending.pending_id:
-            self._approval_store.remove_pending(pending.pending_id)
+            self._approval_store.mark_succeeded(pending.pending_id, result)
         return result
 
     async def _execute_approved(self, pending: PendingApproval) -> str:

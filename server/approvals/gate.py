@@ -90,6 +90,19 @@ class ApprovalStore:
             cols = [r[1] for r in conn.execute("PRAGMA table_info(pending)")]
             if "action_json" not in cols:
                 conn.execute("ALTER TABLE pending ADD COLUMN action_json TEXT")
+            # Step 2A: approval state machine. Statuses: pending -> executing
+            # -> succeeded | failed | unknown. Atomic claim replaces the lock.
+            if "status" not in cols:
+                conn.execute("ALTER TABLE pending ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
+            if "claimed_at" not in cols:
+                conn.execute("ALTER TABLE pending ADD COLUMN claimed_at REAL")
+            if "result" not in cols:
+                conn.execute("ALTER TABLE pending ADD COLUMN result TEXT")
+            # On startup, any row stuck in 'executing' (crash mid-action)
+            # becomes 'unknown' — never auto-rerun, surfaces for decision.
+            conn.execute(
+                "UPDATE pending SET status='unknown' WHERE status='executing'"
+            )
             conn.commit()
         finally:
             conn.close()
@@ -157,14 +170,19 @@ class ApprovalStore:
             conn.close()
 
     def load_pending(self) -> list[PendingApproval]:
-        """Restore the queue in FIFO order after a restart."""
+        """Restore the queue in FIFO order after a restart.
+
+        Step 2A: only loads rows needing action (pending, unknown).
+        Succeeded/failed are history, not queued.
+        """
         import json
 
         conn = sqlite3.connect(self.db_path)
         try:
             rows = conn.execute(
                 "SELECT id, skill, input, draft, approved_hash, run_id, "
-                "created_ts, action_json FROM pending ORDER BY id ASC"
+                "created_ts, action_json, status FROM pending "
+                "WHERE status IN ('pending', 'unknown') ORDER BY id ASC"
             ).fetchall()
 
             def _action(raw) -> dict:
@@ -199,6 +217,59 @@ class ApprovalStore:
                 "DELETE FROM pending WHERE id = ?", (pending_id,)
             )
             conn.commit()
+        finally:
+            conn.close()
+
+    # Step 2A: atomic claim replaces the global lock. Only one claimer wins;
+    # losers get rowcount 0 and must return 409 "already handled".
+    def claim_pending(self, pending_id: int) -> bool:
+        """Atomically claim a pending approval for execution.
+
+        Returns True if this caller won the claim, False if already claimed.
+        """
+        import time
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.execute(
+                "UPDATE pending SET status='executing', claimed_at=? "
+                "WHERE id=? AND status='pending'",
+                (time.time(), pending_id),
+            )
+            conn.commit()
+            return cur.rowcount == 1
+        finally:
+            conn.close()
+
+    def mark_succeeded(self, pending_id: int, result: str) -> None:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute(
+                "UPDATE pending SET status='succeeded', result=? WHERE id=?",
+                (result[:2000], pending_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def mark_failed(self, pending_id: int, error: str) -> None:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute(
+                "UPDATE pending SET status='failed', result=? WHERE id=?",
+                (error[:2000], pending_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_status(self, pending_id: int) -> str | None:
+        """Return the current status, or None if the row doesn't exist."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            row = conn.execute(
+                "SELECT status FROM pending WHERE id=?", (pending_id,)
+            ).fetchone()
+            return row[0] if row else None
         finally:
             conn.close()
 

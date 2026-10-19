@@ -16,30 +16,30 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_approve_lock_exists():
-    """Fix 1: _approve_lock is defined as an asyncio.Lock."""
+    """Step 2A: atomic claim replaces the lock. Verify claim method exists."""
+    from server.approvals.gate import ApprovalStore
+    assert hasattr(ApprovalStore, "claim_pending")
+    # Lock was removed in 2A (atomic UPDATE replaces it)
     import web.server as srv
-    assert hasattr(srv, "_approve_lock")
-    assert isinstance(srv._approve_lock, asyncio.Lock)
+    assert not hasattr(srv, "_approve_lock")
 
 
 def test_approve_uses_lock():
-    """Fix 1: approve() acquires the lock around find+execute+remove."""
+    """Step 2A: approve() uses atomic claim (not a lock)."""
     import inspect
     import web.server as srv
     src = inspect.getsource(srv.approve)
-    assert "_approve_lock" in src
-    assert "async with" in src
+    assert "claim_pending" in src
+    assert "409" in src  # Returns 409 on already-claimed
 
 
 def test_approve_one_deletes_after_success():
-    """Fix 2: _approve_one only removes from DB after successful execution."""
+    """Step 2A: _approve_one uses status transitions (not delete)."""
     import inspect
     from server.conversation.manager import ConversationManager
     src = inspect.getsource(ConversationManager._approve_one)
-    # Should NOT delete at start; should delete after success
-    assert "remove_pending" in src
-    # The new structure: try/except with remove after
-    assert "_execute_approved" in src
+    # Step 2A: mark_succeeded/mark_failed instead of remove_pending
+    assert "mark_succeeded" in src or "claim_pending" in src
 
 
 def test_memory_delete_404_no_db():

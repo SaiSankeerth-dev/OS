@@ -30,11 +30,6 @@ from contextlib import asynccontextmanager
 
 log = logging.getLogger("os.dashboard")
 
-# Phase 1 fix: guards the approval find+execute+remove sequence against
-# concurrent double-execution (P2-1). One lock for the whole process is
-# correct — approvals are a single global queue.
-_approve_lock = asyncio.Lock()
-
 _HERE = Path(__file__).resolve().parent
 _STATIC = _HERE / "static"
 _WORKSPACE = Path.home() / "workspace"
@@ -299,24 +294,36 @@ def _find_pending(mgr, pid: int):
 @app.post("/api/approvals/{pid}/approve")
 async def approve(pid: int) -> dict:
     mgr = get_mgr()
-    # Phase 1 fix: lock the find+execute+remove sequence so concurrent
-    # approves for the same pid can't both execute the action.
-    async with _approve_lock:
-        p = _find_pending(mgr, pid)
-        if p is None:
+    # Step 2A: atomic claim replaces the global lock. The UPDATE only
+    # succeeds if status='pending' — concurrent requests get rowcount 0.
+    store = mgr._approval_store
+    claimed = await asyncio.to_thread(store.claim_pending, pid)
+    if not claimed:
+        status = await asyncio.to_thread(store.get_status, pid)
+        if status is None:
             raise HTTPException(404, "approval not found (maybe it expired)")
-        # Dequeue only AFTER successful execution. On failure the item stays
-        # queued (and the API reports failure) so user-authorized work is never
-        # silently dropped while the UI claims success.
-        try:
-            text = await mgr._approve_one(p)
-        except Exception as e:
-            log.exception("approve failed")
-            raise HTTPException(
-                500, f"Approval failed: {type(e).__name__}. The item is still queued."
-            )
+        # Already claimed by another request — don't execute twice.
+        raise HTTPException(409, f"already handled (status: {status})")
+    p = _find_pending(mgr, pid)
+    if p is None:
+        # Claimed in DB but not in memory. Release the claim so it can
+        # be retried (don't leave it stuck in 'executing').
+        await asyncio.to_thread(store.mark_failed, pid, "claimed but not in memory queue")
+        raise HTTPException(409, "claimed but not in memory queue — retry")
+    try:
+        # Call _execute_approved directly (claim already won above).
+        text = await mgr._execute_approved(p)
+    except Exception as e:
+        log.exception("approve failed")
+        await asyncio.to_thread(store.mark_failed, pid, f"{type(e).__name__}: {e}")
+        raise HTTPException(
+            500, f"Approval failed: {type(e).__name__}. Marked as failed."
+        )
+    await asyncio.to_thread(store.mark_succeeded, pid, text)
+    # Remove from in-memory queue (DB row stays as history).
+    if p in mgr._pending:
         mgr._pending.remove(p)
-        return {"ok": True, "text": text}
+    return {"ok": True, "text": text}
 
 
 @app.post("/api/approvals/{pid}/reject")
@@ -706,30 +713,59 @@ async def deny_connector(cid: str) -> dict:
 @app.post("/api/connectors/{cid}/revoke")
 async def revoke_connector(cid: str) -> dict:
     m = _manifest_or_404(cid)
-    # Phase 1 fix: revoke at the provider BEFORE deleting locally, so the
-    # token is actually dead (was: local delete only, token stayed valid).
+    # Step 2A: revoke at the provider BEFORE deleting locally.
+    # If provider revoke fails, DON'T silently delete — mark revoke_failed
+    # and tell the user to revoke manually.
     provider_revoked = False
+    provider_error = None
     try:
         creds = _creds_for(cid)
         refresh_token = (creds.get("refresh_token") or "").strip()
         if refresh_token:
             if m.auth_kind == "google_oauth":
-                # Google revocation endpoint
                 async with httpx.AsyncClient(timeout=10) as client:
                     resp = await client.post(
                         "https://oauth2.googleapis.com/revoke",
                         data={"token": refresh_token},
                     )
-                    provider_revoked = resp.status_code == 200
+                    if resp.status_code == 200:
+                        provider_revoked = True
+                    else:
+                        provider_error = f"Google returned {resp.status_code}"
             elif m.auth_kind == "microsoft_oauth":
-                # Microsoft has no direct revoke endpoint; the refresh token
-                # is invalidated by removing the app consent. We attempt the
-                # logout endpoint as a best-effort signal.
-                provider_revoked = False  # Manual revocation required
+                provider_error = "Microsoft has no revoke endpoint; revoke manually"
+        else:
+            # No refresh token (e.g., API key auth) — local delete is sufficient.
+            provider_revoked = True
     except Exception as e:
+        provider_error = f"{type(e).__name__}: {e}"
         log.warning("provider revoke failed for %s: %s", cid, e)
+    if not provider_revoked:
+        # Don't silently delete. Mark as revoke_failed so the user knows
+        # the token may still be valid at the provider.
+        dash = get_dash()
+        conn = dash._connect()
+        try:
+            conn.execute(
+                "UPDATE connector_state SET state='revoke_failed', "
+                "health_msg=?, updated_at=? WHERE connector_id=?",
+                (provider_error or "provider revoke failed", time.time(), cid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return {
+            "ok": False,
+            "provider_revoked": False,
+            "error": provider_error or "provider revoke failed",
+            "message": (
+                "Could not revoke at the provider. Your token was NOT deleted "
+                "locally. Please revoke manually at the provider's site, then "
+                "try again."
+            ),
+        }
     get_dash().revoke(cid, m.cred_group)
-    return {"ok": True, "provider_revoked": provider_revoked}
+    return {"ok": True, "provider_revoked": True}
 
 
 class CredsIn(BaseModel):
