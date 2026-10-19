@@ -30,17 +30,39 @@ def web_read(url: str = "", **kwargs) -> ToolResult:
     if not re.match(r"^https?://", url, re.I) or len(url) > 2048:
         return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
                           error="Give me an http(s) URL to read.")
+    # SSRF Protection
+    try:
+        from server.security.url_validator import validate_url_safe, build_safe_opener
+        is_safe, reason, _ = validate_url_safe(url)
+        if not is_safe:
+            return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
+                              error=f"SSRF Protection blocked request: {reason}")
+        opener = build_safe_opener(timeout=20.0)
+    except ImportError:
+        opener = urllib.request.build_opener()
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": _UA})
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with opener.open(req, timeout=20) as resp:
+            # Also re-check final redirected URL
+            final_url = resp.geturl()
+            if final_url != url:
+                try:
+                    from server.security.url_validator import validate_url_safe
+                    safe_dest, dest_reason, _ = validate_url_safe(final_url)
+                    if not safe_dest:
+                        return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
+                                          error=f"SSRF Protection blocked redirect to: {dest_reason}")
+                except ImportError:
+                    pass
             ctype = resp.headers.get("Content-Type", "")
             if "html" not in ctype and "text" not in ctype:
                 return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
                                   error=f"Not a readable page ({ctype or 'unknown type'}).")
-            page = resp.read().decode("utf-8", errors="replace")
+            page = resp.read(2_000_000).decode("utf-8", errors="replace")
     except Exception as e:
         return ToolResult(status="failure", mode=ExecutionMode.DIRECT,
-                          error=f"Could not read page: {type(e).__name__}")
+                          error=f"Could not read page: {type(e).__name__}: {e}")
     title, text = _strip(page)
     if not text:
         return ToolResult(status="failure", mode=ExecutionMode.DIRECT,

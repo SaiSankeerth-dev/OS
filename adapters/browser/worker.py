@@ -205,6 +205,22 @@ class BrowserWorker:
         """Navigate to a URL.  Returns a BrowserReceipt."""
         log.info("Browser navigating to: %s (session=%s)", url, session_id)
 
+        # SSRF Check
+        try:
+            from server.security.url_validator import validate_url_safe
+            is_safe, reason, _ = validate_url_safe(url)
+            if not is_safe:
+                log.warning("SSRF blocked browser navigation to %s: %s", url, reason)
+                return BrowserReceipt(
+                    action="navigate",
+                    url=url,
+                    status="FAILED",
+                    status_code=403,
+                    details={"error": f"SSRF blocked: {reason}"},
+                )
+        except ImportError:
+            pass
+
         if self._use_ab:
             res = _ab_run(["open", url], session_id=session_id, timeout=30)
             self._sessions[session_id] = {

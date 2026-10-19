@@ -59,7 +59,10 @@ class TaskManager:
                 result["errors"].append({"step": step.id, "error": str(e)})
                 break
 
-        if self._current_step_index >= len(self._plan.steps):
+        if not self._plan.steps:
+            self._plan.status = PlanStatus.FAILED
+            result["errors"].append({"step": None, "error": "Plan contains 0 steps; cannot complete an empty plan."})
+        elif self._current_step_index >= len(self._plan.steps):
             self._plan.status = PlanStatus.COMPLETED
         elif self._plan.status != PlanStatus.COMPLETED:
             self._plan.status = PlanStatus.FAILED

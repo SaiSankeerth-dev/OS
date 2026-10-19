@@ -66,6 +66,14 @@ _REJECT_ALL_RE = re.compile(
     r"^\s*(reject\s+all|no\s+to\s+all|discard\s+all)\s*[.!]?\s*$",
     re.IGNORECASE,
 )
+_APPROVE_N_RE = re.compile(
+    r"^\s*(?:approve|yes\s+to|confirm)\s+#?(\d+)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
+_REJECT_N_RE = re.compile(
+    r"^\s*(?:reject|no\s+to|discard|cancel)\s+#?(\d+)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
 
 
 class ConversationState(str, enum.Enum):
@@ -787,24 +795,58 @@ class ConversationManager:
             yield ChatChunk(delta=text, done=True)
             return
 
+        m_app_n = _APPROVE_N_RE.match(user_text)
+        m_rej_n = _REJECT_N_RE.match(user_text)
+
         if _APPROVE_ALL_RE.match(user_text):
             parts = []
             while self._pending:
                 parts.append(await self._approve_one(self._pending.pop(0)))
             text = "\n\n".join(parts)
-        elif _APPROVE_RE.match(user_text):
-            text = await self._approve_one(self._pending.pop(0))
-            if self._pending:
-                text += f"\n\n({len(self._pending)} more waiting.)"
         elif _REJECT_ALL_RE.match(user_text):
             parts = []
             while self._pending:
                 parts.append(self._reject_one(self._pending.pop(0)))
             text = "\n\n".join(parts)
+        elif m_app_n:
+            idx = int(m_app_n.group(1)) - 1
+            if 0 <= idx < len(self._pending):
+                target = self._pending.pop(idx)
+                text = await self._approve_one(target)
+                if self._pending:
+                    text += f"\n\n({len(self._pending)} remaining in queue.)"
+            else:
+                text = f"Invalid approval number #{m_app_n.group(1)}. Currently {len(self._pending)} action(s) waiting."
+        elif m_rej_n:
+            idx = int(m_rej_n.group(1)) - 1
+            if 0 <= idx < len(self._pending):
+                target = self._pending.pop(idx)
+                text = self._reject_one(target)
+                if self._pending:
+                    text += f"\n\n({len(self._pending)} remaining in queue.)"
+            else:
+                text = f"Invalid rejection number #{m_rej_n.group(1)}. Currently {len(self._pending)} action(s) waiting."
+        elif _APPROVE_RE.match(user_text):
+            if len(self._pending) > 1:
+                # Ambiguous bare yes when multiple requests pending
+                lines = [f"{i+1}. {getattr(p, 'label', '') or getattr(p, 'skill', 'action')}" for i, p in enumerate(self._pending)]
+                text = (
+                    f"Multiple actions are awaiting your approval ({len(self._pending)} pending):\n"
+                    + "\n".join(lines)
+                    + "\n\nPlease specify which one to approve (e.g. 'approve 1'), or say 'approve all'."
+                )
+            else:
+                text = await self._approve_one(self._pending.pop(0))
         elif _REJECT_RE.match(user_text):
-            text = self._reject_one(self._pending.pop(0))
-            if self._pending:
-                text += f"\n\n({len(self._pending)} more waiting.)"
+            if len(self._pending) > 1:
+                lines = [f"{i+1}. {getattr(p, 'label', '') or getattr(p, 'skill', 'action')}" for i, p in enumerate(self._pending)]
+                text = (
+                    f"Multiple actions are awaiting your approval ({len(self._pending)} pending):\n"
+                    + "\n".join(lines)
+                    + "\n\nPlease specify which one to reject (e.g. 'reject 1'), or say 'reject all'."
+                )
+            else:
+                text = self._reject_one(self._pending.pop(0))
         else:
             # Ambiguous reply while something is pending - don't guess in
             # either direction, don't silently drop the pending items.

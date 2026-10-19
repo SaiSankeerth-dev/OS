@@ -38,3 +38,7 @@ docker/desktop/scrot_*.png
 temp_skills/
 test_agent_skill.zip
 artifacts/**/*.log
+.staging_*
+.backup_*
+skills/.staging_*
+skills/.backup_*

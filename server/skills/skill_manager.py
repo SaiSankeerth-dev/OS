@@ -825,31 +825,33 @@ When executing this skill in OS:
             skill_slug = f"{skill_slug}_skill"
 
         target_dir = self.skills_dir / skill_slug
-        target_dir.mkdir(parents=True, exist_ok=True)
+        staging_dir = self.skills_dir / f".staging_{skill_slug}_{int(time.time() * 1000)}"
+        staging_dir.mkdir(parents=True, exist_ok=True)
 
-        # 4. Extract safe files
-        for name in namelist:
-            if name.endswith("/") or name.endswith("\\"):
-                continue  # Directory entry
-            rel_name = name
-            if prefix and name.startswith(prefix + "/"):
-                rel_name = name[len(prefix) + 1:]
-            
-            # Skip hidden or dangerous files
-            if ".git" in rel_name or "__pycache__" in rel_name or rel_name.endswith(".pyc"):
-                continue
+        try:
+            # 4. Extract safe files into staging_dir
+            for name in namelist:
+                if name.endswith("/") or name.endswith("\\"):
+                    continue  # Directory entry
+                rel_name = name
+                if prefix and name.startswith(prefix + "/"):
+                    rel_name = name[len(prefix) + 1:]
+                
+                # Skip hidden or dangerous files
+                if ".git" in rel_name or "__pycache__" in rel_name or rel_name.endswith(".pyc"):
+                    continue
 
-            dest_path = (target_dir / rel_name).resolve()
-            if not str(dest_path).startswith(str(target_dir)):
-                continue  # Skip any traversal
-            
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            dest_path.write_bytes(zf.read(name))
+                dest_path = (staging_dir / rel_name).resolve()
+                if not str(dest_path).startswith(str(staging_dir)):
+                    continue  # Skip any traversal
+                
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                dest_path.write_bytes(zf.read(name))
 
-        # 5. Ensure SKILL.md exists
-        if not (target_dir / "SKILL.md").exists():
-            if not skill_md_content:
-                skill_md_content = f"""---
+            # 5. Ensure SKILL.md exists
+            if not (staging_dir / "SKILL.md").exists():
+                if not skill_md_content:
+                    skill_md_content = f"""---
 name: {skill_slug}
 description: Custom skill imported from ZIP package.
 version: 1.0.0
@@ -864,13 +866,41 @@ capabilities: [virtual_computer_ready, script_backed]
 ## Purpose
 Custom skill package extracted from uploaded ZIP archive.
 """
-            (target_dir / "SKILL.md").write_text(skill_md_content, encoding="utf-8")
+                (staging_dir / "SKILL.md").write_text(skill_md_content, encoding="utf-8")
 
-        # 6. Ensure tools.py exists with format_result
-        if not (target_dir / "tools.py").exists():
-            self._write_standard_tools_bridge(target_dir, skill_slug, skill_slug)
+            # 6. Ensure tools.py exists with format_result
+            if not (staging_dir / "tools.py").exists():
+                self._write_standard_tools_bridge(staging_dir, skill_slug, skill_slug)
+            else:
+                # Validate syntax of tools.py
+                try:
+                    import ast
+                    ast.parse((staging_dir / "tools.py").read_text(encoding="utf-8"))
+                except SyntaxError as syn_err:
+                    raise ValueError(f"Imported tools.py contains Python syntax error: {syn_err}")
 
-        parsed = parse_skill_md((target_dir / "SKILL.md").read_text(encoding="utf-8"), skill_slug)
+            # 7. Validate SKILL.md frontmatter
+            parsed = parse_skill_md((staging_dir / "SKILL.md").read_text(encoding="utf-8"), skill_slug)
+
+            # 8. Atomic swap: stage -> target with rollback preservation
+            backup_dir = None
+            if target_dir.exists():
+                backup_dir = self.skills_dir / f".backup_{skill_slug}_{int(time.time() * 1000)}"
+                target_dir.rename(backup_dir)
+
+            try:
+                staging_dir.rename(target_dir)
+                if backup_dir and backup_dir.exists():
+                    shutil.rmtree(backup_dir, ignore_errors=True)
+            except Exception as swap_err:
+                if backup_dir and backup_dir.exists():
+                    backup_dir.rename(target_dir)
+                raise swap_err
+
+        finally:
+            if staging_dir.exists():
+                shutil.rmtree(staging_dir, ignore_errors=True)
+
         content_hash = compute_skill_content_hash(target_dir)
 
         entry = {

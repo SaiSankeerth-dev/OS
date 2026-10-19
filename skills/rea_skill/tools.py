@@ -12,6 +12,8 @@ def run_skill(prompt: str = "", **kwargs) -> ToolResult:
         status="success",
         mode=ExecutionMode.DIRECT,
         data={"skill": "rea_skill", "input": prompt, "result": "Ready for execution."},
+    )
+
 def format_result(result: ToolResult) -> str:
     return str(result.data.get("result", ""))
 

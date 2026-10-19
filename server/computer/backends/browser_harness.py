@@ -341,7 +341,13 @@ class BrowserHarnessBackend(BaseComputerBackend):
                 )
             except Exception as e:
                 log.error("Failed to capture screen observation: %s", e)
-                return ObservationResult(session_id=session_id, backend=self.name, url=sess.current_url)
+                sess.status = "stale"
+                return ObservationResult(
+                    session_id=session_id,
+                    backend=self.name,
+                    url=sess.current_url,
+                    text_content=f"[Observation Error: {type(e).__name__}: {e}]",
+                )
 
     def inspect_page(self, session_id: str) -> ObservationResult:
         return self._run_worker(self._inspect_page_impl, session_id)
@@ -366,7 +372,14 @@ class BrowserHarnessBackend(BaseComputerBackend):
                 )
             except Exception as e:
                 log.error("Failed to inspect page: %s", e)
-                return ObservationResult(session_id=session_id, backend=self.name, url=sess.current_url)
+                sess.status = "stale"
+                return ObservationResult(
+                    session_id=session_id,
+                    backend=self.name,
+                    url=sess.current_url,
+                    title="[Extraction Error]",
+                    text_content=f"[Extraction Failed: {type(e).__name__}: {e}]",
+                )
 
     def click_element(self, session_id: str, target: Any) -> ActionResult:
         return self._run_worker(self._click_element_impl, session_id, target)

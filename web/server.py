@@ -836,10 +836,24 @@ async def approve(pid: int) -> dict:
     mgr._pending.remove(p)
     try:
         text = await mgr._approve_one(p)
+        return {"ok": True, "text": text}
     except Exception as e:
         log.exception("approve failed")
-        text = f"Approval failed: {type(e).__name__}."
-    return {"ok": True, "text": text}
+        if hasattr(mgr, "_approval_store") and hasattr(mgr._approval_store, "record_decision"):
+            try:
+                mgr._approval_store.record_decision(
+                    action_id=str(pid),
+                    decision="FAILED",
+                    approver="user",
+                    notes=f"Execution error: {type(e).__name__}: {e}",
+                )
+            except Exception:
+                pass
+        return {
+            "ok": False,
+            "error": f"Approval execution failed: {type(e).__name__}: {e}",
+            "text": f"Approval failed: {type(e).__name__}."
+        }
 
 
 @app.post("/api/approvals/{pid}/reject")
@@ -904,6 +918,7 @@ async def create_task(inp: TaskIn) -> dict:
 
 
 @app.patch("/api/tasks/{tid}")
+@app.put("/api/tasks/{tid}")
 async def patch_task(tid: int, inp: TaskPatch) -> dict:
     try:
         t = get_store().set_task_status(tid, inp.status.upper())
@@ -977,6 +992,7 @@ async def watchers() -> dict:
 
 
 @app.post("/api/watchers/{nid}/seen")
+@app.delete("/api/watchers/{nid}")
 async def watcher_seen(nid: int) -> dict:
     get_store().mark_suggestion_seen(nid)
     return {"ok": True}
@@ -1823,6 +1839,35 @@ async def upload(file: UploadFile) -> dict:
                 break
             f.write(chunk)
     return {"ok": True, "id": name, "name": file.filename, "size": target.stat().st_size}
+
+
+# --------------------------------------------------------------------------
+# Remote & Companion Access Mode Endpoints (Batch H)
+# --------------------------------------------------------------------------
+
+@app.get("/api/remote/status")
+async def remote_status() -> dict:
+    from server.security.remote_access import get_remote_manager
+    mgr = get_remote_manager()
+    return mgr.get_status_report()
+
+
+@app.post("/api/remote/token")
+async def create_companion_token(body: dict | None = None) -> dict:
+    from server.security.remote_access import get_remote_manager
+    mgr = get_remote_manager()
+    label = (body or {}).get("label", "mobile_device")
+    token, expiry = mgr.generate_companion_token(label)
+    return {"ok": True, "token": token, "expires_at": expiry}
+
+
+@app.post("/api/remote/token/verify")
+async def verify_companion_token(body: dict) -> dict:
+    from server.security.remote_access import get_remote_manager
+    mgr = get_remote_manager()
+    token = body.get("token", "")
+    valid = mgr.verify_token(token)
+    return {"ok": True, "valid": valid}
 
 
 # --------------------------------------------------------------------------

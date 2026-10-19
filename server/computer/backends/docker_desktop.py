@@ -710,7 +710,14 @@ class DockerDesktopBackend(BaseComputerBackend):
                 delta_x=delta_x,
                 delta_y=delta_y,
             )
-        return ActionResult(success=True, action="forward_mouse", session_id=session_id, backend=self.name)
+        return ActionResult(
+            success=False,
+            action="forward_mouse",
+            session_id=session_id,
+            backend=self.name,
+            error="Action 'forward_mouse' is not supported on this desktop runtime backend.",
+            verified=False,
+        )
 
     def forward_keyboard(
         self,
@@ -729,7 +736,14 @@ class DockerDesktopBackend(BaseComputerBackend):
                 code=code,
                 text=text,
             )
-        return ActionResult(success=True, action="forward_keyboard", session_id=session_id, backend=self.name)
+        return ActionResult(
+            success=False,
+            action="forward_keyboard",
+            session_id=session_id,
+            backend=self.name,
+            error="Action 'forward_keyboard' is not supported on this desktop runtime backend.",
+            verified=False,
+        )
 
     def get_element_rect(self, session_id: str, target: str) -> Optional[Dict[str, float]]:
         self._require_session(session_id)

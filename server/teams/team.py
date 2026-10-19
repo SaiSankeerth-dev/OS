@@ -141,15 +141,43 @@ class Team:
         }
 
     def verify(self, subtask: str, result: str) -> bool:
-        """Independent check: non-empty and on-topic. Deterministic."""
-        if not result or result.startswith("[no result"):
+        """Independent postcondition check: non-empty, error-free, substantive, and verified against task requirements."""
+        if not result or not result.strip():
             return False
-        if result.startswith("[worker fallback"):
+        clean = result.strip()
+        if any(clean.lower().startswith(err_prefix) for err_prefix in ("[no result", "[worker fallback", "[error", "failed:", "error:")):
             return False
-        overlap = self._significant_words(subtask) & self._significant_words(
-            result
-        )
-        return bool(overlap)
+        if len(clean) < 15:
+            return False
+
+        subtask_lower = subtask.lower()
+
+        # Structural Postcondition 1: If JSON is requested, ensure valid JSON structure exists and parses
+        if "json" in subtask_lower:
+            if not ("{" in clean or "[" in clean):
+                return False
+            try:
+                json.loads(clean)
+                return True
+            except Exception:
+                return False
+
+        # Structural Postcondition 2: If calculation/math requested, ensure numbers exist in output
+        if any(w in subtask_lower for w in ("calculate", "math", "sum", "average", "count", "total")):
+            if not re.search(r"\d+", clean):
+                return False
+
+        # Structural Postcondition 3: If URL/link requested, ensure valid URL structure exists
+        if any(w in subtask_lower for w in ("url", "link", "website", "domain")):
+            if not re.search(r"https?://|\.com|\.org|\.io|\.net", clean, re.I):
+                return False
+
+        # Relevance check
+        subtask_words = self._significant_words(subtask)
+        if not subtask_words:
+            return True
+        overlap = subtask_words & self._significant_words(clean)
+        return len(overlap) >= 1
 
     # ---------- synthesize ----------------------------------------------
 
