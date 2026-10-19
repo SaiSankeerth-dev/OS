@@ -1122,3 +1122,26 @@
 {"label": "text_turn", "total_ms": 1.2, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 1.1}]}
 {"label": "text_turn", "total_ms": 0.3, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.3}]}
 {"label": "text_turn", "total_ms": 0.3, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.2}]}
+{"label": "text_turn", "total_ms": 198.0, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 193.1}, {"stage": "turn_end:text", "since_turn_start_ms": 195.3}]}
+{"label": "text_turn", "total_ms": 1.0, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 0.2}, {"stage": "turn_end:text", "since_turn_start_ms": 0.9}]}
+{"label": "text_turn", "total_ms": 0.1, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.1}]}
+{"label": "text_turn", "total_ms": 1.2, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 1.2}]}
+{"label": "text_turn", "total_ms": 1.6, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 1.5}]}
+{"label": "text_turn", "total_ms": 103.4, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 101.3}, {"stage": "turn_end:text", "since_turn_start_ms": 103.2}]}
+{"label": "text_turn", "total_ms": 0.8, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 0.1}, {"stage": "turn_end:text", "since_turn_start_ms": 0.8}]}
+{"label": "text_turn", "total_ms": 1.6, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 1.5}]}
+{"label": "text_turn", "total_ms": 116.5, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 114.9}, {"stage": "turn_end:text", "since_turn_start_ms": 116.3}]}
+{"label": "text_turn", "total_ms": 1.1, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 0.2}, {"stage": "turn_end:text", "since_turn_start_ms": 0.9}]}
+{"label": "text_turn", "total_ms": 2.1, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 2.0}]}
+{"label": "text_turn", "total_ms": 107.9, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 106.2}, {"stage": "turn_end:text", "since_turn_start_ms": 107.7}]}
+{"label": "text_turn", "total_ms": 1.2, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 0.1}, {"stage": "turn_end:text", "since_turn_start_ms": 1.0}]}
+{"label": "text_turn", "total_ms": 0.2, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.1}]}
+{"label": "text_turn", "total_ms": 1.1, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 1.0}]}
+{"label": "text_turn", "total_ms": 107.9, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 106.5}, {"stage": "turn_end:text", "since_turn_start_ms": 107.8}]}
+{"label": "text_turn", "total_ms": 0.3, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 0.1}, {"stage": "turn_end:text", "since_turn_start_ms": 0.2}]}
+{"label": "text_turn", "total_ms": 102.9, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 101.8}, {"stage": "turn_end:text", "since_turn_start_ms": 102.7}]}
+{"label": "text_turn", "total_ms": 0.7, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.6}]}
+{"label": "text_turn", "total_ms": 102.6, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "tool_executed", "since_turn_start_ms": 101.3}, {"stage": "turn_end:text", "since_turn_start_ms": 102.5}]}
+{"label": "text_turn", "total_ms": 1.0, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.9}]}
+{"label": "text_turn", "total_ms": 0.3, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.3}]}
+{"label": "text_turn", "total_ms": 0.3, "stages": [{"stage": "turn_start:text", "since_turn_start_ms": 0.0}, {"stage": "turn_end:text", "since_turn_start_ms": 0.2}]}

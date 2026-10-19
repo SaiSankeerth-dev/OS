@@ -103,6 +103,16 @@ class ApprovalStore:
             conn.execute(
                 "UPDATE pending SET status='unknown' WHERE status='executing'"
             )
+            # Council blind spot: a hung action sits in 'executing' forever
+            # while the server is up. Reap stuck rows past the deadline.
+            # 5 minutes is generous; real actions finish in seconds.
+            import time as _time
+            deadline = _time.time() - 300
+            conn.execute(
+                "UPDATE pending SET status='unknown' WHERE status='executing' "
+                "AND claimed_at IS NOT NULL AND claimed_at < ?",
+                (deadline,),
+            )
             conn.commit()
         finally:
             conn.close()
@@ -270,6 +280,28 @@ class ApprovalStore:
                 "SELECT status FROM pending WHERE id=?", (pending_id,)
             ).fetchone()
             return row[0] if row else None
+        finally:
+            conn.close()
+
+    def reap_stuck_executing(self, timeout_sec: int = 300) -> int:
+        """Mark 'executing' rows past the deadline as 'unknown'.
+
+        Council blind spot: a hung action sits in 'executing' forever
+        while the server is up. Call this periodically (e.g., on each
+        approve) to surface stuck rows for user decision.
+        Returns the number of rows reaped.
+        """
+        import time
+        deadline = time.time() - timeout_sec
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.execute(
+                "UPDATE pending SET status='unknown' WHERE status='executing' "
+                "AND claimed_at IS NOT NULL AND claimed_at < ?",
+                (deadline,),
+            )
+            conn.commit()
+            return cur.rowcount
         finally:
             conn.close()
 

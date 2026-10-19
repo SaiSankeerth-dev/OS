@@ -297,6 +297,8 @@ async def approve(pid: int) -> dict:
     # Step 2A: atomic claim replaces the global lock. The UPDATE only
     # succeeds if status='pending' — concurrent requests get rowcount 0.
     store = mgr._approval_store
+    # Reap stuck 'executing' rows (hung actions) before claiming.
+    await asyncio.to_thread(store.reap_stuck_executing)
     claimed = await asyncio.to_thread(store.claim_pending, pid)
     if not claimed:
         status = await asyncio.to_thread(store.get_status, pid)
@@ -741,16 +743,31 @@ async def revoke_connector(cid: str) -> dict:
         provider_error = f"{type(e).__name__}: {e}"
         log.warning("provider revoke failed for %s: %s", cid, e)
     if not provider_revoked:
-        # Don't silently delete. Mark as revoke_failed so the user knows
-        # the token may still be valid at the provider.
+        # Council blind spot: don't leave a usable token around.
+        # Delete the credentials (so OS can't use the token) BUT mark
+        # state='revoke_failed' (so the user sees it and cleans up at
+        # the provider). Not silent, not usable.
         dash = get_dash()
         conn = dash._connect()
         try:
+            # Delete credentials so OS cannot use the token
+            conn.execute(
+                "DELETE FROM connector_credentials WHERE cred_group = ?",
+                (m.cred_group,),
+            )
+            # Mark state as failed (don't delete the row — user must see it)
             conn.execute(
                 "UPDATE connector_state SET state='revoke_failed', "
                 "health_msg=?, updated_at=? WHERE connector_id=?",
                 (provider_error or "provider revoke failed", time.time(), cid),
             )
+            # If no state row existed, insert one
+            if conn.total_changes == 0:
+                conn.execute(
+                    "INSERT INTO connector_state (connector_id, state, health_msg, updated_at) "
+                    "VALUES (?, 'revoke_failed', ?, ?)",
+                    (cid, provider_error or "provider revoke failed", time.time()),
+                )
             conn.commit()
         finally:
             conn.close()
@@ -759,9 +776,9 @@ async def revoke_connector(cid: str) -> dict:
             "provider_revoked": False,
             "error": provider_error or "provider revoke failed",
             "message": (
-                "Could not revoke at the provider. Your token was NOT deleted "
-                "locally. Please revoke manually at the provider's site, then "
-                "try again."
+                "Could not revoke at the provider. The local token was deleted "
+                "(OS cannot use it), but it may still be valid at the provider. "
+                "Please revoke manually at the provider's site."
             ),
         }
     get_dash().revoke(cid, m.cred_group)
