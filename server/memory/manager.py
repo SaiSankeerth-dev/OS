@@ -204,6 +204,51 @@ class MemoryManager:
         finally:
             conn.close()
 
+    def retrieve(self, query: str, limit: int = 4) -> list[Memory]:
+        """Retrieve relevant memories for a query. Used by MemoryRetriever
+        for LLM chat context injection (Memory Day 3).
+
+        Only returns active memories; forgotten/historical are excluded.
+        Uses word-based FTS (not phrase) so natural questions like
+        "what is my deploy branch?" match stored "os-10x".
+        """
+        import re
+        # Extract meaningful words (skip stopwords, punctuation)
+        stopwords = {
+            "what", "is", "my", "the", "a", "an", "do", "you", "about",
+            "tell", "me", "how", "why", "when", "where", "which", "who",
+            "i", "it", "its", "to", "of", "in", "on", "for", "and", "or",
+        }
+        words = [
+            w for w in re.findall(r"\w+", query.lower())
+            if w not in stopwords
+        ]
+        if not words:
+            return []
+        # FTS5 OR query: word1 OR word2 ...
+        fts_query = " OR ".join(f'"{w}"' for w in words[:6])
+        conn = sqlite3.connect(self.db_path)
+        try:
+            rows = conn.execute(
+                """
+                SELECT m.key, m.value, m.status, m.source, m.created_at, m.updated_at
+                FROM memories_fts f
+                JOIN memories m ON m.id = f.rowid
+                WHERE f.memories_fts MATCH ? AND m.status='active'
+                ORDER BY rank LIMIT ?
+                """,
+                (fts_query, limit),
+            ).fetchall()
+            return [
+                Memory(
+                    key=r[0], value=r[1], status=r[2], source=r[3],
+                    created_at=r[4], updated_at=r[5],
+                )
+                for r in rows
+            ]
+        finally:
+            conn.close()
+
     def forget(self, key: str) -> int:
         """Forget a key: blank the value, purge history, keep tombstone.
 

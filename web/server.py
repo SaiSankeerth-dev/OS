@@ -53,7 +53,17 @@ async def lifespan(app: FastAPI):
 
     cfg = load_config()
     _engine["cfg"] = cfg
-    state_store = StateStore()  # tasks, suggestions, events — real store
+    _engine["state_store"] = state_store = StateStore()  # tasks, suggestions, events — real store
+    # Memory Day 3: wire the new MemoryManager into chat via MemoryRetriever.
+    # Memories are injected into the LLM prompt as labeled <memory> data.
+    try:
+        from server.memory.manager import MemoryManager as NewMemoryManager
+        from server.memory.retriever import MemoryRetriever
+        _memory_mgr = NewMemoryManager()
+        _memory_retriever = MemoryRetriever(_memory_mgr, cfg.conversation)
+    except Exception as e:  # noqa: BLE001
+        log.warning("memory unavailable: %s", e)
+        _memory_retriever = None
     try:
         router = ModelRouter.from_config(
             base_url=cfg.llm.base_url,
@@ -61,14 +71,16 @@ async def lifespan(app: FastAPI):
             timeout_sec=float(cfg.llm.request_timeout_sec),
         )
         mgr = ConversationManager(
-            cfg, router, fast_router=LayaRouter(), state_store=state_store
+            cfg, router, fast_router=LayaRouter(), state_store=state_store,
+            memory_retriever=_memory_retriever,
         )
         ok = await mgr.health()
         _engine["model_ok"] = bool(ok)
     except Exception as e:  # Ollama down etc. - dashboard still serves
         log.warning("engine degraded (no model): %s", e)
         mgr = ConversationManager(
-            cfg, None, fast_router=LayaRouter(), state_store=state_store
+            cfg, None, fast_router=LayaRouter(), state_store=state_store,
+            memory_retriever=_memory_retriever,
         )
         _engine["model_ok"] = False
     _engine["mgr"] = mgr
