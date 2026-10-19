@@ -152,6 +152,12 @@ $("#hero-new").addEventListener("click", () => {
   showHero();
   $("#chat-input").focus();
 });
+// Suggestion chips: tap to send
+document.querySelectorAll(".suggestion-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    if (chip.dataset.say) sendMessage(chip.dataset.say);
+  });
+});
 
 function addUserMsg(text) {
   hideHero();

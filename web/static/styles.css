@@ -170,12 +170,13 @@ img { user-select: none; }
 .pink { background: var(--pink-bg); } .purple { background: var(--purple-bg); } .blue { background: var(--blue-bg); }
 .green { background: var(--green-bg); } .orange { background: var(--orange-bg); } .red { background: var(--red-bg); }
 
-.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding: 10px 2px; min-height: 60px; }
-.msg-user { align-self: flex-end; display: flex; align-items: flex-end; gap: 10px; max-width: 78%; }
-.msg-user .bubble { background: var(--grad); color: #fff; border-radius: 20px 20px 6px 20px; padding: 12px 18px; font-size: 14.5px; box-shadow: var(--shadow-sm); }
+.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding: 10px 2px; min-height: 60px; scroll-behavior: smooth; }
+.msg-user { align-self: flex-end; display: flex; align-items: flex-end; gap: 10px; max-width: 78%; animation: slideIn 0.25s ease-out; }
+.msg-user .bubble { background: var(--grad); color: #fff; border-radius: 20px 20px 6px 20px; padding: 12px 18px; font-size: 14.5px; box-shadow: var(--shadow-sm); line-height: 1.5; }
 .msg-user .avatar { width: 32px; height: 32px; font-size: 13px; }
 .msg-user .ts { font-size: 11px; color: var(--muted); }
-.msg-os { align-self: flex-start; max-width: 90%; width: 100%; }
+.msg-os { align-self: flex-start; max-width: 90%; width: 100%; animation: slideIn 0.25s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .msg-os-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .msg-os-head img { width: 30px; height: 30px; object-fit: contain; }
 .msg-os-head b { font-size: 13px; }
@@ -469,7 +470,23 @@ ul.scope-list li:last-child { border-bottom: 0; }
 .exec-params { margin: 8px 0; }
 .exec-params .kv { padding: 4px 0; font-size: 12.5px; }
 .aa-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; }
-#action-approval-card { border: 1.5px solid #e8c86a; }
+#action-approval-card { border: 2px solid #e8c86a; box-shadow: 0 8px 24px rgba(232, 200, 106, 0.25); animation: slideIn 0.3s ease-out; }
+
+/* ---------- Polish: nav, empty states, buttons ---------- */
+.nav-item { transition: all 0.15s ease; }
+.nav-item:hover { background: var(--panel-2); transform: translateX(2px); }
+.nav-item.active { background: var(--grad); color: #fff; box-shadow: var(--shadow-sm); }
+.empty { text-align: center; padding: 48px 24px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.empty::before { content: "✨"; display: block; font-size: 32px; margin-bottom: 12px; }
+.btn { transition: all 0.15s ease; }
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn:active { transform: translateY(0); }
+.badge { animation: slideIn 0.3s ease-out; }
+
+/* ---------- Hero suggestions ---------- */
+.hero-suggestions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+.suggestion-chip { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 10px 18px; font-size: 13.5px; color: var(--ink); cursor: pointer; transition: all 0.15s ease; box-shadow: var(--shadow-sm); }
+.suggestion-chip:hover { border-color: var(--accent); color: var(--accent-deep); transform: translateY(-2px); box-shadow: var(--shadow); }
 
 /* ---------- Command palette ---------- */
 .palette-modal { width: 560px; padding: 12px; }
