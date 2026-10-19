@@ -187,6 +187,34 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "browser_task",
     ),
     (
+        # Agentic computer: desktop tasks. "take a screenshot", "open X",
+        # "lock the screen", "volume up/down", "mute".
+        re.compile(
+            r"^\s*(?:take\s+a\s+)?screenshot\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "computer_task",
+    ),
+    (
+        re.compile(
+            r"^\s*open\s+(calculator|notepad|terminal|files?|settings|"
+            r"camera|music|videos?)\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "computer_task",
+    ),
+    (
+        re.compile(
+            r"^\s*(lock(\s+(the\s+)?screen)?|volume\s+(up|down)|(un)?mute)"
+            r"\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "computer_task",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
@@ -292,6 +320,9 @@ _TOOL_ARG = {
     # browser_task takes the FULL user text; expand_task() parses the
     # "play X" / "youtube <query>" / "do X on <site>" shorthands itself.
     "browser_task": "__full_text__",
+    # computer_task also takes the FULL user text; try_deterministic()
+    # parses the "screenshot" / "open X" / "volume up" shorthands itself.
+    "computer_task": "__full_text__",
 }
 
 
@@ -307,11 +338,11 @@ class IntentRouter:
             m = pattern.match(text)
             if m:
                 args: dict[str, str] = {}
-                if tool in _TOOL_ARG and m.groups():
+                if tool in _TOOL_ARG:
                     arg_key = _TOOL_ARG[tool]
                     if arg_key == "__full_text__":
                         args["task"] = text.strip()
-                    else:
+                    elif m.groups():
                         args[arg_key] = m.group(1).strip()
                 elif intent == Intent.PERSONA and m.groups():
                     args["persona"] = m.group(1).strip().lower()

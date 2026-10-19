@@ -775,6 +775,28 @@ class ConversationManager:
                 pending.run_id, pending.skill, _run_agentic_task
             )
             return completed.message
+        if pending.skill == "computer_task":
+            # Agentic computer: user approved a desktop task.
+            # Instant tasks run immediately; complex ones use cua-agent.
+            def _run_computer_task() -> str:
+                from server.tools.agentic_computer_tool import (
+                    format_computer_result,
+                    run_agentic_computer_task,
+                )
+
+                task = pending.input_text
+                result = run_agentic_computer_task(task)
+                self._approval_store.log(
+                    pending.skill, pending.input_text,
+                    f"steps={len(result.steps)} success={result.success}",
+                    "EXECUTED",
+                )
+                return format_computer_result(result)
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, pending.skill, _run_computer_task
+            )
+            return completed.message
         if pending.skill == "linkedin":
             # STUB: no LinkedIn connector configured yet. Replace
             # this branch with a real publish call when one exists -

@@ -55,6 +55,8 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     # Agentic browser: natural-language tasks run the full agent, so they
     # always need approval before the browser is touched.
     "browser_task": ToolPolicy.NEEDS_APPROVAL,
+    # Agentic computer: same - always needs approval before touching the desktop.
+    "computer_task": ToolPolicy.NEEDS_APPROVAL,
 }
 
 
