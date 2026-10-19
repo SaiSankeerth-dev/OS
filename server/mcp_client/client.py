@@ -162,7 +162,9 @@ class MCPManager:
                         server=cfg.name,
                         name=t.name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        # MCP 2.x uses snake_case; 1.x used camelCase
+                        input_schema=getattr(t, "input_schema",
+                                             getattr(t, "inputSchema", {})) or {},
                     )
                     for t in tools_result.tools
                 ]
