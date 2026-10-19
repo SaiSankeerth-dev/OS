@@ -139,3 +139,40 @@ def test_double_claim_returns_false():
         assert store.claim_pending(pid) is False  # Already claimed
     finally:
         Path(path).unlink(missing_ok=True)
+
+
+def test_completed_after_reap_keeps_unknown():
+    """Slow action finishes after reap → status stays 'unknown', result noted."""
+    store, path = _make_store()
+    try:
+        conn = sqlite3.connect(path)
+        conn.execute(
+            "INSERT INTO pending (skill, input, draft, approved_hash, run_id, created_ts, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'pending')",
+            ("test", "input", "draft", "hash", "run1", 12345.0),
+        )
+        conn.commit()
+        pid = conn.execute("SELECT id FROM pending").fetchone()[0]
+        conn.close()
+
+        # Claim (slow action starts)
+        assert store.claim_pending(pid) is True
+        assert store.get_status(pid) == "executing"
+
+        # Force the reap (simulate timeout with 0 sec)
+        reaped = store.reap_stuck_executing(timeout_sec=0)
+        assert reaped == 1
+        assert store.get_status(pid) == "unknown"
+
+        # Slow action finally completes — must NOT flip back to succeeded
+        store.mark_succeeded(pid, "slow result")
+        assert store.get_status(pid) == "unknown"
+
+        # But the result should be stored as a note
+        conn = sqlite3.connect(path)
+        row = conn.execute("SELECT result FROM pending WHERE id=?", (pid,)).fetchone()
+        conn.close()
+        assert "completed after reap" in row[0]
+        assert "slow result" in row[0]
+    finally:
+        Path(path).unlink(missing_ok=True)

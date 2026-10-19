@@ -251,23 +251,55 @@ class ApprovalStore:
             conn.close()
 
     def mark_succeeded(self, pending_id: int, result: str) -> None:
+        """Mark succeeded — but only if still 'executing'.
+
+        If the row was reaped (now 'unknown'), don't flip it back.
+        Store the result as a note and log it.
+        """
+        import logging
+        log = logging.getLogger("os.dashboard")
         conn = sqlite3.connect(self.db_path)
         try:
-            conn.execute(
-                "UPDATE pending SET status='succeeded', result=? WHERE id=?",
+            cur = conn.execute(
+                "UPDATE pending SET status='succeeded', result=? "
+                "WHERE id=? AND status='executing'",
                 (result[:2000], pending_id),
             )
+            if cur.rowcount == 0:
+                # Reaped while running (timeout). Don't resurrect it —
+                # store result as a note, keep 'unknown' so the user decides.
+                conn.execute(
+                    "UPDATE pending SET result=? WHERE id=?",
+                    (f"[completed after reap] {result[:1900]}", pending_id),
+                )
+                log.warning(
+                    "approval %s completed after reap; kept as 'unknown'",
+                    pending_id,
+                )
             conn.commit()
         finally:
             conn.close()
 
     def mark_failed(self, pending_id: int, error: str) -> None:
+        """Mark failed — but only if still 'executing'. Same reap guard."""
+        import logging
+        log = logging.getLogger("os.dashboard")
         conn = sqlite3.connect(self.db_path)
         try:
-            conn.execute(
-                "UPDATE pending SET status='failed', result=? WHERE id=?",
+            cur = conn.execute(
+                "UPDATE pending SET status='failed', result=? "
+                "WHERE id=? AND status='executing'",
                 (error[:2000], pending_id),
             )
+            if cur.rowcount == 0:
+                conn.execute(
+                    "UPDATE pending SET result=? WHERE id=?",
+                    (f"[failed after reap] {error[:1900]}", pending_id),
+                )
+                log.warning(
+                    "approval %s failed after reap; kept as 'unknown'",
+                    pending_id,
+                )
             conn.commit()
         finally:
             conn.close()
