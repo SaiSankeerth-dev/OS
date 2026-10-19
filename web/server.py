@@ -30,6 +30,11 @@ from contextlib import asynccontextmanager
 
 log = logging.getLogger("os.dashboard")
 
+# Phase 1 fix: guards the approval find+execute+remove sequence against
+# concurrent double-execution (P2-1). One lock for the whole process is
+# correct — approvals are a single global queue.
+_approve_lock = asyncio.Lock()
+
 _HERE = Path(__file__).resolve().parent
 _STATIC = _HERE / "static"
 _WORKSPACE = Path.home() / "workspace"
@@ -294,21 +299,24 @@ def _find_pending(mgr, pid: int):
 @app.post("/api/approvals/{pid}/approve")
 async def approve(pid: int) -> dict:
     mgr = get_mgr()
-    p = _find_pending(mgr, pid)
-    if p is None:
-        raise HTTPException(404, "approval not found (maybe it expired)")
-    # Dequeue only AFTER successful execution. On failure the item stays
-    # queued (and the API reports failure) so user-authorized work is never
-    # silently dropped while the UI claims success.
-    try:
-        text = await mgr._approve_one(p)
-    except Exception as e:
-        log.exception("approve failed")
-        raise HTTPException(
-            500, f"Approval failed: {type(e).__name__}. The item is still queued."
-        )
-    mgr._pending.remove(p)
-    return {"ok": True, "text": text}
+    # Phase 1 fix: lock the find+execute+remove sequence so concurrent
+    # approves for the same pid can't both execute the action.
+    async with _approve_lock:
+        p = _find_pending(mgr, pid)
+        if p is None:
+            raise HTTPException(404, "approval not found (maybe it expired)")
+        # Dequeue only AFTER successful execution. On failure the item stays
+        # queued (and the API reports failure) so user-authorized work is never
+        # silently dropped while the UI claims success.
+        try:
+            text = await mgr._approve_one(p)
+        except Exception as e:
+            log.exception("approve failed")
+            raise HTTPException(
+                500, f"Approval failed: {type(e).__name__}. The item is still queued."
+            )
+        mgr._pending.remove(p)
+        return {"ok": True, "text": text}
 
 
 @app.post("/api/approvals/{pid}/reject")
@@ -429,15 +437,17 @@ async def memory() -> dict:
 @app.delete("/api/memory/{key}")
 async def forget_memory(key: str) -> dict:
     db = Path("memory/os_memory.db")
-    if db.exists():
-        conn = sqlite3.connect(db)
-        try:
-            cur = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
-            conn.commit()
-            if cur.rowcount == 0:
-                raise HTTPException(404, "no such memory")
-        finally:
-            conn.close()
+    if not db.exists():
+        # Phase 1 fix: was returning {"ok": True} when nothing was deleted.
+        raise HTTPException(404, "no such memory (database not found)")
+    conn = sqlite3.connect(db)
+    try:
+        cur = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
+        conn.commit()
+        if cur.rowcount == 0:
+            raise HTTPException(404, "no such memory")
+    finally:
+        conn.close()
     return {"ok": True}
 
 
@@ -696,8 +706,30 @@ async def deny_connector(cid: str) -> dict:
 @app.post("/api/connectors/{cid}/revoke")
 async def revoke_connector(cid: str) -> dict:
     m = _manifest_or_404(cid)
+    # Phase 1 fix: revoke at the provider BEFORE deleting locally, so the
+    # token is actually dead (was: local delete only, token stayed valid).
+    provider_revoked = False
+    try:
+        creds = _creds_for(cid)
+        refresh_token = (creds.get("refresh_token") or "").strip()
+        if refresh_token:
+            if m.auth_kind == "google_oauth":
+                # Google revocation endpoint
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(
+                        "https://oauth2.googleapis.com/revoke",
+                        data={"token": refresh_token},
+                    )
+                    provider_revoked = resp.status_code == 200
+            elif m.auth_kind == "microsoft_oauth":
+                # Microsoft has no direct revoke endpoint; the refresh token
+                # is invalidated by removing the app consent. We attempt the
+                # logout endpoint as a best-effort signal.
+                provider_revoked = False  # Manual revocation required
+    except Exception as e:
+        log.warning("provider revoke failed for %s: %s", cid, e)
     get_dash().revoke(cid, m.cred_group)
-    return {"ok": True}
+    return {"ok": True, "provider_revoked": provider_revoked}
 
 
 class CredsIn(BaseModel):

@@ -12,9 +12,11 @@ exports pages to PDF. No autonomous interactive browsing.
 """
 from __future__ import annotations
 
+import functools
 import re
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 from .store import OmStore, now
 
@@ -121,7 +123,15 @@ def _strip_html(html: str) -> tuple[str, str]:
 
 
 class _PlaywrightDriver:
-    """One Chromium, one context per session id. Lazy; degrades to None."""
+    """One Chromium, one context per session id. Lazy; degrades to None.
+
+    Playwright's sync API has thread affinity: everything must run on the
+    thread that started it, and it cannot start inside a running asyncio
+    loop (which is exactly where FastAPI request handlers run). So every
+    public method hops to a dedicated single Playwright thread via _run().
+    Internal helpers (_page, _act, _evidence, ...) run directly on that
+    thread and must never call _run() themselves (deadlock).
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -135,7 +145,22 @@ class _PlaywrightDriver:
         # is_live() lets callers detect that instead of silently
         # substituting a blank page.
         self._live: set[str] = set()
+        self._exec = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="os-pw")
 
+    def _run(self, fn, *args, **kwargs):
+        """Run fn on the dedicated Playwright thread, propagating errors."""
+        fut = self._exec.submit(fn, *args, **kwargs)
+        return fut.result(timeout=180)
+
+    def _on_pw_thread(fn):
+        """Decorator: public driver methods run on the Playwright thread."""
+        @functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            return self._run(fn, self, *args, **kwargs)
+        return wrapper
+
+    @_on_pw_thread
     def available(self) -> bool:
         if self._ok is not None:
             return self._ok
@@ -220,6 +245,7 @@ class _PlaywrightDriver:
         except Exception:
             pass
 
+    @_on_pw_thread
     def console_logs(self, sid: str) -> list[dict]:
         # ensure the page (and listeners) exist if the browser is available
         try:
@@ -228,25 +254,30 @@ class _PlaywrightDriver:
             pass
         return list(self._console.get(sid, []))
 
+    @_on_pw_thread
     def pdf(self, sid: str) -> bytes:
         return self._page(sid).pdf()
 
+    @_on_pw_thread
     def is_live(self, sid: str) -> bool:
         """True only if this process opened a real page for sid."""
         with self._lock:
             return sid in self._live
 
+    @_on_pw_thread
     def open(self, sid: str, url: str) -> None:
         self._page(sid).goto(url, wait_until="domcontentloaded", timeout=30000)
         with self._lock:
             self._live.add(sid)
 
+    @_on_pw_thread
     def read(self, sid: str) -> tuple[str, str, str]:
         page = self._page(sid)
         title = page.title()[:300]
         text = re.sub(r"\s+", " ", page.inner_text("body")).strip()[:READ_LIMIT]
         return page.url, title, text
 
+    @_on_pw_thread
     def screenshot(self, sid: str) -> bytes:
         return self._page(sid).screenshot(type="png")
 
@@ -270,11 +301,13 @@ class _PlaywrightDriver:
         ev["selector"] = selector
         return ev
 
+    @_on_pw_thread
     def click(self, sid: str, selector: str, timeout_ms: int = 10_000) -> dict:
         return self._act(
             sid, selector, timeout_ms,
             lambda page, sel, t: page.click(sel, timeout=t))
 
+    @_on_pw_thread
     def fill(self, sid: str, selector: str, text: str,
              timeout_ms: int = 10_000) -> dict:
         _validate_interaction(selector, text=text, timeout_ms=timeout_ms)
@@ -288,6 +321,7 @@ class _PlaywrightDriver:
         ev.update({"selector": selector, "value": (value or "")[:1000]})
         return ev
 
+    @_on_pw_thread
     def type_text(self, sid: str, selector: str, text: str,
                   timeout_ms: int = 10_000) -> dict:
         _validate_interaction(selector, text=text, timeout_ms=timeout_ms)
@@ -302,6 +336,7 @@ class _PlaywrightDriver:
         ev.update({"selector": selector, "value": (value or "")[:1000]})
         return ev
 
+    @_on_pw_thread
     def press(self, sid: str, selector: str, key: str,
               timeout_ms: int = 10_000) -> dict:
         _validate_interaction(selector, key=key, timeout_ms=timeout_ms)
@@ -314,6 +349,7 @@ class _PlaywrightDriver:
         ev.update({"selector": selector, "key": key})
         return ev
 
+    @_on_pw_thread
     def select(self, sid: str, selector: str, value: str,
                timeout_ms: int = 10_000) -> dict:
         _validate_interaction(selector, text=value, timeout_ms=timeout_ms)
@@ -327,6 +363,7 @@ class _PlaywrightDriver:
         ev.update({"selector": selector, "value": (chosen or "")[:1000]})
         return ev
 
+    @_on_pw_thread
     def wait_for(self, sid: str, selector: str | None = None,
                  state: str = "visible",
                  timeout_ms: int = 10_000) -> dict:
@@ -351,6 +388,7 @@ class _PlaywrightDriver:
                 f"Wait timed out ({'selector ' + selector if selector else state})", 504)
         return self._evidence(sid, page)
 
+    @_on_pw_thread
     def elements(self, sid: str) -> list[dict]:
         page = self._page(sid)
         try:
@@ -358,6 +396,7 @@ class _PlaywrightDriver:
         except Exception as e:
             raise BrowserError(f"Could not list elements: {str(e)[:200]}", 502)
 
+    @_on_pw_thread
     def describe(self, sid: str, selector: str) -> dict:
         """Read-only element lookup for approval drafts. No side effects."""
         selector, _ = _validate_interaction(selector)
@@ -371,6 +410,7 @@ class _PlaywrightDriver:
         info["selector"] = selector
         return info
 
+    @_on_pw_thread
     def close(self, sid: str) -> None:
         with self._lock:
             page = self._pages.pop(sid, None)
@@ -381,6 +421,7 @@ class _PlaywrightDriver:
             except Exception:
                 pass
 
+    @_on_pw_thread
     def shutdown(self) -> None:
         """Stop the browser and Playwright entirely.
 

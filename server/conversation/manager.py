@@ -690,10 +690,19 @@ class ConversationManager:
 
     async def _approve_one(self, pending: PendingApproval) -> str:
         """Approve a single pending item. Returns the reply text."""
-        # Phase 12: the item leaves the persisted queue the moment it is
-        # processed, whatever the outcome.
+        # Phase 1 fix: the item leaves the persisted queue only AFTER
+        # successful execution. If execution raises, the row stays so a
+        # restart doesn't lose user-authorized work (was: deleted at start).
+        try:
+            result = await self._execute_approved(pending)
+        except Exception:
+            raise
         if pending.pending_id:
             self._approval_store.remove_pending(pending.pending_id)
+        return result
+
+    async def _execute_approved(self, pending: PendingApproval) -> str:
+        """Run the approved action. Called by _approve_one."""
         # Recompute the hash at execution time - if the draft was
         # mutated after being shown, this stops matching and the
         # approval is refused. No execution on a stale approval.
