@@ -74,7 +74,7 @@ def _fmt_date(ts: float) -> str:
 _pending_forget: dict[str, tuple[list[str], float]] = {}
 
 
-def make_tools(memory_manager: MemoryManager | None = None):
+def make_tools(memory_manager: MemoryManager | None = None, **kwargs):
     mgr = memory_manager or MemoryManager()
 
     def memory_save(note: str = "", **kwargs) -> ToolResult:

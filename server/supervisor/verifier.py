@@ -47,24 +47,26 @@ def _check_linkedin_draft(data: dict) -> VerificationResult:
 
 
 def _check_memory_save(data: dict) -> VerificationResult:
-    if not _nonempty_str(data.get("note")):
+    # Day 2 skill returns {"text": "Saved: ...", "key": ...}
+    if not _nonempty_str(data.get("text")):
         return VerificationResult(False, "saved note is empty")
     return VerificationResult(True, "note stored")
 
 
 def _check_memory_recall(data: dict) -> VerificationResult:
-    # Zero hits is a legitimate outcome - the contract is the shape.
-    if not isinstance(data.get("notes"), list):
-        return VerificationResult(False, "recall returned no notes list")
-    return VerificationResult(True, "notes list present")
+    # Day 2 skill returns {"text": "..."}; zero hits is legitimate.
+    if not isinstance(data.get("text"), str):
+        return VerificationResult(False, "recall returned no text")
+    return VerificationResult(True, "recall text present")
 
 
 def _check_memory_forget(data: dict) -> VerificationResult:
-    # A successful forget deleted at least one note - nothing deleted
-    # is a failure upstream, never a "success".
-    deleted = data.get("deleted")
-    if not isinstance(deleted, list) or not deleted:
-        return VerificationResult(False, "forget deleted nothing")
+    # Day 2 skill returns {"text": "Forgot 'x' (N memories removed)."}
+    # or {"text": "Nothing matches 'x'. Nothing deleted."}
+    text = data.get("text")
+    if not isinstance(text, str) or not text:
+        return VerificationResult(False, "forget returned no text")
+    return VerificationResult(True, "forget text present")
     return VerificationResult(True, f"{len(deleted)} note(s) deleted")
 
 

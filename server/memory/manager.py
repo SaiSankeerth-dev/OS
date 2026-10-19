@@ -255,7 +255,8 @@ class MemoryManager:
         When someone says "forget this," they mean it. The value is
         blanked (not just marked), historical rows are purged, and only
         a tombstone (key + timestamp) remains for audit.
-        The FTS triggers handle index cleanup automatically.
+        FTS entries remain but are filtered by status='active' in all
+        searches, so forgotten memories never surface.
         Returns the number of rows forgotten.
         """
         now = time.time()
