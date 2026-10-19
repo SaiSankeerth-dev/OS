@@ -265,7 +265,7 @@ time.sleep(10)
     assert timeout_res["ok"] is False
     assert timeout_res["status"] == "FAILED"
     assert timeout_res["verification"]["verified"] is False
-    assert "timed out" in timeout_res["output"].lower() or "exit code: 124" in timeout_res["output"].lower()
+    assert "timeout" in timeout_res["output"].lower() or "exit code: 124" in timeout_res["output"].lower()
 
 
 def test_incorrect_postcondition_rejects_completion(tmp_path: Path):

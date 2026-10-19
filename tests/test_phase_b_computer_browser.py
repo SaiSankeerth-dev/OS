@@ -40,6 +40,7 @@ from __future__ import annotations
 import http.server
 import socketserver
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -387,7 +388,8 @@ def test_terminal_workspace_boundaries_and_jail(tmp_path):
 
     # 1. Allowed execution inside workspace
     mgr.write_file("hello.txt", "Hello OS Workspace")
-    res = mgr.execute_command("cat hello.txt" if hasattr(mgr, "execute_command") else "type hello.txt")
+    cmd = "type hello.txt" if sys.platform == "win32" else "cat hello.txt"
+    res = mgr.execute_command(cmd)
     assert res.exit_code == 0
     assert "Hello OS Workspace" in res.stdout
 

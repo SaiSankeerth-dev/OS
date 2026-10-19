@@ -31,9 +31,8 @@ def _offline_agent() -> SupervisorAgent:
 
 def test_discovers_all_skill_contracts():
     infos = {i.name: i for i in SkillLoader().discover()}
-    for name in ("linkedin", "datetime", "system", "memory", "calc"):
+    for name in ("linkedin", "datetime", "system", "memory", "calc", "browser"):
         assert infos[name].status == "active", name
-    assert infos["browser"].status == "planned"
     assert infos["files"].status == "planned"
 
 
@@ -42,10 +41,10 @@ def test_load_registers_active_tools_only(tmp_path):
     store = StateStore(tmp_path / "s.db")
     loaded = SkillLoader().load(reg, state_store=store)
     names = {i.name for i in loaded}
-    assert {"linkedin", "datetime", "system", "memory", "calc"} <= names
-    assert "browser" not in names and "files" not in names
+    assert {"linkedin", "datetime", "system", "memory", "calc", "browser"} <= names
+    assert "files" not in names
     for tool in ("linkedin_draft", "get_current_datetime", "get_system_info",
-                 "memory_save", "memory_recall", "calc"):
+                 "memory_save", "memory_recall", "calc", "browser_navigate"):
         reg.get(tool)  # raises KeyError if missing
 
 
@@ -165,13 +164,19 @@ def test_new_tools_allowed_and_scoped(tmp_path):
         assert sup.scope_guard.check(tool) is None
 
 
+def _run_async(coro):
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
+
 def test_disabled_memory_skill_rejected(tmp_path):
     sup = Supervisor(
         _default_registry(StateStore(tmp_path / "s.db")),
         scope_guard=ScopeGuard(disabled_skills=("memory",)),
         agent=_offline_agent(),
     )
-    res = asyncio.run(sup.run_tool("memory_save", {"note": "x"}, "remember x"))
+    res = _run_async(sup.run_tool("memory_save", {"note": "x"}, "remember x"))
     assert res.code == "SKILL_DISABLED"
 
 
@@ -185,7 +190,7 @@ def _collect(m: ConversationManager, text: str) -> str:
             parts.append(c.delta)
         return "".join(parts).strip()
 
-    return asyncio.run(go())
+    return _run_async(go())
 
 
 def test_manager_calc_end_to_end(tmp_path):
