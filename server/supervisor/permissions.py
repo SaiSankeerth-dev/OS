@@ -66,6 +66,10 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "github_issues": ToolPolicy.ALLOW,
     "github_prs": ToolPolicy.ALLOW,
     "github_create_issue": ToolPolicy.NEEDS_APPROVAL,
+    # MCP: list is safe; call/add need approval (run commands, side effects).
+    "mcp_list": ToolPolicy.ALLOW,
+    "mcp_call": ToolPolicy.NEEDS_APPROVAL,
+    "mcp_add": ToolPolicy.NEEDS_APPROVAL,
 }
 
 

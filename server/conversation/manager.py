@@ -829,6 +829,30 @@ class ConversationManager:
                 pending.run_id, pending.skill, _run_github_action
             )
             return completed.message
+        if pending.skill in ("mcp_call", "mcp_add"):
+            # MCP: user approved a tool call or server addition.
+            def _run_mcp_action() -> str:
+                action_args = pending.action_args or {}
+                kind = action_args.get("kind")
+                if kind == "mcp":
+                    from server.tools.mcp_tool import execute_mcp_action
+                    result = execute_mcp_action(
+                        action_args.get("mcp_action", {}))
+                elif kind == "mcp_add":
+                    from server.tools.mcp_tool import execute_mcp_add
+                    result = execute_mcp_add(
+                        action_args.get("mcp_action", {}))
+                else:
+                    result = "MCP action data missing; not executing."
+                self._approval_store.log(
+                    pending.skill, pending.input_text, result, "EXECUTED",
+                )
+                return result
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, pending.skill, _run_mcp_action
+            )
+            return completed.message
         if pending.skill == "linkedin":
             # STUB: no LinkedIn connector configured yet. Replace
             # this branch with a real publish call when one exists -

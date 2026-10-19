@@ -280,6 +280,30 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "github_create_issue",
     ),
     (
+        # MCP: "mcp list"
+        re.compile(r"^\s*mcp\s+list\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "mcp_list",
+    ),
+    (
+        # MCP: "mcp call <server> <tool> '<json>'"
+        re.compile(
+            r"^\s*mcp\s+call\s+(\S+)\s+(\S+)(?:\s+(.+))?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "mcp_call",
+    ),
+    (
+        # MCP: "mcp add <name> <command> [args...]"
+        re.compile(
+            r"^\s*mcp\s+add\s+(\S+)\s+(\S+)(?:\s+(.+))?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "mcp_add",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
@@ -394,6 +418,9 @@ _TOOL_ARG = {
     "github_issues": "repo",
     # github_create_issue takes FULL text; the tool parses repo + title.
     "github_create_issue": "__full_text__",
+    # mcp_call/mcp_add take FULL text; the tools parse server/tool/args.
+    "mcp_call": "__full_text__",
+    "mcp_add": "__full_text__",
 }
 
 
