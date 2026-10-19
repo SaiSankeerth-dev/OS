@@ -1,48 +1,81 @@
-"""Memory skill tools: save and recall notes.
+"""Memory skill tools — rewritten for explicit commands (Memory Phase Day 2).
 
-Local-only. Notes are stored as kind="memory" events in the StateStore
-(SQLite) - no cloud, no embeddings, no cost. Recall is keyword search;
-good enough for a first memory and honest about it.
+Uses the new server/memory/manager.py (not StateStore events).
+No LLM involved. Deterministic parsing.
+
+Response formats (never lie about what happened):
+- Store: "Saved: <exact text>. (key: <key>). Say 'forget <key>' to remove."
+- Update: "Updated <key>: <old> → <new>."
+- Secret: say so, nothing saved.
+- Recall: list with dates, or "nothing matches."
+- Forget: show matches, ask if multiple, say exactly what was removed.
 """
 from __future__ import annotations
 
-import json
+import re
+import time
+from datetime import datetime
 
 from server.intent.registry import ExecutionMode, ToolResult, ToolSpec
-from server.state.store import StateStore
+from server.memory.manager import MemoryManager
 
 
 MEMORY_SAVE_SPEC = ToolSpec(
     name="memory_save",
-    description="Save a note to long-term memory. Usage: remember this.",
+    description="Save to memory. Usage: remember my deploy branch is os-10x",
     execution_mode=ExecutionMode.DIRECT,
 )
 
 MEMORY_RECALL_SPEC = ToolSpec(
     name="memory_recall",
-    description="Recall saved notes matching a query.",
+    description="Recall from memory. Usage: what do you remember about deploy",
     execution_mode=ExecutionMode.DIRECT,
 )
 
 MEMORY_FORGET_SPEC = ToolSpec(
     name="memory_forget",
-    description=(
-        "Forget saved notes matching a query. "
-        "Usage: forget what I told you about the launch code."
-    ),
+    description="Forget from memory. Usage: forget deploy branch",
     execution_mode=ExecutionMode.DIRECT,
 )
 
 
-_MEMORY_STOPWORDS = frozenset(
-    "the a an and or of to in on for with is are was were be as at by "
-    "it its this that these those i you we they he she me my your "
-    "what when where which who how do does did".split()
+# Key derivation: "<subject> is/are/= <value>" → subject as key
+_KEY_PATTERN = re.compile(
+    r"^\s*(.+?)\s+(?:is|are|=)\s+(.+?)\s*$",
+    re.IGNORECASE,
 )
 
 
-def make_tools(state_store: StateStore | None = None):
-    store = state_store or StateStore()
+def _derive_key(text: str) -> tuple[str, str]:
+    """Two-tier key derivation. Returns (key, value).
+
+    Tier 1: "<subject> is/are/= <value>" → (subject, value)
+    Tier 2: free-text → (slug, full text)
+    """
+    m = _KEY_PATTERN.match(text.strip())
+    if m:
+        subject = m.group(1).strip().lower()
+        value = m.group(2).strip()
+        # Clean subject: remove "my", "the", etc. for cleaner keys
+        subject = re.sub(r"^(my|the|a|an)\s+", "", subject)
+        key = re.sub(r"[^a-z0-9]+", "_", subject).strip("_")
+        return key or "note", value
+    # Tier 2: slug from first words
+    words = re.findall(r"\b\w+\b", text.lower())[:4]
+    key = "_".join(words) if words else "note"
+    return key, text.strip()
+
+
+def _fmt_date(ts: float) -> str:
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+
+
+# Pending confirmation state for multi-match forget (2-min expiry)
+_pending_forget: dict[str, tuple[list[str], float]] = {}
+
+
+def make_tools(memory_manager: MemoryManager | None = None):
+    mgr = memory_manager or MemoryManager()
 
     def memory_save(note: str = "", **kwargs) -> ToolResult:
         note = (note or "").strip()
@@ -52,102 +85,152 @@ def make_tools(state_store: StateStore | None = None):
                 mode=ExecutionMode.DIRECT,
                 error="nothing to save",
             )
-        store.log_event(
-            "memory", "memory_skill", json.dumps({"note": note})
-        )
+        key, value = _derive_key(note)
+        # Check if updating (existing active key)
+        existing = mgr.recall(key)
+        try:
+            mgr.store(key, value, source="chat")
+        except ValueError as e:
+            # Secret rejected
+            return ToolResult(
+                status="failure",
+                mode=ExecutionMode.DIRECT,
+                error=str(e),
+            )
+        if existing:
+            text = f"Updated {key}: {existing.value} → {value}."
+        else:
+            text = f"Saved: {value}. (key: {key}). Say \"forget {key}\" to remove."
         return ToolResult(
             status="success",
             mode=ExecutionMode.DIRECT,
-            data={"note": note},
+            data={"text": text, "key": key},
         )
-
-    def _search_notes(query: str) -> list[tuple[int, str]]:
-        """Keyword search over memory notes. Returns (event_id, note)."""
-        # Keyword search: any significant word may hit. This keeps
-        # "what do you remember about launch code" finding a note that
-        # says "my launch code is 1234".
-        words = [
-            w for w in query.lower().split()
-            if len(w) >= 3 and w not in _MEMORY_STOPWORDS
-        ] or [query.lower()]
-        hits: list[tuple[int, str]] = []
-        seen: set[str] = set()
-        for word in words[:6]:
-            for event in store.search_events("memory", word, limit=5):
-                try:
-                    note = json.loads(event["data"])["note"]
-                except (KeyError, ValueError):
-                    continue
-                if note not in seen:
-                    seen.add(note)
-                    hits.append((event["id"], note))
-        return hits[:5]
 
     def memory_recall(query: str = "", **kwargs) -> ToolResult:
         query = (query or "").strip()
         if not query:
+            # List all
+            mems = mgr.list_active(limit=20)
+            if not mems:
+                return ToolResult(
+                    status="success",
+                    mode=ExecutionMode.DIRECT,
+                    data={"text": "Nothing in memory yet."},
+                )
+            lines = [f"- {m.key}: {m.value} ({_fmt_date(m.created_at)})" for m in mems]
             return ToolResult(
-                status="failure",
+                status="success",
                 mode=ExecutionMode.DIRECT,
-                error="nothing to search for",
+                data={"text": "Remembered:\n" + "\n".join(lines)},
             )
-        hits = _search_notes(query)
+        # Try exact key first, then search
+        exact = mgr.recall(query)
+        if exact:
+            return ToolResult(
+                status="success",
+                mode=ExecutionMode.DIRECT,
+                data={
+                    "text": f"{exact.key}: {exact.value} ({_fmt_date(exact.created_at)})"
+                },
+            )
+        results = mgr.search(query, limit=5)
+        if not results:
+            return ToolResult(
+                status="success",
+                mode=ExecutionMode.DIRECT,
+                data={"text": f"Nothing matches '{query}'."},
+            )
+        lines = [
+            f"- {m.key}: {m.value} ({_fmt_date(m.created_at)})" for m in results
+        ]
         return ToolResult(
             status="success",
             mode=ExecutionMode.DIRECT,
-            data={"query": query, "notes": [note for _, note in hits]},
+            data={"text": "Found:\n" + "\n".join(lines)},
         )
 
-    def memory_forget(query: str = "", **kwargs) -> ToolResult:
-        """Phase 12: delete the notes a recall would have found."""
+    def memory_forget(query: str = "", session_id: str = "default", **kwargs) -> ToolResult:
         query = (query or "").strip()
         if not query:
             return ToolResult(
                 status="failure",
                 mode=ExecutionMode.DIRECT,
-                error="nothing to forget",
+                error="say what to forget, e.g. 'forget deploy branch'",
             )
-        hits = _search_notes(query)
-        if not hits:
+        # Check pending confirmation
+        if session_id in _pending_forget:
+            keys, expiry = _pending_forget[session_id]
+            if time.time() > expiry:
+                del _pending_forget[session_id]
+                return ToolResult(
+                    status="failure",
+                    mode=ExecutionMode.DIRECT,
+                    error="Confirmation expired. Say 'forget <what>' again.",
+                )
+            # User is confirming — query should be a number
+            if query.isdigit():
+                idx = int(query) - 1
+                if 0 <= idx < len(keys):
+                    key = keys[idx]
+                    del _pending_forget[session_id]
+                    n = mgr.forget(key)
+                    return ToolResult(
+                        status="success",
+                        mode=ExecutionMode.DIRECT,
+                        data={"text": f"Forgot '{key}' ({n} memories removed)."},
+                    )
+            # Not a valid choice — cancel
+            del _pending_forget[session_id]
             return ToolResult(
                 status="failure",
                 mode=ExecutionMode.DIRECT,
-                error=f"nothing remembered about '{query}'",
+                error="Cancelled. Say 'forget <what>' to try again.",
             )
-        for event_id, _note in hits:
-            store.delete_event(event_id)
+
+        # Find matches
+        exact = mgr.recall(query)
+        if exact:
+            n = mgr.forget(query)
+            return ToolResult(
+                status="success",
+                mode=ExecutionMode.DIRECT,
+                data={"text": f"Forgot '{query}' ({n} memories removed)."},
+            )
+        results = mgr.search(query, limit=5)
+        if not results:
+            return ToolResult(
+                status="success",
+                mode=ExecutionMode.DIRECT,
+                data={"text": f"Nothing matches '{query}'. Nothing deleted."},
+            )
+        if len(results) == 1:
+            key = results[0].key
+            n = mgr.forget(key)
+            return ToolResult(
+                status="success",
+                mode=ExecutionMode.DIRECT,
+                data={"text": f"Forgot '{key}' ({n} memories removed)."},
+            )
+        # Multiple matches — ask which
+        keys = [r.key for r in results]
+        _pending_forget[session_id] = (keys, time.time() + 120)  # 2-min expiry
+        lines = [f"{i+1}. {r.key}: {r.value[:60]}" for i, r in enumerate(results)]
         return ToolResult(
             status="success",
             mode=ExecutionMode.DIRECT,
             data={
-                "query": query,
-                "deleted": [note for _, note in hits],
+                "text": (
+                    f"Multiple matches for '{query}':\n"
+                    + "\n".join(lines)
+                    + "\nReply with the number to forget, or anything else to cancel."
+                ),
+                "awaiting_confirmation": True,
             },
         )
 
-    def format_memory_save(result: ToolResult) -> str:
-        if result.status != "success":
-            return "I couldn't save that."
-        return f"Saved: {result.data['note']}"
-
-    def format_memory_recall(result: ToolResult) -> str:
-        if result.status != "success":
-            return "I couldn't search memory."
-        notes = result.data["notes"]
-        if not notes:
-            return f"I don't remember anything about '{result.data['query']}'."
-        return "Here's what I remember:\n- " + "\n- ".join(notes)
-
-    def format_memory_forget(result: ToolResult) -> str:
-        if result.status != "success":
-            return f"I couldn't forget that - {result.error or 'nothing matched'}."
-        deleted = result.data["deleted"]
-        n = len(deleted)
-        lines = "\n- ".join(deleted)
-        return f"Forgot {n} note{'s' if n != 1 else ''}:\n- {lines}"
-
-    return [
-        (MEMORY_SAVE_SPEC, memory_save, format_memory_save),
-        (MEMORY_RECALL_SPEC, memory_recall, format_memory_recall),
-        (MEMORY_FORGET_SPEC, memory_forget, format_memory_forget),
-    ]
+    return {
+        "memory_save": (MEMORY_SAVE_SPEC, memory_save),
+        "memory_recall": (MEMORY_RECALL_SPEC, memory_recall),
+        "memory_forget": (MEMORY_FORGET_SPEC, memory_forget),
+    }

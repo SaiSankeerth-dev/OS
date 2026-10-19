@@ -179,6 +179,9 @@ class MemoryManager:
 
     def search(self, query: str, limit: int = 5) -> list[Memory]:
         """Full-text search over active memories."""
+        # Quote the query for FTS5 phrase search (handles hyphens, etc.)
+        # e.g. "os-10x" not os NOT 10x
+        fts_query = f'"{query}"' if query else '""'
         conn = sqlite3.connect(self.db_path)
         try:
             rows = conn.execute(
@@ -189,7 +192,7 @@ class MemoryManager:
                 WHERE f.memories_fts MATCH ? AND m.status='active'
                 ORDER BY rank LIMIT ?
                 """,
-                (query, limit),
+                (fts_query, limit),
             ).fetchall()
             return [
                 Memory(

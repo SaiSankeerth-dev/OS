@@ -420,44 +420,62 @@ async def delete_task(tid: int) -> dict:
 
 @app.get("/api/memory")
 async def memory() -> dict:
-    db = Path("memory/os_memory.db")
-    items: list[dict] = []
-    if db.exists():
-        conn = sqlite3.connect(db)
-        try:
-            rows = conn.execute(
-                "SELECT key, value, memory_type, updated_at FROM memories"
-                " ORDER BY updated_at DESC LIMIT 50"
-            ).fetchall()
-            for key, value, mtype, updated_at in rows:
-                items.append(
-                    {
-                        "key": key,
-                        "value": value,
-                        "type": mtype,
-                        "updated_at": updated_at,
-                    }
-                )
-        finally:
-            conn.close()
+    # Memory Phase: wired to the new MemoryManager (not raw SQL).
+    from server.memory.manager import MemoryManager
+    mgr = MemoryManager()
+    mems = mgr.list_active(limit=50)
+    items = [
+        {
+            "key": m.key,
+            "value": m.value,
+            "status": m.status,
+            "source": m.source,
+            "updated_at": m.updated_at,
+        }
+        for m in mems
+    ]
     return {"memories": items}
+
+
+class MemoryIn(BaseModel):
+    key: str = ""
+    value: str = ""
+    text: str = ""  # alternative: free text (key derived)
+
+
+@app.post("/api/memory")
+async def save_memory(body: MemoryIn) -> dict:
+    # Memory Phase: POST to store. Accepts key+value or free text.
+    from server.memory.manager import MemoryManager
+    mgr = MemoryManager()
+    key = body.key.strip()
+    value = body.value.strip()
+    if not key and body.text.strip():
+        # Derive key from text (same logic as chat)
+        import importlib.util
+        _sp = Path(__file__).parent.parent / "skills" / "memory_skill" / "tools.py"
+        _sm = importlib.util.spec_from_file_location("mst", _sp)
+        _mm = importlib.util.module_from_spec(_sm)
+        _sm.loader.exec_module(_mm)
+        key, value = _mm._derive_key(body.text.strip())
+    if not key or not value:
+        raise HTTPException(400, "provide key+value or text")
+    try:
+        mem = mgr.store(key, value, source="api")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "key": mem.key, "value": mem.value}
 
 
 @app.delete("/api/memory/{key}")
 async def forget_memory(key: str) -> dict:
-    db = Path("memory/os_memory.db")
-    if not db.exists():
-        # Phase 1 fix: was returning {"ok": True} when nothing was deleted.
-        raise HTTPException(404, "no such memory (database not found)")
-    conn = sqlite3.connect(db)
-    try:
-        cur = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
-        conn.commit()
-        if cur.rowcount == 0:
-            raise HTTPException(404, "no such memory")
-    finally:
-        conn.close()
-    return {"ok": True}
+    # Memory Phase: wired to MemoryManager.forget (blanks value, purges).
+    from server.memory.manager import MemoryManager
+    mgr = MemoryManager()
+    n = mgr.forget(key)
+    if n == 0:
+        raise HTTPException(404, "no such memory")
+    return {"ok": True, "forgotten": n}
 
 
 @app.get("/api/watchers")
