@@ -22,10 +22,14 @@ from pathlib import Path
 
 
 # Patterns that look like secrets — refuse to store these.
+# NOTE: This is a heuristic, not a guarantee. It catches common formats
+# but will miss novel or obfuscated secrets. Users should never rely on
+# this as their only protection — don't say secrets near OS at all.
 _SECRET_PATTERNS = [
     re.compile(r"\b(sk-|ghp_|gho_|xox[bap]-|AKIA)[A-Za-z0-9_\-]{10,}", re.I),
     re.compile(r"\b(api[_-]?key|secret|password|token)\s*[:=]\s*\S{8,}", re.I),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
 ]
 
 
@@ -124,7 +128,9 @@ class MemoryManager:
         if _looks_like_secret(value):
             raise ValueError(
                 "Refusing to store: value looks like a secret "
-                "(API key, token, or password). OS never stores secrets in memory."
+                "(API key, token, or password). OS never stores secrets in memory. "
+                "Note: this check is a heuristic, not a guarantee — "
+                "never say secrets near OS."
             )
         if _looks_like_secret(key):
             raise ValueError("Refusing to store: key looks like a secret.")
@@ -196,17 +202,32 @@ class MemoryManager:
             conn.close()
 
     def forget(self, key: str) -> int:
-        """Mark active memories for key as 'forgotten'. Returns count."""
+        """Forget a key: blank the value, purge history, keep tombstone.
+
+        When someone says "forget this," they mean it. The value is
+        blanked (not just marked), historical rows are purged, and only
+        a tombstone (key + timestamp) remains for audit.
+        The FTS triggers handle index cleanup automatically.
+        Returns the number of rows forgotten.
+        """
         now = time.time()
         conn = sqlite3.connect(self.db_path)
         try:
-            cur = conn.execute(
-                "UPDATE memories SET status='forgotten', updated_at=? "
-                "WHERE key=? AND status='active'",
+            # Count first
+            count = conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE key=? AND status IN ('active', 'historical')",
+                (key,),
+            ).fetchone()[0]
+            if count == 0:
+                return 0
+            # Blank values and mark forgotten (tombstone keeps key + timestamp)
+            conn.execute(
+                "UPDATE memories SET value='', status='forgotten', updated_at=? "
+                "WHERE key=? AND status IN ('active', 'historical')",
                 (now, key),
             )
             conn.commit()
-            return cur.rowcount
+            return count
         finally:
             conn.close()
 
