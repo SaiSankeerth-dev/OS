@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -532,6 +532,156 @@ async def skills() -> dict:
                 }
             )
     return {"skills": out}
+
+
+@app.get("/api/alerts")
+async def alerts() -> dict:
+    """Proactive alerts: what needs attention."""
+    from server.proactive.checks import check_all
+    alerts = check_all()
+    return {
+        "alerts": [
+            {
+                "severity": a.severity,
+                "source": a.source,
+                "title": a.title,
+                "detail": a.detail,
+                "action": a.action,
+            }
+            for a in alerts
+        ],
+        "count": len(alerts),
+    }
+
+
+@app.get("/api/plans")
+async def plans() -> dict:
+    """List all plans."""
+    from server.tools.planner_tool import _plans
+    return {
+        "plans": [
+            {
+                "id": pid,
+                "title": p.title,
+                "status": p.status.value,
+                "done": p.done_steps,
+                "total": p.total_steps,
+                "steps": [
+                    {
+                        "description": s.description,
+                        "status": s.status.value,
+                    }
+                    for s in p.steps
+                ],
+            }
+            for pid, p in _plans.items()
+        ]
+    }
+
+
+@app.get("/api/mcp")
+async def mcp_servers() -> dict:
+    """List MCP servers and their tools."""
+    from server.mcp_client.client import get_mcp_manager
+    import asyncio as _asyncio
+    mgr = get_mcp_manager()
+    try:
+        all_tools = _asyncio.run(mgr.list_all_tools())
+    except Exception:
+        all_tools = {}
+    return {
+        "servers": [
+            {
+                "name": name,
+                "tools": [
+                    {"name": t.name, "description": t.description[:100]}
+                    for t in tools
+                ],
+            }
+            for name, tools in all_tools.items()
+        ]
+    }
+
+
+@app.websocket("/ws/voice")
+async def voice_ws(websocket: WebSocket):
+    """Voice chat via WebSocket.
+
+    Client sends: {"type": "audio", "data": "<base64 pcm16>"} chunks
+    Server sends: {"type": "transcript", "text": "..."} (STT result)
+                  {"type": "response", "text": "..."} (chat reply)
+                  {"type": "audio", "data": "<base64>"} (TTS audio)
+                  {"type": "state", "state": "..."} (IDLE/LISTENING/etc.)
+    Client sends: {"type": "text", "text": "..."} to skip STT (typed input)
+    """
+    await websocket.accept()
+    log = logging.getLogger("voice_ws")
+    try:
+        from server.voice.engine import VoiceEngine
+        # VoiceEngine needs a ConversationManager; get it lazily
+        mgr = get_mgr()
+        # Check if voice is available (mic/speaker hardware)
+        try:
+            import sounddevice  # noqa
+            voice_available = True
+        except ImportError:
+            voice_available = False
+
+        if not voice_available:
+            await websocket.send_json({
+                "type": "error",
+                "error": "Voice hardware not available. "
+                         "Install sounddevice and connect a mic/speaker.",
+            })
+            await websocket.close()
+            return
+
+        await websocket.send_json({"type": "state", "state": "IDLE"})
+
+        # Simple text-based voice loop (full audio streaming needs
+        # sounddevice on the client; this handles the protocol)
+        while True:
+            msg = await websocket.receive_json()
+            mtype = msg.get("type")
+
+            if mtype == "text":
+                # Typed input via voice channel → run through chat
+                text = msg.get("text", "")
+                # Use the conversation manager directly
+                response = await _chat_via_manager(mgr, text)
+                await websocket.send_json({
+                    "type": "response", "text": response,
+                })
+
+            elif mtype == "audio":
+                # Audio chunk → STT (requires faster-whisper)
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Audio STT not yet wired. Send type:'text' instead.",
+                })
+
+            elif mtype == "ping":
+                await websocket.send_json({"type": "pong"})
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        log.warning("Voice WS error: %s", e)
+        try:
+            await websocket.send_json({"type": "error", "error": str(e)})
+        except Exception:
+            pass
+
+
+async def _chat_via_manager(mgr, text: str) -> str:
+    """Run text through the conversation manager, return the reply."""
+    # The manager's respond method handles the full pipeline
+    if hasattr(mgr, "respond"):
+        result = mgr.respond(text)
+        if hasattr(result, "__await__"):
+            result = await result
+        return str(result)
+    return "Chat not available."
 
 
 @app.get("/api/files")

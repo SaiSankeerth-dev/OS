@@ -135,6 +135,8 @@ async function refreshBadges() {
     $("#badge-tasks").textContent = t.open || "";
     const w = await api("/api/watchers");
     $("#badge-watchers").textContent = w.suggestions.length || "";
+    const a = await api("/api/alerts");
+    $("#badge-alerts").textContent = a.count || "";
   } catch {}
 }
 
@@ -706,6 +708,24 @@ async function loadWatchers() {
       .catch((e) => toast("Dismiss failed: " + e.message));
     loadWatchers(); refreshBadges();
   }));
+}
+
+/* ---------------- alerts (proactive) ---------------- */
+loaders.alerts = loadAlerts;
+async function loadAlerts() {
+  let data = { alerts: [], count: 0 };
+  try { data = await api("/api/alerts"); } catch {}
+  const wrap = $("#alerts-list");
+  const icons = { urgent: "🔴", warning: "🟡", info: "🔵" };
+  wrap.innerHTML = data.alerts.length ? data.alerts.map((a) => {
+    return `<div class="watcher-row">
+      <div class="watcher-ico">${icons[a.severity] || "○"}</div>
+      <div class="grow"><b>[${esc(a.source)}] ${esc(a.title)}</b>
+        ${a.detail ? `<div class="muted">${esc(a.detail)}</div>` : ""}
+        ${a.action ? `<div class="muted">→ Say '${esc(a.action)}'</div>` : ""}
+      </div>
+    </div>`;
+  }).join("") : `<div class="empty">All clear. Nothing needs your attention.</div>`;
 }
 
 /* ---------------- files ---------------- */

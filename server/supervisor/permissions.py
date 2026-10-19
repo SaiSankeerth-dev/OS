@@ -74,6 +74,8 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "plan": ToolPolicy.ALLOW,
     "plan_list": ToolPolicy.ALLOW,
     "plan_run": ToolPolicy.NEEDS_APPROVAL,
+    # Proactive: read-only checks.
+    "check_alerts": ToolPolicy.ALLOW,
 }
 
 

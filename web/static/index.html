@@ -43,6 +43,7 @@
       <button class="nav-item" data-view="memory"><span class="nav-ico">🧠</span>Memory</button>
       <button class="nav-item" data-view="skills"><span class="nav-ico">🛠</span>Skills</button>
       <button class="nav-item" data-view="watchers"><span class="nav-ico">🔔</span>Watchers<span class="badge" id="badge-watchers"></span></button>
+      <button class="nav-item" data-view="alerts"><span class="nav-ico">⚠️</span>Alerts<span class="badge" id="badge-alerts"></span></button>
       <button class="nav-item" data-view="files"><span class="nav-ico">🗂</span>Files</button>
       <button class="nav-item" data-view="analytics"><span class="nav-ico">📊</span>Analytics</button>
       <button class="nav-item" data-view="connectors"><span class="nav-ico">🔌</span>Connectors</button>
@@ -236,6 +237,12 @@
       <section class="view" id="view-watchers">
         <div class="page-head"><div><h2>Watchers</h2><p class="page-sub">Get suggestions, never acts without you.</p></div></div>
         <div id="watcher-list" class="list"></div>
+      </section>
+
+      <section class="view" id="view-alerts">
+        <div class="page-head"><div><h2>Alerts</h2><p class="page-sub">Proactive — what needs your attention.</p></div>
+        <button class="btn" onclick="loadAlerts()">Refresh</button></div>
+        <div id="alerts-list" class="list"></div>
       </section>
 
       <!-- ===== FILES ===== -->

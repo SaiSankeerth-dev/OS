@@ -344,6 +344,12 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "plan_run",
     ),
     (
+        # Proactive: "check alerts"
+        re.compile(r"^\s*check\s+alerts\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "check_alerts",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
