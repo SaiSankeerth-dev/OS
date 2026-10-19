@@ -70,6 +70,10 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "mcp_list": ToolPolicy.ALLOW,
     "mcp_call": ToolPolicy.NEEDS_APPROVAL,
     "mcp_add": ToolPolicy.NEEDS_APPROVAL,
+    # Planner: proposing/listing is safe; executing needs approval.
+    "plan": ToolPolicy.ALLOW,
+    "plan_list": ToolPolicy.ALLOW,
+    "plan_run": ToolPolicy.NEEDS_APPROVAL,
 }
 
 

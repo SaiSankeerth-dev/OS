@@ -304,6 +304,46 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "mcp_add",
     ),
     (
+        # Planner: "plan list" (must come before generic "plan <something>")
+        re.compile(r"^\s*plan\s+list\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "plan_list",
+    ),
+    (
+        # Planner: "plan my trip to Goa" / "plan <something>"
+        re.compile(r"^\s*plan\s+(.+?)\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "plan",
+    ),
+    (
+        # Planner: "do X then Y then Z"
+        re.compile(r"^\s*(?:please\s+)?do\s+(.+?)\s+then\s+(.+?)\s*$",
+                   re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "plan",
+    ),
+    (
+        # Planner: "morning briefing" / "start my day"
+        re.compile(
+            r"^\s*(morning\s+briefing|start\s+my\s+day|daily\s+briefing)\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "plan",
+    ),
+    (
+        # Planner: "plan list"
+        re.compile(r"^\s*plan\s+list\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "plan_list",
+    ),
+    (
+        # Planner: "run plan <id>"
+        re.compile(r"^\s*run\s+plan\s+(\w+)\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "plan_run",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
@@ -421,6 +461,9 @@ _TOOL_ARG = {
     # mcp_call/mcp_add take FULL text; the tools parse server/tool/args.
     "mcp_call": "__full_text__",
     "mcp_add": "__full_text__",
+    # plan/plan_run take FULL text; the tools parse the request.
+    "plan": "__full_text__",
+    "plan_run": "__full_text__",
 }
 
 

@@ -853,6 +853,44 @@ class ConversationManager:
                 pending.run_id, pending.skill, _run_mcp_action
             )
             return completed.message
+        if pending.skill == "plan_run":
+            # Planner: user approved executing a plan. Run each step.
+            def _run_plan() -> str:
+                import asyncio as _asyncio
+                from server.tools.planner_tool import execute_plan_action
+                from server.intent.router import IntentRouter
+                from server.intent.router import Intent as _Intent
+
+                action = (pending.action_args or {}).get("plan_action", {})
+                plan_id = action.get("plan_id", "")
+
+                async def tool_runner(tool_name: str, args: dict) -> str:
+                    from server.skills.loader import get_tool, get_formatter
+                    tool_fn = get_tool(tool_name)
+                    if not tool_fn:
+                        raise ValueError(f"Unknown tool: {tool_name}")
+                    result = tool_fn(**args)
+                    fmt = get_formatter(tool_name)
+                    return fmt(result) if fmt else str(result)
+
+                def intent_router(text: str):
+                    route = IntentRouter().classify(text)
+                    if route.intent == _Intent.TOOL_CALL and route.tool_name:
+                        return (route.tool_name, route.args)
+                    return None
+
+                result = _asyncio.run(execute_plan_action(
+                    plan_id, tool_runner, intent_router))
+                self._approval_store.log(
+                    pending.skill, pending.input_text, result[:500],
+                    "EXECUTED",
+                )
+                return result
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, pending.skill, _run_plan
+            )
+            return completed.message
         if pending.skill == "linkedin":
             # STUB: no LinkedIn connector configured yet. Replace
             # this branch with a real publish call when one exists -
