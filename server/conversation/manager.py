@@ -458,6 +458,19 @@ class ConversationManager:
                     run_id=supervised.run_id,
                     action_args=action if isinstance(action, dict) else {},
                 )
+            elif "action_args" in data:
+                # Generic approved action (e.g. GitHub): draft describes it,
+                # action_args holds the machine-readable payload.
+                action = data["action_args"]
+                draft = data.get("draft") or "Action"
+                pending = PendingApproval(
+                    skill=tool_name,
+                    input_text=draft,
+                    draft=draft,
+                    approved_hash=content_hash(draft),
+                    run_id=supervised.run_id,
+                    action_args=action if isinstance(action, dict) else {},
+                )
             elif "draft" in data:
                 # Drafting skill with external effects (linkedin): stash
                 # the draft and wait for the next turn's approve/reject.
@@ -795,6 +808,25 @@ class ConversationManager:
 
             completed = await self._supervisor.complete_approved(
                 pending.run_id, pending.skill, _run_computer_task
+            )
+            return completed.message
+        if pending.skill == "github_create_issue":
+            # GitHub: user approved creating an issue. Execute via gh CLI.
+            def _run_github_action() -> str:
+                from server.tools.github_tool import execute_github_action
+
+                # action_args = {"kind": "github", "github_action": {...}}
+                action = (pending.action_args or {}).get("github_action", {})
+                if not action:
+                    return "GitHub action data missing; not executing."
+                result = execute_github_action(action)
+                self._approval_store.log(
+                    pending.skill, pending.input_text, result, "EXECUTED",
+                )
+                return result
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, pending.skill, _run_github_action
             )
             return completed.message
         if pending.skill == "linkedin":

@@ -61,6 +61,11 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "schedule_reminder": ToolPolicy.ALLOW,
     "list_reminders": ToolPolicy.ALLOW,
     "cancel_reminder": ToolPolicy.ALLOW,
+    # GitHub: reads are safe; creating issues needs approval.
+    "github_repos": ToolPolicy.ALLOW,
+    "github_issues": ToolPolicy.ALLOW,
+    "github_prs": ToolPolicy.ALLOW,
+    "github_create_issue": ToolPolicy.NEEDS_APPROVAL,
 }
 
 

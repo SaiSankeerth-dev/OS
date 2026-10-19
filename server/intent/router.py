@@ -243,6 +243,43 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "cancel_reminder",
     ),
     (
+        # GitHub: "show my github repos" / "list my repos"
+        re.compile(
+            r"^\s*(?:show|list)\s+(?:my\s+)?github\s+repos?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "github_repos",
+    ),
+    (
+        # GitHub: "github issues in OS" / "issues in OS"
+        re.compile(
+            r"^\s*(?:github\s+)?issues\s+in\s+(\S+)\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "github_issues",
+    ),
+    (
+        # GitHub: "show my github PRs"
+        re.compile(
+            r"^\s*show\s+(?:my\s+)?github\s+prs?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "github_prs",
+    ),
+    (
+        # GitHub: "create issue in OS titled Fix bug"
+        re.compile(
+            r"^\s*create\s+(?:github\s+)?issue\s+in\s+(\S+)\s+"
+            r"titled\s+(.+?)\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "github_create_issue",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
@@ -354,6 +391,9 @@ _TOOL_ARG = {
     # schedule_reminder takes the FULL user text; parse_reminder() handles it.
     "schedule_reminder": "__full_text__",
     "cancel_reminder": "reminder_id",
+    "github_issues": "repo",
+    # github_create_issue takes FULL text; the tool parses repo + title.
+    "github_create_issue": "__full_text__",
 }
 
 
