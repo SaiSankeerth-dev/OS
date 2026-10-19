@@ -26,6 +26,21 @@ identified; every action returns observed page state.
 - `browser_press(session_id, selector, key)` - press Enter/Tab/Escape/arrows/F-keys (NEEDS APPROVAL)
 - `browser_select(session_id, selector, value)` - choose a dropdown option (NEEDS APPROVAL)
 
+## Agentic Tasks (NEW)
+
+`browser_task(task)` runs a multi-step browser task from natural language,
+powered by browser-use (117k stars, MIT) + local Ollama. Always NEEDS_APPROVAL.
+
+Say it simply:
+- `play lofi` -> opens YouTube, searches, plays first result
+- `youtube lofi hip hop` -> opens YouTube and searches
+- `youtube` -> just opens YouTube
+- `do X on github` -> agent figures out the steps on GitHub
+
+The agent shows each step as it works. Clicks and form fills inside the
+task ask for approval again before acting. If a step fails, it stops and
+says which step broke - never pretends it worked.
+
 ## Safety
 - URLs pass the same SSRF guard as web_read (no loopback/private/link-local/metadata).
 - Interactive actions are draft-only until the user approves the exact

@@ -230,7 +230,14 @@ def make_tools(memory_manager: MemoryManager | None = None):
         )
 
     return {
-        "memory_save": (MEMORY_SAVE_SPEC, memory_save),
-        "memory_recall": (MEMORY_RECALL_SPEC, memory_recall),
-        "memory_forget": (MEMORY_FORGET_SPEC, memory_forget),
+        "memory_save": (MEMORY_SAVE_SPEC, memory_save, _format_text),
+        "memory_recall": (MEMORY_RECALL_SPEC, memory_recall, _format_text),
+        "memory_forget": (MEMORY_FORGET_SPEC, memory_forget, _format_text),
     }
+
+
+def _format_text(result: ToolResult) -> str:
+    """Extract the display text from a memory ToolResult."""
+    if result.status == "failure":
+        return f"Memory error: {result.error}"
+    return (result.data or {}).get("text", "Done.")

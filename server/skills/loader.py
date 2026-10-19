@@ -125,7 +125,11 @@ class SkillLoader:
     def _collect_tools(mod, tool_kwargs: dict) -> list[tuple]:
         factory = getattr(mod, "make_tools", None)
         if callable(factory):
-            return list(factory(**tool_kwargs))
+            made = factory(**tool_kwargs)
+            # Factory may return a dict (name -> tuple) or a list of tuples.
+            if isinstance(made, dict):
+                return list(made.values())
+            return list(made)
         tools = getattr(mod, "TOOLS", None)
         if tools is None:
             raise ValueError("tools.py defines neither TOOLS nor make_tools")

@@ -158,6 +158,35 @@ DEFAULT_PATTERNS: list[tuple[re.Pattern[str], Intent, str | None]] = [
         "browser_open",
     ),
     (
+        # Agentic browser: "play X" / "play X on youtube" -> the agent
+        # opens YouTube, searches, and plays the first result.
+        re.compile(
+            r"^\s*(?:play|watch)\s+(.+?)(?:\s+on\s+youtube)?\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "browser_task",
+    ),
+    (
+        # Agentic browser: "youtube" / "youtube <query>" -> agent drives YouTube.
+        re.compile(r"^\s*(youtube|yt)\b\s*(.*?)\s*[.!]?\s*$", re.IGNORECASE),
+        Intent.TOOL_CALL,
+        "browser_task",
+    ),
+    (
+        # Agentic browser: "<site> <query>" for known sites
+        # (gmail, github, reddit...). "do X on <site>" for general tasks.
+        re.compile(
+            r"^\s*(?:do|handle|take\s+care\s+of)\s+(.+?)\s+on\s+"
+            r"(youtube|gmail|github|reddit|amazon|google|maps|drive|"
+            r"calendar|twitter|x|wikipedia|wiki|stackoverflow|linkedin)"
+            r"\s*[.!]?\s*$",
+            re.IGNORECASE,
+        ),
+        Intent.TOOL_CALL,
+        "browser_task",
+    ),
+    (
         # "open <url> in the browser" - the suffix distinguishes it from
         # web_read's bare "open <url>".
         re.compile(
@@ -260,6 +289,9 @@ _TOOL_ARG = {
     "web_search": "query",
     "web_read": "url",
     "browser_open": "url",
+    # browser_task takes the FULL user text; expand_task() parses the
+    # "play X" / "youtube <query>" / "do X on <site>" shorthands itself.
+    "browser_task": "__full_text__",
 }
 
 
@@ -276,7 +308,11 @@ class IntentRouter:
             if m:
                 args: dict[str, str] = {}
                 if tool in _TOOL_ARG and m.groups():
-                    args[_TOOL_ARG[tool]] = m.group(1).strip()
+                    arg_key = _TOOL_ARG[tool]
+                    if arg_key == "__full_text__":
+                        args["task"] = text.strip()
+                    else:
+                        args[arg_key] = m.group(1).strip()
                 elif intent == Intent.PERSONA and m.groups():
                     args["persona"] = m.group(1).strip().lower()
                 elif intent == Intent.PERMISSION:

@@ -52,6 +52,9 @@ DEFAULT_POLICIES: dict[str, ToolPolicy] = {
     "browser_type": ToolPolicy.NEEDS_APPROVAL,
     "browser_press": ToolPolicy.NEEDS_APPROVAL,
     "browser_select": ToolPolicy.NEEDS_APPROVAL,
+    # Agentic browser: natural-language tasks run the full agent, so they
+    # always need approval before the browser is touched.
+    "browser_task": ToolPolicy.NEEDS_APPROVAL,
 }
 
 

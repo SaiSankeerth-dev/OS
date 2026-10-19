@@ -745,6 +745,36 @@ class ConversationManager:
                 pending.run_id, pending.skill, _run_browser_action
             )
             return completed.message
+        if pending.skill == "browser_task":
+            # Agentic browser: user approved a natural-language browser task.
+            # Run it via browser-use + local Ollama, streaming progress.
+            def _run_agentic_task() -> str:
+                from server.tools.agentic_browser_tool import (
+                    format_agentic_result,
+                    run_agentic_task,
+                )
+
+                # Extract the original task from the draft description.
+                # Draft format: 'Agentic browser task: "<task>"\nPlan: ...'
+                task = pending.input_text
+                # input_text is the user text; use it directly.
+                steps_log: list[str] = []
+
+                def _on_step(step) -> None:
+                    steps_log.append(f"{step.n}. {step.action}")
+
+                result = run_agentic_task(task, on_step=_on_step)
+                self._approval_store.log(
+                    pending.skill, pending.input_text,
+                    f"steps={len(result.steps)} success={result.success}",
+                    "EXECUTED",
+                )
+                return format_agentic_result(result)
+
+            completed = await self._supervisor.complete_approved(
+                pending.run_id, pending.skill, _run_agentic_task
+            )
+            return completed.message
         if pending.skill == "linkedin":
             # STUB: no LinkedIn connector configured yet. Replace
             # this branch with a real publish call when one exists -

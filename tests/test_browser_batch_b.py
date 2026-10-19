@@ -249,7 +249,8 @@ def test_browser_skill_loads():
     assert "browser" in names
     assert names["browser"].status == "active"
     assert "browser_click" in names["browser"].tools
-    assert len(names["browser"].tools) == 11
+    assert "browser_task" in names["browser"].tools
+    assert len(names["browser"].tools) == 12
 
 
 def test_browser_tool_policies():
